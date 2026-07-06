@@ -1,0 +1,50 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: mall
+  datasource:
+    url: jdbc:mysql://localhost:3306/mall?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  redis:
+    host: localhost
+    port: 6379
+    password: ${REDIS_PASSWORD:}
+    database: 0
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+jwt:
+  secret: ${JWT_SECRET:pzhu-mall-dev-secret-key-please-change-in-production}
+  expire-seconds: 604800
+
+mall:
+  upload:
+    dir: /data/mall/uploads
+    base-url: http://localhost:8080/uploads
+  order:
+    timeout-minutes: 30
+  stock:
+    lock-wait-seconds: 3
+    lock-lease-seconds: 10
+
+logging:
+  level:
+    com.pzhu.mall: INFO
+    com.pzhu.mall.modules.order: DEBUG

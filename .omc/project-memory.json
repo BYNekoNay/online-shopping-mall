@@ -1,0 +1,354 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1783341224682,
+  "projectRoot": "D:\\codegitee\\online-shopping-mall",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs"
+    ],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 16,
+      "lastAccessed": 1783341224643,
+      "keyFiles": [
+        "00-文档说明.md",
+        "01-可行性研究报告.md",
+        "02-项目开发计划.md",
+        "03-软件需求规格说明书.md",
+        "04-概要设计说明书.md"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "docs\\14-项目脚手架与环境规范.md",
+      "accessCount": 7,
+      "lastAccessed": 1783342048713,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MetaObjectHandlerConfig.java",
+      "accessCount": 7,
+      "lastAccessed": 1783343758895,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\result\\PageResult.java",
+      "accessCount": 6,
+      "lastAccessed": 1783343827799,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\exception\\GlobalExceptionHandler.java",
+      "accessCount": 6,
+      "lastAccessed": 1783343837129,
+      "type": "file"
+    },
+    {
+      "path": "backend\\pom.xml",
+      "accessCount": 5,
+      "lastAccessed": 1783343377630,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\RoleCheckAspect.java",
+      "accessCount": 5,
+      "lastAccessed": 1783343929943,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\RedisConfig.java",
+      "accessCount": 4,
+      "lastAccessed": 1783343877460,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\result\\Result.java",
+      "accessCount": 3,
+      "lastAccessed": 1783343821624,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\enums\\ErrorCode.java",
+      "accessCount": 3,
+      "lastAccessed": 1783343831301,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\exception\\BusinessException.java",
+      "accessCount": 3,
+      "lastAccessed": 1783343834038,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtInterceptor.java",
+      "accessCount": 3,
+      "lastAccessed": 1783343917552,
+      "type": "file"
+    },
+    {
+      "path": "docs\\07-用户操作手册.md",
+      "accessCount": 2,
+      "lastAccessed": 1783342051463,
+      "type": "file"
+    },
+    {
+      "path": "docs\\08-开发指南.md",
+      "accessCount": 2,
+      "lastAccessed": 1783342054303,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MyBatisPlusConfig.java",
+      "accessCount": 2,
+      "lastAccessed": 1783343881473,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\WebMvcConfig.java",
+      "accessCount": 2,
+      "lastAccessed": 1783343884490,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtUtil.java",
+      "accessCount": 2,
+      "lastAccessed": 1783343915203,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\LoginUserContext.java",
+      "accessCount": 2,
+      "lastAccessed": 1783343923099,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\RequireRole.java",
+      "accessCount": 2,
+      "lastAccessed": 1783343926974,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\application.yml",
+      "accessCount": 2,
+      "lastAccessed": 1783344897766,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341350278,
+      "type": "file"
+    },
+    {
+      "path": "项目计划书1-AI智能推荐网络商城.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341350539,
+      "type": "file"
+    },
+    {
+      "path": "docs\\01-可行性研究报告.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341360876,
+      "type": "file"
+    },
+    {
+      "path": "docs\\02-项目开发计划.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341361625,
+      "type": "file"
+    },
+    {
+      "path": "docs\\03-软件需求规格说明书.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341362919,
+      "type": "file"
+    },
+    {
+      "path": "docs\\04-概要设计说明书.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341372301,
+      "type": "file"
+    },
+    {
+      "path": "docs\\05-详细设计说明书.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341372750,
+      "type": "file"
+    },
+    {
+      "path": "docs\\06-测试计划.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341379006,
+      "type": "file"
+    },
+    {
+      "path": "docs\\09-接口规范.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341388291,
+      "type": "file"
+    },
+    {
+      "path": "docs\\10-数据库规范.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341393651,
+      "type": "file"
+    },
+    {
+      "path": "docs\\11-后端开发详细文档.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341396859,
+      "type": "file"
+    },
+    {
+      "path": "docs\\12-核心算法设计文档.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341398136,
+      "type": "file"
+    },
+    {
+      "path": "docs\\13-前端开发详细文档.md",
+      "accessCount": 1,
+      "lastAccessed": 1783341403181,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\MallApplication.java",
+      "accessCount": 1,
+      "lastAccessed": 1783342817385,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\application-dev.yml",
+      "accessCount": 1,
+      "lastAccessed": 1783342823386,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\application-prod.yml",
+      "accessCount": 1,
+      "lastAccessed": 1783342827031,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\sql\\V1__init_schema.sql",
+      "accessCount": 1,
+      "lastAccessed": 1783344463707,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\index.html",
+      "accessCount": 1,
+      "lastAccessed": 1783344941071,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\package.json",
+      "accessCount": 1,
+      "lastAccessed": 1783344943202,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\vite.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344944850,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\.env.development",
+      "accessCount": 1,
+      "lastAccessed": 1783344947695,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\.env.production",
+      "accessCount": 1,
+      "lastAccessed": 1783344949618,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\main.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344958423,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\App.vue",
+      "accessCount": 1,
+      "lastAccessed": 1783344961984,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\utils\\request.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344972510,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\router\\index.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344975469,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\user.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344977429,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\cart.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344980413,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\merchant.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344983409,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\app.js",
+      "accessCount": 1,
+      "lastAccessed": 1783344985582,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\layouts\\ConsumerLayout.vue",
+      "accessCount": 1,
+      "lastAccessed": 1783345024799,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

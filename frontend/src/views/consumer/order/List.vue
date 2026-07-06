@@ -1,0 +1,123 @@
+<template>
+  <div class="order-list">
+    <el-tabs v-model="activeStatus" @tab-change="loadOrders">
+      <el-tab-pane label="全部" name="" />
+      <el-tab-pane label="待付款" name="0" />
+      <el-tab-pane label="待发货" name="1" />
+      <el-tab-pane label="已发货" name="2" />
+      <el-tab-pane label="已完成" name="4" />
+      <el-tab-pane label="已取消" name="5" />
+    </el-tabs>
+    <div v-if="orders.length === 0" class="empty">
+      <el-empty description="暂无订单" />
+    </div>
+    <el-card v-for="order in orders" :key="order.id" class="order-card" style="margin-bottom: 15px;">
+      <div class="order-header">
+        <span>订单号：{{ order.orderNo }}</span>
+        <span class="order-status">{{ formatStatus(order.status) }}</span>
+      </div>
+      <div class="order-items">
+        <div v-for="item in order.items" :key="item.id" class="order-item">
+          <img :src="item.productImageSnapshot" />
+          <div class="item-info">
+            <div>{{ item.productNameSnapshot }}</div>
+            <div v-if="item.isGift" class="gift-tag">赠品</div>
+          </div>
+          <div class="item-price">¥{{ item.price }} x {{ item.quantity }}</div>
+        </div>
+      </div>
+      <div class="order-footer">
+        <span>实付：<strong>¥{{ order.payAmount }}</strong></span>
+        <div>
+          <el-button v-if="order.status === 0" type="primary" @click="$router.push(`/order/pay/${order.id}`)">去支付</el-button>
+          <el-button v-if="order.status === 0" @click="cancelOrder(order.id)">取消订单</el-button>
+          <el-button v-if="order.status === 2" @click="confirmOrder(order.id)">确认收货</el-button>
+        </div>
+      </div>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import request from '@/api/order'
+
+const activeStatus = ref('')
+const orders = ref([])
+
+const statusMap = { '0': '待付款', '1': '待发货', '2': '已发货', '3': '已收货', '4': '已完成', '5': '已取消', '6': '退款中', '7': '已退款' }
+
+function formatStatus(status) {
+  return statusMap[status] || '未知'
+}
+
+async function loadOrders() {
+  try {
+    const data = await request.getOrders(activeStatus.value ? { status: activeStatus.value } : {})
+    orders.value = data.records || data
+  } catch {
+    orders.value = []
+  }
+}
+
+async function cancelOrder(id) {
+  await request.cancelOrder(id)
+  ElMessage.success('Cancelled')
+  loadOrders()
+}
+
+async function confirmOrder(id) {
+  await request.confirmOrder(id)
+  ElMessage.success('Confirmed')
+  loadOrders()
+}
+
+onMounted(loadOrders)
+</script>
+
+<style scoped>
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.order-status {
+  color: #f56c6c;
+}
+.order-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 10px 0;
+}
+.order-item img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.item-info {
+  flex: 1;
+}
+.gift-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #fdf6ec;
+  color: #e6a23c;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.item-price {
+  color: #666;
+}
+.order-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid #f5f5f5;
+}
+</style>

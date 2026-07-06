@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    password: ${DB_PASSWORD:root}
+  redis:
+    password: ${REDIS_PASSWORD:}
+
+jwt:
+  secret: ${JWT_SECRET:pzhu-mall-dev-secret-key}
+
+logging:
+  level:
+    com.pzhu.mall: DEBUG
