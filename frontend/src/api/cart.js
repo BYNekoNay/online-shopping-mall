@@ -15,3 +15,5 @@ export function updateCartItem(id, data) {
 export function deleteCartItem(id) {
   return request.delete(`/cart/${id}`)
 }
+
+export default { getCart, addToCart, updateCartItem, deleteCartItem }

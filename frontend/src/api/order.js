@@ -31,3 +31,13 @@ export function reviewOrder(orderItemId, data) {
 export function refundOrder(orderId, data) {
   return request.post(`/orders/${orderId}/refund`, data)
 }
+
+export function getPoints() {
+  return request.get('/user/points')
+}
+
+export function getPointsRecords(params) {
+  return request.get('/user/points/records', { params })
+}
+
+export default { getOrders, getOrderDetail, createOrder, payOrder, cancelOrder, confirmOrder, reviewOrder, refundOrder, getPoints, getPointsRecords }

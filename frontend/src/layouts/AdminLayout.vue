@@ -37,7 +37,7 @@
     </aside>
     <div class="content">
       <header class="content-header">
-        <span>管理员</span>
+        <span>{{ nickname }}</span>
         <el-button text @click="handleLogout">退出</el-button>
       </header>
       <main class="content-main">
@@ -57,6 +57,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const currentRoute = computed(() => route.path)
+const nickname = computed(() => userStore.nickname || '管理员')
 
 function handleLogout() {
   userStore.logout()

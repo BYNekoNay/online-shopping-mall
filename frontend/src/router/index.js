@@ -7,6 +7,11 @@ const routes = [
     component: () => import('@/views/common/Login.vue'),
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/common/Register.vue'),
+  },
+  {
     path: '/403',
     name: 'Forbidden',
     component: () => import('@/views/common/Forbidden.vue'),

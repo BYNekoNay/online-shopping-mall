@@ -19,3 +19,5 @@ export function getCategories() {
 export function addToCart(data) {
   return request.post('/cart', data)
 }
+
+export default { getProducts, getProduct, searchProducts, getCategories, addToCart }

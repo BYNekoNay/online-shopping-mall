@@ -47,3 +47,5 @@ export function getLogs(params) {
 export function getDicts() {
   return request.get('/admin/dicts')
 }
+
+export default { getUsers, updateUserStatus, getProducts, auditProduct, offlineProduct, getCategories, getShops, auditShop, getDashboard, getStatisticsDetail, getLogs, getDicts }

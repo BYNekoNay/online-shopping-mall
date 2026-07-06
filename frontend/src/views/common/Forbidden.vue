@@ -2,13 +2,16 @@
   <div class="forbidden-page">
     <el-result icon="warning" title="403" sub-title="You don't have permission to access this page.">
       <template #extra>
-        <el-button type="primary" @click="$router.push('/')">Back to Home</el-button>
+        <el-button type="primary" @click="goHome">Back to Home</el-button>
       </template>
     </el-result>
   </div>
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+const router = useRouter()
+function goHome() { router.push('/') }
 </script>
 
 <style scoped>

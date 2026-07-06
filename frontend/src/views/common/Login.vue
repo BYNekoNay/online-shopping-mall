@@ -25,10 +25,12 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/store/user'
 import request from '@/utils/request'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const formRef = ref(null)
 const loading = ref(false)
 const form = ref({ username: '', password: '' })
@@ -42,11 +44,8 @@ async function handleLogin() {
   loading.value = true
   try {
     const data = await request.post('/auth/login', form.value)
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('userId', data.userId)
-    localStorage.setItem('role', data.role)
-    localStorage.setItem('nickname', data.nickname)
-    ElMessage.success('Login successful')
+    userStore.setUser(data)
+    ElMessage.success('登录成功')
     const redirect = route.query.redirect || '/'
     router.push(redirect)
   } catch {

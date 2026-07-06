@@ -63,3 +63,5 @@ export function getSalesStatistics(params) {
 export function getTopProducts() {
   return request.get('/merchant/statistics/top-products')
 }
+
+export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getRefunds, auditRefund, getSalesStatistics, getTopProducts }

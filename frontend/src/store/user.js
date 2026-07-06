@@ -16,6 +16,7 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('userId', userId.value)
     localStorage.setItem('role', role.value)
     localStorage.setItem('nickname', nickname.value)
+    localStorage.setItem('user', JSON.stringify({ token: token.value, userId: userId.value, role: role.value, nickname: nickname.value }))
   }
 
   function logout() {
@@ -27,6 +28,7 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('userId')
     localStorage.removeItem('role')
     localStorage.removeItem('nickname')
+    localStorage.removeItem('user')
   }
 
   return { token, userId, role, nickname, setUser, logout }

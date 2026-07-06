@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pzhu.mall.modules.order.mapper.OrderMapper">
+
+  <select id="selectTimeoutUnpaidOrders" resultType="com.pzhu.mall.modules.order.entity.Order">
+    SELECT id, order_no, user_id, shop_id, total_amount, freight_amount,
+           discount_amount, pay_amount, status, address_snapshot, pay_type,
+           pay_time, remark, create_time, update_time, is_deleted
+    FROM orders
+    WHERE status = 0
+      AND is_deleted = 0
+      AND create_time &lt; #{now}
+    ORDER BY create_time ASC
+    LIMIT #{timeoutMinutes}
+  </select>
+
+</mapper>

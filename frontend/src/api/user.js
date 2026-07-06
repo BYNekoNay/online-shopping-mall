@@ -39,3 +39,5 @@ export function getSearchHistory() {
 export function clearSearchHistory() {
   return request.delete('/user/search-history')
 }
+
+export default { login, register, getProfile, updateProfile, getAddresses, addAddress, updateAddress, deleteAddress, getSearchHistory, clearSearchHistory }

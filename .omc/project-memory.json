@@ -50,15 +50,21 @@
   },
   "hotPaths": [
     {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MetaObjectHandlerConfig.java",
+      "accessCount": 8,
+      "lastAccessed": 1783346500807,
+      "type": "file"
+    },
+    {
       "path": "docs\\14-项目脚手架与环境规范.md",
       "accessCount": 7,
       "lastAccessed": 1783342048713,
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MetaObjectHandlerConfig.java",
+      "path": "backend\\pom.xml",
       "accessCount": 7,
-      "lastAccessed": 1783343758895,
+      "lastAccessed": 1783346506967,
       "type": "file"
     },
     {
@@ -74,33 +80,51 @@
       "type": "file"
     },
     {
-      "path": "backend\\pom.xml",
-      "accessCount": 5,
-      "lastAccessed": 1783343377630,
-      "type": "file"
-    },
-    {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\RoleCheckAspect.java",
       "accessCount": 5,
       "lastAccessed": 1783343929943,
       "type": "file"
     },
     {
+      "path": "docs\\11-后端开发详细文档.md",
+      "accessCount": 5,
+      "lastAccessed": 1783346459107,
+      "type": "file"
+    },
+    {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\RedisConfig.java",
+      "accessCount": 5,
+      "lastAccessed": 1783346500409,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\sql\\V1__init_schema.sql",
+      "accessCount": 5,
+      "lastAccessed": 1783346651541,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtInterceptor.java",
       "accessCount": 4,
-      "lastAccessed": 1783343877460,
+      "lastAccessed": 1783346507183,
       "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\result\\Result.java",
-      "accessCount": 3,
-      "lastAccessed": 1783343821624,
+      "accessCount": 4,
+      "lastAccessed": 1783346507600,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\application.yml",
+      "accessCount": 4,
+      "lastAccessed": 1783346615768,
       "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\enums\\ErrorCode.java",
-      "accessCount": 3,
-      "lastAccessed": 1783343831301,
+      "accessCount": 4,
+      "lastAccessed": 1783346618112,
       "type": "file"
     },
     {
@@ -110,9 +134,21 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtInterceptor.java",
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\WebMvcConfig.java",
       "accessCount": 3,
-      "lastAccessed": 1783343917552,
+      "lastAccessed": 1783346234528,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MyBatisPlusConfig.java",
+      "accessCount": 3,
+      "lastAccessed": 1783346494807,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\LoginUserContext.java",
+      "accessCount": 3,
+      "lastAccessed": 1783346506520,
       "type": "file"
     },
     {
@@ -128,27 +164,9 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MyBatisPlusConfig.java",
-      "accessCount": 2,
-      "lastAccessed": 1783343881473,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\WebMvcConfig.java",
-      "accessCount": 2,
-      "lastAccessed": 1783343884490,
-      "type": "file"
-    },
-    {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtUtil.java",
       "accessCount": 2,
       "lastAccessed": 1783343915203,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\LoginUserContext.java",
-      "accessCount": 2,
-      "lastAccessed": 1783343923099,
       "type": "file"
     },
     {
@@ -158,9 +176,75 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\resources\\application.yml",
+      "path": "docs\\09-接口规范.md",
       "accessCount": 2,
-      "lastAccessed": 1783344897766,
+      "lastAccessed": 1783346459716,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\MallApplication.java",
+      "accessCount": 2,
+      "lastAccessed": 1783346492399,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\user.js",
+      "accessCount": 2,
+      "lastAccessed": 1783346536911,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\router\\index.js",
+      "accessCount": 2,
+      "lastAccessed": 1783346536973,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\utils\\request.js",
+      "accessCount": 2,
+      "lastAccessed": 1783346537630,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\package.json",
+      "accessCount": 2,
+      "lastAccessed": 1783346600345,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\.env.development",
+      "accessCount": 2,
+      "lastAccessed": 1783346605670,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\.env.production",
+      "accessCount": 2,
+      "lastAccessed": 1783346606687,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\application-prod.yml",
+      "accessCount": 2,
+      "lastAccessed": 1783346615868,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\application-dev.yml",
+      "accessCount": 2,
+      "lastAccessed": 1783346615969,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\cart.js",
+      "accessCount": 2,
+      "lastAccessed": 1783346763320,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\app.js",
+      "accessCount": 2,
+      "lastAccessed": 1783346782798,
       "type": "file"
     },
     {
@@ -212,21 +296,9 @@
       "type": "file"
     },
     {
-      "path": "docs\\09-接口规范.md",
-      "accessCount": 1,
-      "lastAccessed": 1783341388291,
-      "type": "file"
-    },
-    {
       "path": "docs\\10-数据库规范.md",
       "accessCount": 1,
       "lastAccessed": 1783341393651,
-      "type": "file"
-    },
-    {
-      "path": "docs\\11-后端开发详细文档.md",
-      "accessCount": 1,
-      "lastAccessed": 1783341396859,
       "type": "file"
     },
     {
@@ -242,57 +314,15 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\MallApplication.java",
-      "accessCount": 1,
-      "lastAccessed": 1783342817385,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\resources\\application-dev.yml",
-      "accessCount": 1,
-      "lastAccessed": 1783342823386,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\resources\\application-prod.yml",
-      "accessCount": 1,
-      "lastAccessed": 1783342827031,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\resources\\sql\\V1__init_schema.sql",
-      "accessCount": 1,
-      "lastAccessed": 1783344463707,
-      "type": "file"
-    },
-    {
       "path": "frontend\\index.html",
       "accessCount": 1,
       "lastAccessed": 1783344941071,
       "type": "file"
     },
     {
-      "path": "frontend\\package.json",
-      "accessCount": 1,
-      "lastAccessed": 1783344943202,
-      "type": "file"
-    },
-    {
       "path": "frontend\\vite.config.js",
       "accessCount": 1,
       "lastAccessed": 1783344944850,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\.env.development",
-      "accessCount": 1,
-      "lastAccessed": 1783344947695,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\.env.production",
-      "accessCount": 1,
-      "lastAccessed": 1783344949618,
       "type": "file"
     },
     {
@@ -308,39 +338,9 @@
       "type": "file"
     },
     {
-      "path": "frontend\\src\\utils\\request.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344972510,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\router\\index.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344975469,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\store\\user.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344977429,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\store\\cart.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344980413,
-      "type": "file"
-    },
-    {
       "path": "frontend\\src\\store\\merchant.js",
       "accessCount": 1,
       "lastAccessed": 1783344983409,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\store\\app.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344985582,
       "type": "file"
     },
     {
