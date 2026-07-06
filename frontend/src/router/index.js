@@ -78,9 +78,18 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const userStore = JSON.parse(localStorage.getItem('user') || '{}')
-  if (to.meta.requiresAuth && !userStore.token) {
+
+  // 收集当前路由及所有父级路由的 meta
+  let requiresAuth = false
+  let allowedRoles = null
+  for (const record of to.matched) {
+    if (record.meta.requiresAuth) requiresAuth = true
+    if (record.meta.roles) allowedRoles = record.meta.roles
+  }
+
+  if (requiresAuth && !userStore.token) {
     next({ path: '/login', query: { redirect: to.fullPath } })
-  } else if (to.meta.roles && !to.meta.roles.includes(userStore.role)) {
+  } else if (allowedRoles && !allowedRoles.includes(userStore.role)) {
     next('/403')
   } else {
     next()

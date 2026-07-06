@@ -5,9 +5,9 @@ import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.modules.shop.service.ShopService;
 import com.pzhu.mall.modules.shop.vo.ShopVO;
+import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -19,6 +19,7 @@ import java.util.List;
 @Tag(name = "管理员-店铺管理")
 @RestController
 @RequestMapping("/api/admin/shops")
+@RequireRole(3)
 public class AdminShopController {
 
     @Resource

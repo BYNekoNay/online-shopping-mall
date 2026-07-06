@@ -7,6 +7,7 @@ import com.pzhu.mall.modules.admin.entity.OperationLog;
 import com.pzhu.mall.modules.admin.mapper.DictMapper;
 import com.pzhu.mall.modules.admin.mapper.OperationLogMapper;
 import com.pzhu.mall.modules.admin.service.OperationLogService;
+import com.pzhu.mall.security.RequireRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,7 @@ import java.util.List;
 @Tag(name = "管理员-系统管理")
 @RestController
 @RequestMapping("/api/admin/system")
+@RequireRole(3)
 public class AdminSystemController {
 
     @Resource

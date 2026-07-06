@@ -4,10 +4,10 @@ import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.common.result.PageResult;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
+import com.pzhu.mall.security.RequireRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -18,6 +18,7 @@ import javax.annotation.Resource;
 @Tag(name = "管理员-商品管理")
 @RestController
 @RequestMapping("/api/admin/products")
+@RequireRole(3)
 public class AdminProductController {
 
     @Resource

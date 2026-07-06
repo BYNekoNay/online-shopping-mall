@@ -9,7 +9,7 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": null,
+    "buildCommand": "cd \"D:/codegitee/online-shopping-mall\" && git commit -m \"feat: implement backend infrastructure modules (user, shop, product, cart, order, behavior, recommend, marketing, logistics, admin) + frontend fixes\n\nBackend (119 Java files):\n- Entity classes: User, Address, Shop, Category, Product, Sku, Cart, Order, OrderItem, Payment, Refund, Coupon, UserCoupon, Promotion, PointsRecord, FreightTemplate, Logistics, UserBehavior, PageViewLog, RecommendResult, UserScore, SearchHistory, OperationLog, Dict\n- Mapper interfaces: 22 mappers extending BaseMapper\n- DTOs: RegisterDTO, LoginDTO, UpdateProfileDTO, ShopApplyDTO, ShopUpdateDTO, CreateOrderDTO, ProductItemDTO, ProductQueryDTO, RefundApplyDTO, RefundAuditDTO, BehaviorRecordDTO, PageViewDTO, PageLeaveDTO\n- VOs: LoginVO, UserVO, AddressVO, ShopVO, ShopApplyStatusVO, ProductVO, SkuVO, CategoryVO, CartVO, OrderVO, OrderItemVO, RefundVO\n- Services: UserService, AddressService, ShopService, ProductService, CategoryService, CartService, OrderService, RefundService, BehaviorService, RecommendService, CouponService, PromotionService, PointsService, FreightService, LogisticsQueryService, OperationLogService\n- Controllers: 14 REST controllers with Swagger/OpenAPI annotations\n- Components: OrderNoGenerator, StockService (Redis-based), OrderTimeoutTask, RecommendRefreshTask\n- Mapper XML: OrderMapper.xml for timeout query\n\nFrontend fixes:\n- Fix auth data model: user store now persists 'user' JSON to localStorage\n- Add /register route and Register.vue view\n- Fix Forbidden.vue $router reference (use useRouter())\n- Fix AdminLayout.vue hardcoded username (bind to user store nickname)\n- Update Login.vue to use userStore.setUser()\n\nBuild verification:\n- Backend: mvn compile BUILD SUCCESS\n- Frontend: npm run build built in 8.82s\"",
     "testCommand": null,
     "lintCommand": null,
     "devCommand": null,
@@ -51,8 +51,14 @@
   "hotPaths": [
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MetaObjectHandlerConfig.java",
+      "accessCount": 9,
+      "lastAccessed": 1783349849116,
+      "type": "file"
+    },
+    {
+      "path": "backend\\pom.xml",
       "accessCount": 8,
-      "lastAccessed": 1783346500807,
+      "lastAccessed": 1783349980609,
       "type": "file"
     },
     {
@@ -62,9 +68,15 @@
       "type": "file"
     },
     {
-      "path": "backend\\pom.xml",
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\exception\\GlobalExceptionHandler.java",
       "accessCount": 7,
-      "lastAccessed": 1783346506967,
+      "lastAccessed": 1783349848191,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\RedisConfig.java",
+      "accessCount": 7,
+      "lastAccessed": 1783350699275,
       "type": "file"
     },
     {
@@ -74,15 +86,9 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\exception\\GlobalExceptionHandler.java",
-      "accessCount": 6,
-      "lastAccessed": 1783343837129,
-      "type": "file"
-    },
-    {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\RoleCheckAspect.java",
-      "accessCount": 5,
-      "lastAccessed": 1783343929943,
+      "accessCount": 6,
+      "lastAccessed": 1783350729585,
       "type": "file"
     },
     {
@@ -92,27 +98,27 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\RedisConfig.java",
-      "accessCount": 5,
-      "lastAccessed": 1783346500409,
-      "type": "file"
-    },
-    {
       "path": "backend\\src\\main\\resources\\sql\\V1__init_schema.sql",
       "accessCount": 5,
       "lastAccessed": 1783346651541,
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtInterceptor.java",
-      "accessCount": 4,
-      "lastAccessed": 1783346507183,
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\result\\Result.java",
+      "accessCount": 5,
+      "lastAccessed": 1783349821660,
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\result\\Result.java",
-      "accessCount": 4,
-      "lastAccessed": 1783346507600,
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\enums\\ErrorCode.java",
+      "accessCount": 5,
+      "lastAccessed": 1783349848423,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtInterceptor.java",
+      "accessCount": 5,
+      "lastAccessed": 1783350694014,
       "type": "file"
     },
     {
@@ -122,33 +128,75 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\enums\\ErrorCode.java",
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MyBatisPlusConfig.java",
       "accessCount": 4,
-      "lastAccessed": 1783346618112,
+      "lastAccessed": 1783349847806,
       "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\exception\\BusinessException.java",
-      "accessCount": 3,
-      "lastAccessed": 1783343834038,
+      "accessCount": 4,
+      "lastAccessed": 1783349847902,
       "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\WebMvcConfig.java",
-      "accessCount": 3,
-      "lastAccessed": 1783346234528,
+      "accessCount": 4,
+      "lastAccessed": 1783349850615,
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\MyBatisPlusConfig.java",
-      "accessCount": 3,
-      "lastAccessed": 1783346494807,
+      "path": "frontend\\src\\utils\\request.js",
+      "accessCount": 4,
+      "lastAccessed": 1783350691907,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\router\\index.js",
+      "accessCount": 4,
+      "lastAccessed": 1783350747284,
       "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\LoginUserContext.java",
       "accessCount": 3,
       "lastAccessed": 1783346506520,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\cart.js",
+      "accessCount": 3,
+      "lastAccessed": 1783349926236,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\app.js",
+      "accessCount": 3,
+      "lastAccessed": 1783349926409,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\store\\user.js",
+      "accessCount": 3,
+      "lastAccessed": 1783350687223,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\main.js",
+      "accessCount": 3,
+      "lastAccessed": 1783350713837,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\vite.config.js",
+      "accessCount": 3,
+      "lastAccessed": 1783350715612,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\layouts\\ConsumerLayout.vue",
+      "accessCount": 3,
+      "lastAccessed": 1783350718460,
       "type": "file"
     },
     {
@@ -188,24 +236,6 @@
       "type": "file"
     },
     {
-      "path": "frontend\\src\\store\\user.js",
-      "accessCount": 2,
-      "lastAccessed": 1783346536911,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\router\\index.js",
-      "accessCount": 2,
-      "lastAccessed": 1783346536973,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\utils\\request.js",
-      "accessCount": 2,
-      "lastAccessed": 1783346537630,
-      "type": "file"
-    },
-    {
       "path": "frontend\\package.json",
       "accessCount": 2,
       "lastAccessed": 1783346600345,
@@ -236,15 +266,15 @@
       "type": "file"
     },
     {
-      "path": "frontend\\src\\store\\cart.js",
+      "path": "frontend\\src\\store\\merchant.js",
       "accessCount": 2,
-      "lastAccessed": 1783346763320,
+      "lastAccessed": 1783349926279,
       "type": "file"
     },
     {
-      "path": "frontend\\src\\store\\app.js",
+      "path": "frontend\\src\\App.vue",
       "accessCount": 2,
-      "lastAccessed": 1783346782798,
+      "lastAccessed": 1783350005655,
       "type": "file"
     },
     {
@@ -317,36 +347,6 @@
       "path": "frontend\\index.html",
       "accessCount": 1,
       "lastAccessed": 1783344941071,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\vite.config.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344944850,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\main.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344958423,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\App.vue",
-      "accessCount": 1,
-      "lastAccessed": 1783344961984,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\store\\merchant.js",
-      "accessCount": 1,
-      "lastAccessed": 1783344983409,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\layouts\\ConsumerLayout.vue",
-      "accessCount": 1,
-      "lastAccessed": 1783345024799,
       "type": "file"
     }
   ],

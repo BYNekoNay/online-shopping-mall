@@ -1,5 +1,6 @@
 package com.pzhu.mall.modules.order.component;
 
+import com.pzhu.mall.common.config.RedisKeyPrefix;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.order.entity.Order;
@@ -30,8 +31,13 @@ public class StockService {
     @Value("${mall.stock.lock-lease-seconds:10}")
     private long lockLeaseSeconds;
 
-    private static final String STOCK_KEY_PREFIX = "stock:";
-    private static final String LOCK_KEY_PREFIX = "lock:stock:";
+    private String stockKey(Long skuId) {
+        return RedisKeyPrefix.STOCK + ":" + skuId;
+    }
+
+    private String lockKey(Long skuId) {
+        return RedisKeyPrefix.STOCK_LOCK + ":" + skuId;
+    }
 
     /**
      * 预扣减库存。
@@ -39,8 +45,8 @@ public class StockService {
      * @return true 扣减成功，false 库存不足
      */
     public boolean deduct(Long skuId, int quantity) {
-        String lockKey = LOCK_KEY_PREFIX + skuId;
-        String stockKey = STOCK_KEY_PREFIX + skuId;
+        String lockKey = lockKey(skuId);
+        String stockKey = stockKey(skuId);
 
         // 简易分布式锁（非 Redisson，用于演示；生产环境应替换为 RedissonClient）
         Boolean locked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", lockLeaseSeconds, TimeUnit.SECONDS);
@@ -72,7 +78,7 @@ public class StockService {
      * 归还预扣减的库存。
      */
     public void rollback(Long skuId, int quantity) {
-        String stockKey = STOCK_KEY_PREFIX + skuId;
+        String stockKey = stockKey(skuId);
         redisTemplate.opsForValue().increment(stockKey, quantity);
     }
 }
