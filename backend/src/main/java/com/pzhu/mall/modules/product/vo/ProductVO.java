@@ -1,6 +1,7 @@
 package com.pzhu.mall.modules.product.vo;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -24,6 +25,8 @@ public class ProductVO {
     private String shopName;
     private List<SkuVO> skuList;
     private java.time.LocalDateTime createTime;
+    /** 当前商品命中的生效促销（无命中时为 null） */
+    private Object activePromotion;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -57,4 +60,6 @@ public class ProductVO {
     public void setSkuList(List<SkuVO> skuList) { this.skuList = skuList; }
     public java.time.LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(java.time.LocalDateTime createTime) { this.createTime = createTime; }
+    public Object getActivePromotion() { return activePromotion; }
+    public void setActivePromotion(Object activePromotion) { this.activePromotion = activePromotion; }
 }

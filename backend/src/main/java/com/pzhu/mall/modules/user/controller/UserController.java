@@ -35,6 +35,9 @@ public class UserController {
     @Resource
     private AddressService addressService;
 
+    @Resource
+    private com.pzhu.mall.modules.statistics.service.SearchHistoryService searchHistoryService;
+
     @Operation(summary = "用户注册")
     @PostMapping("/auth/register")
     public Result<Void> register(@Validated @RequestBody RegisterDTO dto) {
@@ -112,6 +115,23 @@ public class UserController {
     public Result<Void> deleteAddress(@PathVariable Long id) {
         Long userId = LoginUserContext.getCurrentUserId();
         addressService.delete(userId, id);
+        return Result.success();
+    }
+
+    @Operation(summary = "获取搜索历史")
+    @RequireRole(1)
+    @GetMapping("/user/search-history")
+    public Result<List<com.pzhu.mall.modules.statistics.entity.SearchHistory>> searchHistory() {
+        Long userId = LoginUserContext.getCurrentUserId();
+        return Result.success(searchHistoryService.listByUser(userId));
+    }
+
+    @Operation(summary = "清空搜索历史")
+    @RequireRole(1)
+    @DeleteMapping("/user/search-history")
+    public Result<Void> clearSearchHistory() {
+        Long userId = LoginUserContext.getCurrentUserId();
+        searchHistoryService.deleteByUser(userId);
         return Result.success();
     }
 }

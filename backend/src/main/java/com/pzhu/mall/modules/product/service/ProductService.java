@@ -44,6 +44,9 @@ public class ProductService {
     @Resource
     private BehaviorService behaviorService;
 
+    @Resource
+    private com.pzhu.mall.modules.marketing.service.PromotionService promotionService;
+
     public ProductMapper getProductMapper() {
         return productMapper;
     }
@@ -109,6 +112,12 @@ public class ProductService {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
         ProductVO vo = toVO(product);
+
+        // 注入当前命中的生效促销
+        List<com.pzhu.mall.modules.marketing.entity.Promotion> promotions = promotionService.matchActive(product.getShopId());
+        if (!promotions.isEmpty()) {
+            vo.setActivePromotion(promotions.get(0));
+        }
 
         // 记录浏览行为（behaviorType=1）
         Long currentUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
