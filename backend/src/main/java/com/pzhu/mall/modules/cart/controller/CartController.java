@@ -4,9 +4,9 @@ import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.modules.cart.entity.Cart;
 import com.pzhu.mall.modules.cart.service.CartService;
 import com.pzhu.mall.modules.cart.vo.CartVO;
+import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -18,6 +18,7 @@ import java.util.List;
 @Tag(name = "购物车")
 @RestController
 @RequestMapping("/api/cart")
+@RequireRole(1)
 public class CartController {
 
     @Resource

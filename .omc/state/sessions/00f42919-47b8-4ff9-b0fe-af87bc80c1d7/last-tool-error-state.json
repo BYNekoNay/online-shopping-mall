@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"mkdir -p D:/codegitee/online-shopping-mall/backend/src/main/java/com/pzhu/mall/modules/statistics/vo && mv D:/codegitee/online-shopping-mall/backend/src/main/java/com/zhu/mall/modules/stat...",
+  "error": "Exit code 1\nmv: cannot stat 'D:/codegitee/online-shopping-mall/backend/src/main/java/com/zhu/mall/modules/statistics/vo/*.java': No such file or directory",
+  "timestamp": "2026-07-07T12:30:46.281Z",
+  "retry_count": 3
+}

@@ -13,7 +13,7 @@
 
     <div class="category-nav">
       <div class="category-inner">
-        <div v-for="cat in categories" :key="cat.id" class="category-item">
+        <div v-for="cat in categories" :key="cat.id" class="category-item" @click="goCategory(cat.id)">
           {{ cat.name }}
         </div>
       </div>
@@ -28,9 +28,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@/api/product'
 import RecommendList from '@/components/RecommendList.vue'
 
+const router = useRouter()
 const categories = ref([])
 const bannerColors = ['#409eff', '#67c23a', '#e6a23c']
 
@@ -41,6 +43,10 @@ onMounted(async () => {
     categories.value = []
   }
 })
+
+function goCategory(id) {
+  router.push(`/category?id=${id}`)
+}
 </script>
 
 <style scoped>

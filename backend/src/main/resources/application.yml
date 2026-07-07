@@ -7,7 +7,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/mall?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password:
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
   redis:
     host: localhost
@@ -43,6 +43,9 @@ mall:
   stock:
     lock-wait-seconds: 3
     lock-lease-seconds: 10
+
+cors:
+  allowed-origins: http://localhost:5173
 
 logging:
   level:

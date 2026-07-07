@@ -25,6 +25,7 @@
             <el-input-number v-model="item.quantity" :min="1" :max="item.stock || 99" size="small" @change="updateQuantity(item)" />
           </div>
           <div class="cart-item-subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
+          <div v-if="!item.stockEnough" class="stock-warning">库存不足</div>
           <el-button type="text" @click="removeItem(item)">删除</el-button>
         </div>
         <div class="cart-footer">
@@ -125,6 +126,11 @@ function goCheckout() {
   text-align: right;
   color: #f56c6c;
   font-weight: bold;
+}
+.stock-warning {
+  color: #e6a23c;
+  font-size: 12px;
+  margin-right: 8px;
 }
 .cart-footer {
   display: flex;

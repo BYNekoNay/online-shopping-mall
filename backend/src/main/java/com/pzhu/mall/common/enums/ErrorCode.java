@@ -14,7 +14,7 @@ public enum ErrorCode {
     PRODUCT_OFFLINE(30002, "Product is currently offline"),
     SKU_NOT_FOUND(30003, "SKU not found"),
     STOCK_NOT_ENOUGH(40001, "Insufficient stock"),
-    PRODUCT_OFFLINE_ORDER(40002, "Product is offline"),
+    PRODUCT_OFFLINE_ORDER(40002, "Product is offline and cannot be ordered"),
     COUPON_UNAVAILABLE(40003, "Coupon is not available"),
     ORDER_STATUS_INVALID(40004, "Order status does not allow this operation"),
     ORDER_NOT_FOUND(40005, "Order not found"),

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 订单号生成器。
@@ -15,11 +16,10 @@ import java.util.Random;
 public class OrderNoGenerator {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-    private static final Random RANDOM = new Random();
 
     public String generate() {
         String timestamp = FORMATTER.format(LocalDateTime.now());
-        String random = String.format("%06d", RANDOM.nextInt(1000000));
-        return timestamp + random;
+        int random = ThreadLocalRandom.current().nextInt(1000000);
+        return timestamp + String.format("%06d", random);
     }
 }

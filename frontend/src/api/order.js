@@ -12,6 +12,10 @@ export function createOrder(data) {
   return request.post('/orders', data)
 }
 
+export function estimateOrder(data) {
+  return request.post('/orders/estimate', data)
+}
+
 export function payOrder(id, data) {
   return request.post(`/orders/${id}/pay`, data)
 }

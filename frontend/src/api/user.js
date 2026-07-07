@@ -40,4 +40,16 @@ export function clearSearchHistory() {
   return request.delete('/user/search-history')
 }
 
-export default { login, register, getProfile, updateProfile, getAddresses, addAddress, updateAddress, deleteAddress, getSearchHistory, clearSearchHistory }
+export function getFavorites() {
+  return request.get('/behavior/favorites')
+}
+
+export function favoriteProduct(productId) {
+  return request.post(`/behavior/favorites/${productId}`)
+}
+
+export function unfavoriteProduct(productId) {
+  return request.delete(`/behavior/favorites/${productId}`)
+}
+
+export default { login, register, getProfile, updateProfile, getAddresses, addAddress, updateAddress, deleteAddress, getSearchHistory, clearSearchHistory, getFavorites, favoriteProduct, unfavoriteProduct }

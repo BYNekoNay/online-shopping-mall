@@ -2,9 +2,15 @@ package com.pzhu.mall.modules.admin.controller;
 
 import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.common.result.PageResult;
+import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
+import com.pzhu.mall.modules.admin.service.OperationLogService;
+import com.pzhu.mall.modules.admin.vo.AdminUserVO;
+import com.pzhu.mall.security.LoginUserContext;
 import com.pzhu.mall.security.RequireRole;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 管理员端用户管理控制器。
@@ -25,12 +32,37 @@ public class AdminUserController {
     @Resource
     private UserMapper userMapper;
 
+    @Resource
+    private OperationLogService operationLogService;
+
     @Operation(summary = "用户列表")
     @GetMapping
-    public Result<PageResult<User>> list(@RequestParam(defaultValue = "1") Integer pageNum,
-                                         @RequestParam(defaultValue = "10") Integer pageSize) {
+    public Result<PageResult<AdminUserVO>> list(@RequestParam(defaultValue = "1") Integer pageNum,
+                                                @RequestParam(defaultValue = "10") Integer pageSize,
+                                                @RequestParam(required = false) Integer role,
+                                                @RequestParam(required = false) Integer status,
+                                                @RequestParam(required = false) String keyword) {
+        var qw = new LambdaQueryWrapper<User>()
+                .eq(User::getIsDeleted, 0);
+        if (role != null) {
+            qw.eq(User::getRole, role);
+        }
+        if (status != null) {
+            qw.eq(User::getStatus, status);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            qw.and(w -> w.like(User::getUsername, keyword).or().like(User::getNickname, keyword));
+        }
+        qw.orderByDesc(User::getCreateTime);
+
         Page<User> page = new Page<>(pageNum, pageSize);
-        return Result.success(PageResult.of(userMapper.selectPage(page, null)));
+        var result = userMapper.selectPage(page, qw);
+        List<AdminUserVO> voList = result.getRecords().stream()
+                .map(AdminUserVO::from)
+                .collect(Collectors.toList());
+        long pages = (long) Math.ceil((double) result.getTotal() / pageSize);
+        var pageResult = new PageResult<AdminUserVO>(result.getTotal(), pageNum, pageSize, pages, voList);
+        return Result.success(pageResult);
     }
 
     @Operation(summary = "禁用/启用用户")
@@ -38,10 +70,15 @@ public class AdminUserController {
     public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusDTO dto) {
         User user = userMapper.selectById(id);
         if (user == null) {
-            return Result.error(404, "User not found");
+            throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         user.setStatus(dto.getStatus());
         userMapper.updateById(user);
+
+        Long operatorId = LoginUserContext.getCurrentUserId();
+        operationLogService.record(operatorId,
+                dto.getStatus() == 1 ? "启用用户" : "禁用用户",
+                "用户#" + id);
         return Result.success();
     }
 

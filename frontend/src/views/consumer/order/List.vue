@@ -7,6 +7,8 @@
       <el-tab-pane label="已发货" name="2" />
       <el-tab-pane label="已完成" name="4" />
       <el-tab-pane label="已取消" name="5" />
+      <el-tab-pane label="退款中" name="6" />
+      <el-tab-pane label="已退款" name="7" />
     </el-tabs>
     <div v-if="orders.length === 0" class="empty">
       <el-empty description="暂无订单" />
@@ -32,6 +34,7 @@
           <el-button v-if="order.status === 0" type="primary" @click="$router.push(`/order/pay/${order.id}`)">去支付</el-button>
           <el-button v-if="order.status === 0" @click="cancelOrder(order.id)">取消订单</el-button>
           <el-button v-if="order.status === 2" @click="confirmOrder(order.id)">确认收货</el-button>
+          <el-button type="default" @click="$router.push(`/orders/${order.id}`)">查看详情</el-button>
         </div>
       </div>
     </el-card>

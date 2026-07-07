@@ -13,8 +13,8 @@ export const useUserStore = defineStore('user', () => {
     role.value = data.role || 0
     nickname.value = data.nickname || ''
     localStorage.setItem('token', token.value)
-    localStorage.setItem('userId', userId.value)
-    localStorage.setItem('role', role.value)
+    localStorage.setItem('userId', String(userId.value))
+    localStorage.setItem('role', String(role.value))
     localStorage.setItem('nickname', nickname.value)
     localStorage.setItem('user', JSON.stringify({ token: token.value, userId: userId.value, role: role.value, nickname: nickname.value }))
   }

@@ -54,4 +54,19 @@ public class JwtUtil {
             return true;
         }
     }
+
+    /**
+     * 测试辅助：使用给定密钥和 TTL 生成 token，用于集成测试。
+     */
+    public static String generateTestToken(Long userId, int role, String secret, long expireSeconds) {
+        long now = System.currentTimeMillis();
+        Key key = Keys.hmacShaKeyFor(secret.getBytes());
+        return Jwts.builder()
+                .setSubject(String.valueOf(userId))
+                .claim("role", role)
+                .setIssuedAt(new Date(now))
+                .setExpiration(new Date(now + expireSeconds * 1000))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
 }

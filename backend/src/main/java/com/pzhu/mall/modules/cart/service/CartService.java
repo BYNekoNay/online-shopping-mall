@@ -62,6 +62,8 @@ public class CartService {
                 if (sku != null) {
                     vo.setSpecText(sku.getSpecJson());
                     vo.setPrice(sku.getPrice());
+                    vo.setStock(sku.getStock());
+                    vo.setStockEnough(sku.getStock() >= item.getQuantity());
                 }
             }
             voList.add(vo);

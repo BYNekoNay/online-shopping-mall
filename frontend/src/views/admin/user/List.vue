@@ -1,7 +1,22 @@
 <template>
   <div class="admin-users">
     <el-card>
-      <h3>用户管理</h3>
+      <div class="header">
+        <h3>用户管理</h3>
+      </div>
+      <div class="filters">
+        <el-select v-model="filters.role" placeholder="角色" clearable style="width: 120px;">
+          <el-option label="消费者" :value="1" />
+          <el-option label="商家" :value="2" />
+          <el-option label="管理员" :value="3" />
+        </el-select>
+        <el-select v-model="filters.status" placeholder="状态" clearable style="width: 120px;">
+          <el-option label="正常" :value="1" />
+          <el-option label="禁用" :value="0" />
+        </el-select>
+        <el-input v-model="filters.keyword" placeholder="用户名/昵称" style="width: 180px;" clearable />
+        <el-button type="primary" @click="load">查询</el-button>
+      </div>
       <el-table :data="users" style="width: 100%; margin-top: 15px;">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" />
@@ -16,18 +31,57 @@
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">{{ row.status === 1 ? '正常' : '禁用' }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="createTime" label="注册时间" width="180" />
+        <el-table-column label="操作" width="140" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
+              {{ row.status === 1 ? '禁用' : '启用' }}
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
+      <el-pagination v-model:current-page="pageNum" :page-size="pageSize" :total="total" layout="total, prev, pager, next" style="margin-top: 20px; justify-content: flex-end;" @current-change="load" />
     </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/admin'
 
 const users = ref([])
+const pageNum = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 const roleMap = { 1: '消费者', 2: '商家', 3: '管理员' }
-onMounted(async () => {
-  try { users.value = (await request.getUsers()).records || [] } catch {}
-})
+const filters = ref({ role: null, status: null, keyword: '' })
+
+async function load() {
+  try {
+    const data = await request.getUsers({ ...filters.value, pageNum: pageNum.value, pageSize: pageSize.value })
+    users.value = data.records || []
+    total.value = data.total || 0
+  } catch {
+    users.value = []
+    total.value = 0
+  }
+}
+
+async function toggleStatus(row) {
+  const action = row.status === 1 ? '禁用' : '启用'
+  try {
+    await ElMessageBox.confirm(`确认${action}用户 ${row.username}？`, '提示', { type: 'warning' })
+    await request.updateUserStatus(row.id, { status: row.status === 1 ? 0 : 1 })
+    ElMessage.success(`${action}成功`)
+    load()
+  } catch {}
+}
+
+onMounted(load)
 </script>
+
+<style scoped>
+.header { display: flex; justify-content: space-between; align-items: center; }
+.filters { display: flex; gap: 10px; margin-top: 15px; }
+</style>

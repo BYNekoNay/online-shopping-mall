@@ -1,0 +1,106 @@
+package com.pzhu.mall.modules.product.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.pzhu.mall.common.exception.BusinessException;
+import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.modules.order.entity.OrderItem;
+import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
+import com.pzhu.mall.modules.product.entity.Review;
+import com.pzhu.mall.modules.product.mapper.ReviewMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 商品评价服务。
+ * <p>评分按需动态计算，不写回 product 表（product 表无 rating 字段）。</p>
+ */
+@Service
+public class ReviewService {
+
+    private static final Logger log = LoggerFactory.getLogger(ReviewService.class);
+
+    @Resource
+    private ReviewMapper reviewMapper;
+
+    @Resource
+    private OrderItemMapper orderItemMapper;
+
+    /**
+     * 提交评价。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void submit(Long orderItemId, Long userId, Integer rating, String content, String imagesJson) {
+        OrderItem item = orderItemMapper.selectById(orderItemId);
+        if (item == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+
+        // 幂等：同一 orderItemId 只能评价一次
+        Long existing = reviewMapper.selectCount(
+                new LambdaQueryWrapper<Review>().eq(Review::getOrderItemId, orderItemId)
+        );
+        if (existing > 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该订单项已评价");
+        }
+
+        Review review = new Review();
+        review.setOrderItemId(orderItemId);
+        review.setUserId(userId);
+        review.setProductId(item.getProductId());
+        review.setRating(rating);
+        review.setContent(content);
+        review.setImages(imagesJson);
+        review.setCreateTime(LocalDateTime.now());
+        reviewMapper.insert(review);
+
+        log.info("[评价] 用户{}评价订单项{} 评分{} 商品{}", userId, orderItemId, rating, item.getProductId());
+    }
+
+    /**
+     * 查询商品评价列表。
+     */
+    public List<Review> listByProduct(Long productId) {
+        return reviewMapper.selectList(
+                new LambdaQueryWrapper<Review>()
+                        .eq(Review::getProductId, productId)
+                        .orderByDesc(Review::getCreateTime)
+        );
+    }
+
+    /**
+     * 获取商品平均评分与评价数（动态计算，不依赖 product 表字段）。
+     */
+    public ProductRatingVO getProductRating(Long productId) {
+        Double avg = reviewMapper.avgRatingByProductId(productId);
+        Long count = reviewMapper.countByProductId(productId);
+        ProductRatingVO vo = new ProductRatingVO();
+        vo.setProductId(productId);
+        vo.setAvgRating(avg != null ? BigDecimal.valueOf(avg).setScale(1, RoundingMode.HALF_UP) : BigDecimal.ZERO);
+        vo.setReviewCount(count != null ? count.intValue() : 0);
+        return vo;
+    }
+
+    /**
+     * 评价统计 VO。
+     */
+    public static class ProductRatingVO {
+        private Long productId;
+        private BigDecimal avgRating;
+        private Integer reviewCount;
+
+        public Long getProductId() { return productId; }
+        public void setProductId(Long productId) { this.productId = productId; }
+        public BigDecimal getAvgRating() { return avgRating; }
+        public void setAvgRating(BigDecimal avgRating) { this.avgRating = avgRating; }
+        public Integer getReviewCount() { return reviewCount; }
+        public void setReviewCount(Integer reviewCount) { this.reviewCount = reviewCount; }
+    }
+}

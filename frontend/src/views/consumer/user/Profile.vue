@@ -27,6 +27,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/api/user'
+import pointsRequest from '@/api/coupon'
 
 const form = ref({ username: '', nickname: '', phone: '', email: '' })
 
@@ -34,10 +35,21 @@ onMounted(async () => {
   try {
     const data = await request.getProfile()
     form.value = { username: data.username, nickname: data.nickname || '', phone: data.phone || '', email: data.email || '' }
+    // Load points info in background
+    loadPoints()
   } catch {
     ElMessage.error('Failed to load profile')
   }
 })
+
+async function loadPoints() {
+  try {
+    const pts = await pointsRequest.getPoints()
+    // Points info displayed via Coupons.vue / Points.vue pages
+  } catch {
+    // silent
+  }
+}
 
 async function saveProfile() {
   try {

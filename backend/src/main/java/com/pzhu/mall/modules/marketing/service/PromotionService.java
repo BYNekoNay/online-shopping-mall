@@ -4,9 +4,13 @@ import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.marketing.entity.Promotion;
 import com.pzhu.mall.modules.marketing.mapper.PromotionMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,48 +20,64 @@ import java.util.List;
 @Service
 public class PromotionService {
 
+    private static final Logger log = LoggerFactory.getLogger(PromotionService.class);
+
     @Resource
     private PromotionMapper promotionMapper;
 
     /**
-     * 计算店铺促销折扣金额。
+     * 计算店铺促销折扣金额（取同类型最大优惠）。
      */
-    public java.math.BigDecimal calculateDiscount(Long shopId, java.math.BigDecimal goodsAmount) {
-        List<Promotion> promotions = listActiveByShop(shopId);
-        java.math.BigDecimal maxDiscount = java.math.BigDecimal.ZERO;
+    public BigDecimal calculateDiscount(Long shopId, BigDecimal goodsAmount) {
+        List<Promotion> promotions = matchActive(shopId);
+        BigDecimal maxDiscount = BigDecimal.ZERO;
         for (Promotion p : promotions) {
-            // 简化处理：按 rule_json 计算折扣
-            if (p.getType() == 1) { // 限时折扣
-                // rule_json: {"discountPercent":0.8}
-                try {
-                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                    java.util.Map<String, Object> rule = mapper.readValue(p.getRuleJson(), java.util.Map.class);
-                    double percent = ((Number) rule.getOrDefault("discountPercent", 1.0)).doubleValue();
-                    java.math.BigDecimal discount = goodsAmount.multiply(new java.math.BigDecimal(1 - percent));
-                    if (discount.compareTo(maxDiscount) > 0) {
-                        maxDiscount = discount;
-                    }
-                } catch (Exception e) {
-                    // ignore
-                }
-            } else if (p.getType() == 2) { // 满减
-                try {
-                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                    java.util.Map<String, Object> rule = mapper.readValue(p.getRuleJson(), java.util.Map.class);
-                    int threshold = ((Number) rule.getOrDefault("threshold", 0)).intValue();
-                    int reduce = ((Number) rule.getOrDefault("reduce", 0)).intValue();
-                    if (goodsAmount.compareTo(new java.math.BigDecimal(threshold)) >= 0) {
-                        java.math.BigDecimal discount = new java.math.BigDecimal(reduce);
-                        if (discount.compareTo(maxDiscount) > 0) {
-                            maxDiscount = discount;
-                        }
-                    }
-                } catch (Exception e) {
-                    // ignore
-                }
+            BigDecimal discount = calculateSingleDiscount(p, goodsAmount);
+            if (discount != null && discount.compareTo(maxDiscount) > 0) {
+                maxDiscount = discount;
             }
         }
         return maxDiscount;
+    }
+
+    /**
+     * 根据促销类型计算单条促销的折扣金额。
+     */
+    BigDecimal calculateSingleDiscount(Promotion p, BigDecimal goodsAmount) {
+        if (p.getType() == null || p.getRuleJson() == null || p.getRuleJson().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            java.util.Map<String, Object> rule = mapper.readValue(p.getRuleJson(), java.util.Map.class);
+            return switch (p.getType()) {
+                case 1 -> { // 限时折扣：ruleJson={"discountPercent":0.8}
+                    double percent = ((Number) rule.getOrDefault("discountPercent", 1.0)).doubleValue();
+                    BigDecimal pct = BigDecimal.valueOf(percent);
+                    yield goodsAmount.multiply(BigDecimal.ONE.subtract(pct));
+                }
+                case 2 -> { // 满减：ruleJson={"threshold":100,"reduce":20}
+                    int threshold = ((Number) rule.getOrDefault("threshold", 0)).intValue();
+                    int reduce = ((Number) rule.getOrDefault("reduce", 0)).intValue();
+                    if (goodsAmount.compareTo(new BigDecimal(threshold)) >= 0) {
+                        yield new BigDecimal(reduce);
+                    }
+                    yield BigDecimal.ZERO;
+                }
+                case 3 -> BigDecimal.ZERO; // 满赠：无金额减免，仅返回是否达到门槛
+                case 4 -> { // 组合套餐：ruleJson={"packagePrice":299}
+                    Object priceObj = rule.get("packagePrice");
+                    if (priceObj != null) {
+                        yield goodsAmount.subtract(new BigDecimal(priceObj.toString()));
+                    }
+                    yield BigDecimal.ZERO;
+                }
+                default -> BigDecimal.ZERO;
+            };
+        } catch (Exception e) {
+            log.warn("[促销] 解析 rule_json 失败 promotionId={} rule={}", p.getId(), p.getRuleJson(), e);
+            return BigDecimal.ZERO;
+        }
     }
 
     /**
@@ -65,13 +85,20 @@ public class PromotionService {
      */
     public List<Promotion> listActiveByShop(Long shopId) {
         return promotionMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
-                .eq(Promotion::getStatus, 1)
-                .eq(Promotion::getScope, "SHOP")
-                .eq(Promotion::getScopeId, shopId)
-                .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
-                .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
+                        .eq(Promotion::getStatus, 1)
+                        .eq(Promotion::getScope, "SHOP")
+                        .eq(Promotion::getScopeId, shopId)
+                        .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
+                        .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
         );
+    }
+
+    /**
+     * 匹配店铺当前生效的促销活动（供下单流程调用）。
+     */
+    public List<Promotion> matchActive(Long shopId) {
+        return listActiveByShop(shopId);
     }
 
     /**
@@ -79,17 +106,69 @@ public class PromotionService {
      */
     public List<Promotion> listActive() {
         return promotionMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
-                .eq(Promotion::getStatus, 1)
-                .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
-                .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
+                        .eq(Promotion::getStatus, 1)
+                        .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
+                        .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
+        );
+    }
+
+    /**
+     * 查询所有促销（管理端，含已下线/删除）。
+     */
+    public List<Promotion> listAll() {
+        return promotionMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
+                        .orderByDesc(Promotion::getCreateTime)
         );
     }
 
     /**
      * 创建促销活动（管理端）。
      */
+    @Transactional(rollbackFor = Exception.class)
     public void create(Promotion promotion) {
         promotionMapper.insert(promotion);
+        log.info("[促销] 管理员创建促销 name={} type={} scope={}", promotion.getName(), promotion.getType(), promotion.getScope());
+    }
+
+    /**
+     * 更新促销活动（管理端）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void update(Promotion promotion) {
+        promotionMapper.updateById(promotion);
+        log.info("[促销] 管理员更新促销 id={}", promotion.getId());
+    }
+
+    /**
+     * 提前下线促销活动（status 置为 0）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void offline(Long promotionId) {
+        Promotion promotion = new Promotion();
+        promotion.setId(promotionId);
+        promotion.setStatus(0);
+        promotionMapper.updateById(promotion);
+        log.info("[促销] 管理员下线促销 id={}", promotionId);
+    }
+
+    /**
+     * 删除促销活动（软删除）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long promotionId) {
+        Promotion promotion = new Promotion();
+        promotion.setId(promotionId);
+        promotion.setIsDeleted(1);
+        promotionMapper.updateById(promotion);
+        log.info("[促销] 管理员删除促销 id={}", promotionId);
+    }
+
+    /**
+     * 根据 ID 查询促销活动。
+     */
+    public Promotion getById(Long promotionId) {
+        return promotionMapper.selectById(promotionId);
     }
 }

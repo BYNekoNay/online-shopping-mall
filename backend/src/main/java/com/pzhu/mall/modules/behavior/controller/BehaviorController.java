@@ -1,15 +1,26 @@
 package com.pzhu.mall.modules.behavior.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.modules.behavior.dto.BehaviorRecordDTO;
 import com.pzhu.mall.modules.behavior.dto.PageViewDTO;
 import com.pzhu.mall.modules.behavior.dto.PageLeaveDTO;
+import com.pzhu.mall.modules.behavior.entity.UserBehavior;
+import com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper;
 import com.pzhu.mall.modules.behavior.service.BehaviorService;
+import com.pzhu.mall.modules.product.entity.Product;
+import com.pzhu.mall.modules.product.mapper.ProductMapper;
+import com.pzhu.mall.modules.behavior.dto.RecommendExposureDTO;
+import com.pzhu.mall.modules.behavior.dto.RecommendClickDTO;
+import com.pzhu.mall.security.LoginUserContext;
+import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 用户行为埋点控制器。
@@ -17,15 +28,36 @@ import javax.annotation.Resource;
 @Tag(name = "用户行为")
 @RestController
 @RequestMapping("/api/behavior")
+@RequireRole(1)
 public class BehaviorController {
 
     @Resource
     private BehaviorService behaviorService;
 
+    @Resource
+    private UserBehaviorMapper userBehaviorMapper;
+
+    @Resource
+    private ProductMapper productMapper;
+
     @Operation(summary = "记录行为（浏览/收藏/购买/评价）")
     @PostMapping("/record")
     public Result<Void> record(@RequestBody BehaviorRecordDTO dto) {
         behaviorService.record(dto.getUserId(), dto.getProductId(), dto.getBehaviorType());
+        return Result.success();
+    }
+
+    @Operation(summary = "推荐位曝光埋点")
+    @PostMapping("/recommend-exposure")
+    public Result<Void> recommendExposure(@RequestBody RecommendExposureDTO dto) {
+        behaviorService.recordRecommendExposure(dto);
+        return Result.success();
+    }
+
+    @Operation(summary = "推荐位点击埋点（记为浏览行为 type=1）")
+    @PostMapping("/recommend-click")
+    public Result<Void> recommendClick(@RequestBody RecommendClickDTO dto) {
+        behaviorService.recordRecommendClick(dto);
         return Result.success();
     }
 
@@ -39,6 +71,42 @@ public class BehaviorController {
     @PutMapping("/page-view/{id}/leave")
     public Result<Void> pageLeave(@PathVariable Long id, @RequestBody PageLeaveDTO dto) {
         behaviorService.recordPageLeave(id, dto.getStayDuration());
+        return Result.success();
+    }
+
+    @Operation(summary = "我的收藏列表")
+    @GetMapping("/favorites")
+    public Result<List<Product>> favorites() {
+        Long userId = LoginUserContext.getCurrentUserId();
+        LambdaQueryWrapper<UserBehavior> qw = new LambdaQueryWrapper<>();
+        qw.eq(UserBehavior::getUserId, userId)
+          .eq(UserBehavior::getBehaviorType, 2) // 2=收藏
+          .orderByDesc(UserBehavior::getCreateTime);
+        List<UserBehavior> behaviors = userBehaviorMapper.selectList(qw);
+        List<Product> products = behaviors.stream()
+            .map(b -> productMapper.selectById(b.getProductId()))
+            .filter(p -> p != null && p.getIsDeleted() == 0)
+            .collect(Collectors.toList());
+        return Result.success(products);
+    }
+
+    @Operation(summary = "收藏商品")
+    @PostMapping("/favorites/{productId}")
+    public Result<Void> favorite(@PathVariable Long productId) {
+        Long userId = LoginUserContext.getCurrentUserId();
+        behaviorService.record(userId, productId, 2); // 2=收藏
+        return Result.success();
+    }
+
+    @Operation(summary = "取消收藏")
+    @DeleteMapping("/favorites/{productId}")
+    public Result<Void> unfavorite(@PathVariable Long productId) {
+        Long userId = LoginUserContext.getCurrentUserId();
+        LambdaQueryWrapper<UserBehavior> qw = new LambdaQueryWrapper<>();
+        qw.eq(UserBehavior::getUserId, userId)
+          .eq(UserBehavior::getProductId, productId)
+          .eq(UserBehavior::getBehaviorType, 2);
+        userBehaviorMapper.delete(qw);
         return Result.success();
     }
 }

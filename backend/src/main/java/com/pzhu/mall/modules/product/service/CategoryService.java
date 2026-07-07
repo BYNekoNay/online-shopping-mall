@@ -49,6 +49,15 @@ public class CategoryService {
         return result;
     }
 
+    /**
+     * 获取全部分类（平铺列表，供管理员后台使用）。
+     */
+    public List<Category> listAll() {
+        LambdaQueryWrapper<Category> qw = new LambdaQueryWrapper<>();
+        qw.eq(Category::getIsDeleted, 0).orderByAsc(Category::getSort).orderByAsc(Category::getId);
+        return categoryMapper.selectList(qw);
+    }
+
     private CategoryVO toVO(Category c) {
         CategoryVO vo = new CategoryVO();
         vo.setId(c.getId());

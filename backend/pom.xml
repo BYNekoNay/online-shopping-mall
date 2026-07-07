@@ -58,11 +58,17 @@
       <artifactId>spring-boot-starter-data-redis</artifactId>
     </dependency>
 
-    <!-- Distributed Lock: Redisson -->
+    <!-- Distributed Lock: Redisson（排除 spring-data 集成模块，避免与 Spring Boot 2.7 不兼容） -->
     <dependency>
       <groupId>org.redisson</groupId>
       <artifactId>redisson-spring-boot-starter</artifactId>
       <version>3.27.2</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.redisson</groupId>
+          <artifactId>redisson-spring-data-32</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- JWT -->
@@ -107,17 +113,28 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- API Doc: Knife4j (optional, can be removed if time is tight) -->
+    <!-- API Doc: Knife4j (暂排除 springfox 兼容性问题，如需 API 文档可临时开启) -->
     <dependency>
       <groupId>com.github.xiaoymin</groupId>
-      <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
-      <version>4.4.0</version>
+      <artifactId>knife4j-spring-boot-starter</artifactId>
+      <version>3.0.3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.springfox</groupId>
+          <artifactId>springfox-boot-starter</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- Test -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

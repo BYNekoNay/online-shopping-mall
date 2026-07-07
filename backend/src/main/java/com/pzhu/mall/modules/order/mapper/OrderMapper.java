@@ -5,6 +5,7 @@ import com.pzhu.mall.modules.order.entity.Order;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,4 +18,9 @@ public interface OrderMapper extends BaseMapper<Order> {
      */
     List<Order> selectTimeoutUnpaidOrders(@Param("timeoutMinutes") int timeoutMinutes,
                                          @Param("now") LocalDateTime now);
+
+    /**
+     * 统计平台累计实付金额（GMV）。
+     */
+    BigDecimal selectAllTotalPayAmount();
 }

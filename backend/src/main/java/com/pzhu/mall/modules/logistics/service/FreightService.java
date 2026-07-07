@@ -49,6 +49,14 @@ public class FreightService {
         }
 
         FreightTemplate template = templates.get(0);
+
+        // 满额免邮
+        if (template.getFreeShippingThreshold() != null
+                && goodsAmount != null
+                && goodsAmount.compareTo(template.getFreeShippingThreshold()) >= 0) {
+            return BigDecimal.ZERO;
+        }
+
         String region = PROVINCE_REGION.getOrDefault(province, "default");
 
         // 解析 region_rule_json

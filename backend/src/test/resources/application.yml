@@ -1,0 +1,34 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+  autoconfigure:
+    exclude:
+      - org.redisson.spring.starter.RedissonAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+jwt:
+  secret: test-secret-key-for-unit-test-only
+  expire-seconds: 3600
+
+mall:
+  upload:
+    dir: /tmp/mall-test-uploads
+    base-url: http://localhost:8080/uploads
+
+logging:
+  level:
+    com.pzhu.mall: WARN
+
+# Disable OpenAPI doc (knife4j incompatible with Spring Boot 2.7 in test classpath)
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

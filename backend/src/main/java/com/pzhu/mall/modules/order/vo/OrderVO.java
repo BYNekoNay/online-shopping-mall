@@ -16,6 +16,9 @@ public class OrderVO {
     private BigDecimal totalAmount;
     private BigDecimal freightAmount;
     private BigDecimal discountAmount;
+    private BigDecimal promotionDiscountAmount;
+    private BigDecimal couponDiscountAmount;
+    private BigDecimal pointsDeductAmount;
     private BigDecimal payAmount;
     private Integer status;
     private String statusText;
@@ -40,6 +43,12 @@ public class OrderVO {
     public void setFreightAmount(BigDecimal freightAmount) { this.freightAmount = freightAmount; }
     public BigDecimal getDiscountAmount() { return discountAmount; }
     public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+    public BigDecimal getPromotionDiscountAmount() { return promotionDiscountAmount; }
+    public void setPromotionDiscountAmount(BigDecimal promotionDiscountAmount) { this.promotionDiscountAmount = promotionDiscountAmount; }
+    public BigDecimal getCouponDiscountAmount() { return couponDiscountAmount; }
+    public void setCouponDiscountAmount(BigDecimal couponDiscountAmount) { this.couponDiscountAmount = couponDiscountAmount; }
+    public BigDecimal getPointsDeductAmount() { return pointsDeductAmount; }
+    public void setPointsDeductAmount(BigDecimal pointsDeductAmount) { this.pointsDeductAmount = pointsDeductAmount; }
     public BigDecimal getPayAmount() { return payAmount; }
     public void setPayAmount(BigDecimal payAmount) { this.payAmount = payAmount; }
     public Integer getStatus() { return status; }

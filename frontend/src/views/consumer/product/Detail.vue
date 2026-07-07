@@ -19,7 +19,8 @@
               <span class="original-price" v-if="product.originalPrice">¥{{ product.originalPrice }}</span>
             </div>
             <div class="stock-info">
-              库存：{{ product.stock }} | 销量：{{ product.sales }}
+              <span v-if="product.stock > 0">库存：{{ product.stock }} | 销量：{{ product.sales }}</span>
+              <span v-else class="sold-out-text">已售罄</span>
             </div>
             <div class="promotion-tag" v-if="product.activePromotion">
               {{ formatPromotionTag(product.activePromotion) }}
@@ -33,10 +34,13 @@
                   </el-radio>
                 </el-radio-group>
               </div>
+              <div v-if="selectedSku && selectedSku.stock === 0" class="sold-out-tip">
+                该规格已售罄
+              </div>
             </div>
             <div class="actions">
               <el-button type="primary" size="large" :disabled="!canAddToCart" @click="addToCart">
-                加入购物车
+                {{ canAddToCartText }}
               </el-button>
             </div>
           </div>
@@ -51,7 +55,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/product'
@@ -65,11 +69,27 @@ const loading = ref(false)
 const product = ref({})
 const selectedSkuId = ref(null)
 
+const selectedSku = computed(() => {
+  if (!product.value.skuList || !selectedSkuId.value) return null
+  return product.value.skuList.find(s => s.id === selectedSkuId.value) || null
+})
+
 const canAddToCart = computed(() => {
+  if (product.value.stock === 0) return false
   if (product.value.skuList && product.value.skuList.length > 0) {
-    return selectedSkuId.value !== null
+    if (selectedSkuId.value === null) return false
+    return (selectedSku.value?.stock || 0) > 0
   }
   return product.value.stock > 0
+})
+
+const canAddToCartText = computed(() => {
+  if (product.value.stock === 0) return '已售罄'
+  if (product.value.skuList && product.value.skuList.length > 0) {
+    if (selectedSkuId.value === null) return '请选择规格'
+    if ((selectedSku.value?.stock || 0) === 0) return '该规格已售罄'
+  }
+  return '加入购物车'
 })
 
 function formatPromotionTag(promotion) {
@@ -144,6 +164,16 @@ onMounted(async () => {
 .stock-info {
   color: #666;
   margin-bottom: 15px;
+}
+.sold-out-text {
+  color: #f56c6c;
+  font-weight: bold;
+  font-size: 16px;
+}
+.sold-out-tip {
+  color: #f56c6c;
+  font-size: 14px;
+  margin-top: 8px;
 }
 .promotion-tag {
   display: inline-block;

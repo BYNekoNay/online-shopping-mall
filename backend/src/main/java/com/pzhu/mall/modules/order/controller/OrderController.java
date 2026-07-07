@@ -2,11 +2,14 @@ package com.pzhu.mall.modules.order.controller;
 
 import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.modules.order.dto.CreateOrderDTO;
+import com.pzhu.mall.modules.order.dto.RefundApplyDTO;
 import com.pzhu.mall.modules.order.service.OrderService;
 import com.pzhu.mall.modules.order.vo.OrderVO;
+import com.pzhu.mall.modules.order.vo.PayVO;
+import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -18,10 +21,14 @@ import java.util.List;
 @Tag(name = "订单")
 @RestController
 @RequestMapping("/api/orders")
+@RequireRole(1)
 public class OrderController {
 
     @Resource
     private OrderService orderService;
+
+    @Resource
+    private com.pzhu.mall.modules.order.service.RefundService refundService;
 
     @Operation(summary = "提交订单")
     @PostMapping
@@ -57,9 +64,12 @@ public class OrderController {
 
     @Operation(summary = "支付订单（模拟）")
     @PostMapping("/{id}/pay")
-    public Result<Void> pay(@PathVariable Long id, @RequestBody PayDTO dto) {
+    public Result<PayVO> pay(@PathVariable Long id, @RequestBody PayDTO dto) {
         orderService.pay(id, dto.getPayType());
-        return Result.success();
+        PayVO vo = new PayVO();
+        vo.setPaySuccess(true);
+        vo.setPayNo("PAY" + System.currentTimeMillis());
+        return Result.success(vo);
     }
 
     @Operation(summary = "评价订单项")
@@ -82,5 +92,13 @@ public class OrderController {
         public void setRating(Integer rating) { this.rating = rating; }
         public String getContent() { return content; }
         public void setContent(String content) { this.content = content; }
+    }
+
+    @Operation(summary = "申请退款")
+    @PostMapping("/{orderId}/refund")
+    public Result<Void> refund(@PathVariable Long orderId, @Validated @RequestBody RefundApplyDTO dto) {
+        dto.setOrderId(orderId);
+        refundService.apply(dto);
+        return Result.success();
     }
 }

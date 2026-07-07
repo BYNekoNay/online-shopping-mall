@@ -17,6 +17,7 @@ public class CartVO {
     private BigDecimal price;
     private String specText;
     private Integer stock;
+    private Boolean stockEnough;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -38,4 +39,6 @@ public class CartVO {
     public void setSpecText(String specText) { this.specText = specText; }
     public Integer getStock() { return stock; }
     public void setStock(Integer stock) { this.stock = stock; }
+    public Boolean getStockEnough() { return stockEnough; }
+    public void setStockEnough(Boolean stockEnough) { this.stockEnough = stockEnough; }
 }

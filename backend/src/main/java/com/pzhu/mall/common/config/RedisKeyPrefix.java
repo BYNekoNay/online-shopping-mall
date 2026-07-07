@@ -39,4 +39,6 @@ public final class RedisKeyPrefix {
     public static final String UPLOAD     = "mall:upload";
     /** 搜索历史 */
     public static final String SEARCH_HISTORY = "mall:search:history";
+    /** 登录暴力破解防护 */
+    public static final String LOGIN_FAIL = "mall:login:fail";
 }

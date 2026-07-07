@@ -22,7 +22,7 @@ public class ProductVO {
     private Integer status;
     private String categoryName;
     private String shopName;
-    private List<SkuVO> skus;
+    private List<SkuVO> skuList;
     private java.time.LocalDateTime createTime;
 
     public Long getId() { return id; }
@@ -53,8 +53,8 @@ public class ProductVO {
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
     public String getShopName() { return shopName; }
     public void setShopName(String shopName) { this.shopName = shopName; }
-    public List<SkuVO> getSkus() { return skus; }
-    public void setSkus(List<SkuVO> skus) { this.skus = skus; }
+    public List<SkuVO> getSkuList() { return skuList; }
+    public void setSkuList(List<SkuVO> skuList) { this.skuList = skuList; }
     public java.time.LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(java.time.LocalDateTime createTime) { this.createTime = createTime; }
 }

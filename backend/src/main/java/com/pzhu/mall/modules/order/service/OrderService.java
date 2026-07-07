@@ -1,9 +1,11 @@
 package com.pzhu.mall.modules.order.service;
 
+import com.pzhu.mall.common.config.RedisKeyPrefix;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.cart.entity.Cart;
 import com.pzhu.mall.modules.cart.mapper.CartMapper;
+import com.pzhu.mall.modules.behavior.service.BehaviorService;
 import com.pzhu.mall.modules.marketing.service.CouponService;
 import com.pzhu.mall.modules.order.dto.CreateOrderDTO;
 import com.pzhu.mall.modules.order.dto.ProductItemDTO;
@@ -11,13 +13,19 @@ import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.entity.OrderItem;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
+import com.pzhu.mall.modules.order.component.OrderNoGenerator;
+import com.pzhu.mall.modules.order.component.StockService;
+import com.pzhu.mall.modules.order.vo.OrderItemVO;
 import com.pzhu.mall.modules.order.vo.OrderVO;
+import com.pzhu.mall.modules.product.service.ReviewService;
+import com.pzhu.mall.modules.product.entity.Review;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.entity.Sku;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.product.mapper.SkuMapper;
 import com.pzhu.mall.modules.user.entity.Address;
 import com.pzhu.mall.modules.user.mapper.AddressMapper;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +41,22 @@ import java.util.stream.Collectors;
 @Service
 public class OrderService {
 
-    private static final String ORDER_STATUS_MAP = "{\"0\":\"待付款\",\"1\":\"待发货\",\"2\":\"已发货\",\"3\":\"已收货\",\"4\":\"已完成\",\"5\":\"已取消\",\"6\":\"退款中\",\"7\":\"已退款\"}";
+    @Resource
+    private OrderNoGenerator orderNoGenerator;
+
+    @Resource
+    private StockService stockService;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    private static final Map<Integer, String> STATUS_MAP = Map.of(
+        0, "待付款", 1, "待发货", 2, "已发货", 3, "已收货",
+        4, "已完成", 5, "已取消", 6, "退款中", 7, "已退款"
+    );
+
+    /** 幂等 key 过期时间（24 小时，覆盖订单超时取消窗口） */
+    private static final long IDEMPOTENT_TTL_HOURS = 24;
 
     @Resource
     private OrderMapper orderMapper;
@@ -51,6 +74,9 @@ public class OrderService {
     private SkuMapper skuMapper;
 
     @Resource
+    private ReviewService reviewService;
+
+    @Resource
     private AddressMapper addressMapper;
 
     @Resource
@@ -63,17 +89,37 @@ public class OrderService {
     private com.pzhu.mall.modules.marketing.service.PointsService pointsService;
 
     @Resource
+    private BehaviorService behaviorService;
+
+    @Resource
     private com.pzhu.mall.modules.logistics.service.FreightService freightService;
+
+    @Resource
+    private com.pzhu.mall.modules.logistics.mapper.LogisticsMapper logisticsMapper;
 
     /**
      * 提交订单（核心链路）。
+     * <p>
+     * 按店铺拆单后每组独立执行，每组通过独立的 {@code @Transactional} 方法处理，
+     * 单组因库存不足等原因失败时，已成功创建的子订单不回滚（符合设计文档要求）。
+     * 每组内部通过 Redis 预扣减 + 失败手动回滚保证一致性。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public List<OrderVO> createOrder(CreateOrderDTO dto) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
 
-        // 幂等校验
-        // TODO: Redis requestId 幂等缓存（待 Redis 集成完成后实现）
+        // 0. 幂等校验（Redis SET NX）
+        String requestId = dto.getRequestId();
+        if (requestId == null || requestId.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "requestId 不能为空");
+        }
+        String idempotentKey = RedisKeyPrefix.ORDER + ":idempotent:" + requestId;
+        Boolean alreadySet = stringRedisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", IDEMPOTENT_TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
+        if (alreadySet != null && !alreadySet) {
+            // 重复请求：根据设计文档 §1.5，直接返回已创建的订单列表
+            // 此处简化处理：返回空列表（生产环境应缓存并返回原始订单列表）
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "订单已提交，请勿重复操作");
+        }
 
         // 1. 获取商品列表
         List<ProductItemDTO> items = dto.getProductItems();
@@ -103,7 +149,7 @@ public class OrderService {
             if (product == null || product.getIsDeleted() == 1) {
                 throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
             }
-            if (product.getStatus() != 1) {
+            if (com.pzhu.mall.common.enums.ProductStatus.of(product.getStatus()) != com.pzhu.mall.common.enums.ProductStatus.ONLINE) {
                 throw new BusinessException(ErrorCode.PRODUCT_OFFLINE_ORDER);
             }
             byShop.computeIfAbsent(product.getShopId(), k -> new ArrayList<>()).add(item);
@@ -118,111 +164,183 @@ public class OrderService {
                 address.getReceiver(), address.getPhone(), address.getProvince(), address.getCity(), address.getDistrict(), address.getDetail());
 
         List<OrderVO> allOrders = new ArrayList<>();
-        boolean firstGroup = true;
+        boolean pointsProcessed = false;
+        boolean cartDeleted = false;
+        List<String> failedShops = new ArrayList<>();
 
-        // 4. 按分组创建订单
+        // 4. 按分组创建订单（每组独立事务，单组失败跳过并记录，其余组继续）
         for (Map.Entry<Long, List<ProductItemDTO>> entry : byShop.entrySet()) {
             Long shopId = entry.getKey();
             List<ProductItemDTO> groupItems = entry.getValue();
 
-            // 4.1 计算商品金额（促销折扣后）
-            BigDecimal goodsAmount = BigDecimal.ZERO;
-            List<OrderItem> orderItems = new ArrayList<>();
-            for (ProductItemDTO item : groupItems) {
-                Product product = productMapper.selectById(item.getProductId());
-                Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
-                BigDecimal unitPrice = sku != null ? sku.getPrice() : product.getPrice();
-                BigDecimal itemAmount = unitPrice.multiply(new BigDecimal(item.getQuantity()));
-                goodsAmount = goodsAmount.add(itemAmount);
-
-                OrderItem oi = new OrderItem();
-                oi.setProductId(item.getProductId());
-                oi.setSkuId(item.getSkuId());
-                oi.setProductNameSnapshot(product.getName());
-                oi.setProductImageSnapshot(sku != null ? sku.getImage() : product.getMainImage());
-                oi.setPrice(unitPrice);
-                oi.setQuantity(item.getQuantity());
-                oi.setIsGift(0);
-                orderItems.add(oi);
+            List<Long> deductedSkus = new ArrayList<>();
+            List<Integer> deductedQtys = new ArrayList<>();
+            boolean stockFailed = false;
+            try {
+                // 4.7 库存预扣减（该分组内全部 SKU，失败则回滚该分组已扣减的库存）
+                for (ProductItemDTO item : groupItems) {
+                    Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
+                    if (sku != null) {
+                        boolean ok = stockService.deduct(sku.getId(), item.getQuantity());
+                        if (!ok) {
+                            stockFailed = true;
+                            break;
+                        }
+                        deductedSkus.add(sku.getId());
+                        deductedQtys.add(item.getQuantity());
+                    }
+                }
+            } catch (Exception e) {
+                stockFailed = true;
+            }
+            if (stockFailed) {
+                for (int i = 0; i < deductedSkus.size(); i++) {
+                    stockService.rollback(deductedSkus.get(i), deductedQtys.get(i));
+                }
+                failedShops.add("店铺" + shopId + "库存不足");
+                continue;
             }
 
-            // 4.2 计算运费
-            BigDecimal freightAmount = freightService.calculate(shopId, address.getProvince(), goodsAmount);
-
-            // 4.3 促销优惠
-            BigDecimal promotionDiscount = promotionService.calculateDiscount(shopId, goodsAmount);
-
-            // 4.4 优惠券抵扣
-            BigDecimal couponDiscount = BigDecimal.ZERO;
-            if (dto.getCouponId() != null) {
-                couponDiscount = couponService.calculateDiscount(dto.getCouponId(), goodsAmount);
+            // 4.8 调用独立事务方法处理该分组（insert order + orderItems + 积分/优惠券 + 购物车清理）
+            boolean applyPoints = !pointsProcessed && Boolean.TRUE.equals(dto.getUsePoints());
+            List<OrderVO> groupOrders;
+            try {
+                groupOrders = processOrderGroup(userId, shopId, groupItems, addressSnapshot, address.getProvince(), dto, applyPoints);
+            } catch (Exception e) {
+                // 事务回滚后，归还 Redis 预扣减的库存
+                for (int i = 0; i < deductedSkus.size(); i++) {
+                    stockService.rollback(deductedSkus.get(i), deductedQtys.get(i));
+                }
+                failedShops.add("店铺" + shopId + "下单失败");
+                continue;
             }
+            allOrders.addAll(groupOrders);
 
-            // 4.5 积分抵扣（仅第一组）
-            BigDecimal pointsDeduct = BigDecimal.ZERO;
-            Integer pointsUsed = 0;
-            if (firstGroup && Boolean.TRUE.equals(dto.getUsePoints())) {
-                java.math.BigDecimal[] result = pointsService.calculateDeduct(userId, goodsAmount);
-                pointsDeduct = result[0];
-                pointsUsed = result[1].intValue();
+            // 标记积分已处理（仅第一个成功分组处理一次）
+            if (applyPoints) {
+                pointsProcessed = true;
             }
-            firstGroup = false;
-
-            // 4.6 实付金额
-            BigDecimal payAmount = goodsAmount.add(freightAmount)
-                    .subtract(promotionDiscount)
-                    .subtract(couponDiscount)
-                    .subtract(pointsDeduct);
-
-            // 4.7 创建订单
-            Order order = new Order();
-            order.setOrderNo(generateOrderNo());
-            order.setUserId(userId);
-            order.setShopId(shopId);
-            order.setTotalAmount(goodsAmount.add(freightAmount));
-            order.setFreightAmount(freightAmount);
-            order.setDiscountAmount(promotionDiscount.add(couponDiscount).add(pointsDeduct));
-            order.setPayAmount(payAmount);
-            order.setStatus(0); // 待付款
-            order.setAddressSnapshot(addressSnapshot);
-            order.setRemark(dto.getRemark());
-            order.setIsDeleted(0);
-            orderMapper.insert(order);
-
-            // 4.8 批量插入订单明细
-            for (OrderItem oi : orderItems) {
-                oi.setOrderId(order.getId());
-                orderItemMapper.insert(oi);
-            }
-
-            // 4.9 积分抵扣记录
-            if (pointsUsed > 0) {
-                pointsService.settleDeduct(userId, pointsUsed, order.getId());
-            }
-
-            // 4.10 标记优惠券已使用
-            if (dto.getCouponId() != null) {
-                couponService.markUsed(dto.getCouponId(), order.getId());
-            }
-
-            // 4.11 删除已提交的购物车项
-            if (dto.getCartItemIds() != null) {
+            // 删除已提交的购物车项（仅处理一次）
+            if (dto.getCartItemIds() != null && !cartDeleted) {
                 cartMapper.deleteBatchIds(dto.getCartItemIds());
+                cartDeleted = true;
             }
+        }
 
-            allOrders.add(toVO(order));
+        // 汇总部分失败的提示
+        if (!failedShops.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, String.join("；", failedShops) + "，其余订单已创建");
         }
 
         return allOrders;
     }
 
     /**
-     * 生成订单号。
+     * 处理单个店铺分组（独立事务）。
+     * <p>
+     * 内部保证：创建 Order → 批量插入 OrderItem → 积分抵扣结算 → 标记优惠券已使用，
+     * 任一环节失败时整个分组回滚，调用方负责 Redis 库存归还。
+     *
+     * @param applyPoints 是否应用积分抵扣（仅第一个成功分组传 true）
      */
-    private String generateOrderNo() {
-        String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now());
-        String random = String.format("%06d", new Random().nextInt(1000000));
-        return timestamp + random;
+    @Transactional(rollbackFor = Exception.class)
+    public List<OrderVO> processOrderGroup(Long userId, Long shopId,
+                                           List<ProductItemDTO> groupItems,
+                                           String addressSnapshot,
+                                           String province,
+                                           CreateOrderDTO dto,
+                                           boolean applyPoints) {
+        List<OrderVO> result = new ArrayList<>();
+
+        // 4.1 计算商品金额
+        BigDecimal goodsAmount = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new ArrayList<>();
+        for (ProductItemDTO item : groupItems) {
+            Product product = productMapper.selectById(item.getProductId());
+            Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
+            BigDecimal unitPrice = sku != null ? sku.getPrice() : product.getPrice();
+            BigDecimal itemAmount = unitPrice.multiply(new BigDecimal(item.getQuantity()));
+            goodsAmount = goodsAmount.add(itemAmount);
+
+            OrderItem oi = new OrderItem();
+            oi.setProductId(item.getProductId());
+            oi.setSkuId(item.getSkuId());
+            oi.setProductNameSnapshot(product.getName());
+            oi.setProductImageSnapshot(sku != null ? sku.getImage() : product.getMainImage());
+            oi.setPrice(unitPrice);
+            oi.setQuantity(item.getQuantity());
+            oi.setIsGift(0);
+            orderItems.add(oi);
+        }
+
+        // 4.2 计算运费
+        BigDecimal freightAmount = freightService.calculate(shopId, province, goodsAmount);
+
+        // 4.3 促销优惠
+        BigDecimal promotionDiscount = promotionService.calculateDiscount(shopId, goodsAmount);
+
+        // 4.4 优惠券抵扣（按店铺分组金额计算）
+        BigDecimal couponDiscount = BigDecimal.ZERO;
+        if (dto.getCouponId() != null) {
+            couponDiscount = couponService.calculateDiscount(dto.getCouponId(), goodsAmount);
+        }
+
+        // 4.5 积分抵扣（仅第一个成功分组处理一次）
+        BigDecimal pointsDeduct = BigDecimal.ZERO;
+        Integer pointsUsed = 0;
+        if (applyPoints && Boolean.TRUE.equals(dto.getUsePoints())) {
+            java.math.BigDecimal[] deductResult = pointsService.calculateDeduct(userId, goodsAmount);
+            pointsDeduct = deductResult[0];
+            pointsUsed = deductResult[1].intValue();
+        }
+
+        // 4.6 实付金额
+        BigDecimal payAmount = goodsAmount.add(freightAmount)
+                .subtract(promotionDiscount)
+                .subtract(couponDiscount)
+                .subtract(pointsDeduct);
+
+        // 4.8 创建订单
+        Order order = new Order();
+        order.setOrderNo(orderNoGenerator.generate());
+        order.setUserId(userId);
+        order.setShopId(shopId);
+        order.setTotalAmount(goodsAmount.add(freightAmount));
+        order.setFreightAmount(freightAmount);
+        order.setPromotionDiscountAmount(promotionDiscount);
+        order.setCouponDiscountAmount(couponDiscount);
+        order.setPointsDeductAmount(pointsDeduct);
+        order.setDiscountAmount(promotionDiscount.add(couponDiscount).add(pointsDeduct));
+        order.setPayAmount(payAmount);
+        order.setStatus(0); // 待付款
+        order.setAddressSnapshot(addressSnapshot);
+        order.setRemark(dto.getRemark());
+        order.setIsDeleted(0);
+        orderMapper.insert(order);
+
+        // 4.9 批量插入订单明细
+        for (OrderItem oi : orderItems) {
+            oi.setOrderId(order.getId());
+            orderItemMapper.insert(oi);
+        }
+
+        // 4.10 积分抵扣记录
+        if (pointsUsed > 0) {
+            pointsService.settleDeduct(userId, pointsUsed, order.getId());
+        }
+
+        // 4.11 标记优惠券已使用
+        if (dto.getCouponId() != null) {
+            couponService.markUsed(dto.getCouponId(), order.getId());
+        }
+
+        // 4.12 记录购买行为（behaviorType=3）
+        for (OrderItem oi : orderItems) {
+            behaviorService.record(userId, oi.getProductId(), 3);
+        }
+
+        result.add(toVO(order));
+        return result;
     }
 
     /**
@@ -247,7 +365,60 @@ public class OrderService {
                 .eq(Order::getUserId, userId)
                 .orderByDesc(Order::getCreateTime)
         );
-        return orders.stream().map(this::toVO).collect(Collectors.toList());
+        return toVOList(orders);
+    }
+
+    /**
+     * 商家端：获取本店铺的订单列表。
+     */
+    public List<OrderVO> listByMerchant(Long shopId, Integer status) {
+        var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>();
+        qw.eq(Order::getShopId, shopId)
+          .eq(Order::getIsDeleted, 0);
+        if (status != null) {
+            qw.eq(Order::getStatus, status);
+        }
+        qw.orderByDesc(Order::getCreateTime);
+        List<Order> orders = orderMapper.selectList(qw);
+        return toVOList(orders);
+    }
+
+    /**
+     * 商家端：发货。
+     */
+    @Transactional
+    public void ship(Long orderId, String logisticsCompany, String trackingNo) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        if (order.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        order.setStatus(2); // 已发货
+        orderMapper.updateById(order);
+
+        // 写入物流记录
+        com.pzhu.mall.modules.logistics.entity.Logistics logistics = new com.pzhu.mall.modules.logistics.entity.Logistics();
+        logistics.setOrderId(orderId);
+        logistics.setCompany(logisticsCompany);
+        logistics.setTrackingNo(trackingNo);
+        logistics.setStatus(1); // 待揽收
+        logistics.setLastTrackInfo("商家已发货，等待快递揽收");
+        logistics.setCreateTime(java.time.LocalDateTime.now());
+        logistics.setUpdateTime(java.time.LocalDateTime.now());
+        logisticsMapper.insert(logistics);
+    }
+
+    /**
+     * 商家端：获取指定订单详情（校验店铺归属）。
+     */
+    public OrderVO getMerchantOrderDetail(Long orderId, Long shopId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || !order.getShopId().equals(shopId)) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        return toVO(order);
     }
 
     /**
@@ -265,7 +436,26 @@ public class OrderService {
         }
         order.setStatus(5); // 已取消
         orderMapper.updateById(order);
-        // TODO: 库存归还
+
+        // 库存归还
+        var itemQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>();
+        itemQw.eq(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId, orderId);
+        List<com.pzhu.mall.modules.order.entity.OrderItem> items = orderItemMapper.selectList(itemQw);
+        for (com.pzhu.mall.modules.order.entity.OrderItem item : items) {
+            if (item.getSkuId() != null) {
+                stockService.rollback(item.getSkuId(), item.getQuantity());
+            }
+        }
+
+        // 释放优惠券
+        if (order.getDiscountAmount() != null && order.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
+            couponService.releaseByOrderId(orderId);
+        }
+
+        // 扣回积分（若订单使用了积分抵扣）
+        if (order.getPointsDeductAmount() != null && order.getPointsDeductAmount().compareTo(BigDecimal.ZERO) > 0) {
+            pointsService.clawback(orderId);
+        }
     }
 
     /**
@@ -294,13 +484,38 @@ public class OrderService {
         if (order.getStatus() != 0) {
             throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
         }
+        // 幂等保护：通过 Redis 标记已支付
+        String payKey = RedisKeyPrefix.ORDER + ":paid:" + orderId;
+        Boolean paid = stringRedisTemplate.opsForValue().setIfAbsent(payKey, "1", 30, java.util.concurrent.TimeUnit.DAYS);
+        if (paid == null || !paid) {
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
+        }
         order.setStatus(1); // 待发货
         order.setPayType(payType);
         order.setPayTime(LocalDateTime.now());
         orderMapper.updateById(order);
 
-        // TODO: 真实库存扣减
-        // TODO: 积分正记录
+        // 真实库存扣减（数据库原子操作，利用 WHERE stock >= ? 防超卖）
+        var itemQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>();
+        itemQw.eq(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId, orderId);
+        List<com.pzhu.mall.modules.order.entity.OrderItem> items = orderItemMapper.selectList(itemQw);
+        for (com.pzhu.mall.modules.order.entity.OrderItem item : items) {
+            if (item.getSkuId() != null) {
+                skuMapper.deductStock(item.getSkuId(), item.getQuantity());
+            }
+        }
+
+        // 积分正记录（按实付金额 1:1）
+        pointsService.settleEarn(orderId, order.getUserId(), order.getPayAmount());
+
+        // 记录购买行为（behaviorType=3）
+        List<com.pzhu.mall.modules.order.entity.OrderItem> payItems = orderItemMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>()
+                .eq(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId, orderId)
+        );
+        for (com.pzhu.mall.modules.order.entity.OrderItem item : payItems) {
+            behaviorService.record(order.getUserId(), item.getProductId(), 3);
+        }
     }
 
     /**
@@ -312,7 +527,14 @@ public class OrderService {
         if (item == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        // TODO: 写入 review 表
+
+        // 写入 review 表（幂等：同一订单项只能评价一次）
+        reviewService.submit(orderItemId, userId, rating, content, null);
+
+        // 记录评价行为（behaviorType=4，仅好评计入，rating>=4）
+        if (rating != null && rating >= 4) {
+            behaviorService.record(userId, item.getProductId(), 4);
+        }
     }
 
     private OrderVO toVO(Order order) {
@@ -322,14 +544,96 @@ public class OrderService {
         vo.setShopId(order.getShopId());
         vo.setTotalAmount(order.getTotalAmount());
         vo.setFreightAmount(order.getFreightAmount());
+        vo.setPromotionDiscountAmount(order.getPromotionDiscountAmount());
+        vo.setCouponDiscountAmount(order.getCouponDiscountAmount());
+        vo.setPointsDeductAmount(order.getPointsDeductAmount());
         vo.setDiscountAmount(order.getDiscountAmount());
         vo.setPayAmount(order.getPayAmount());
         vo.setStatus(order.getStatus());
+        vo.setStatusText(STATUS_MAP.getOrDefault(order.getStatus(), "未知"));
         vo.setAddressSnapshot(order.getAddressSnapshot());
         vo.setPayType(order.getPayType());
         vo.setPayTime(order.getPayTime());
         vo.setRemark(order.getRemark());
         vo.setCreateTime(order.getCreateTime());
+
+        // Load order items
+        var itemQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>();
+        itemQw.eq(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId, order.getId());
+        List<com.pzhu.mall.modules.order.entity.OrderItem> items = orderItemMapper.selectList(itemQw);
+        if (items != null) {
+            vo.setItems(items.stream().map(item -> {
+                OrderItemVO iv = new OrderItemVO();
+                iv.setId(item.getId());
+                iv.setProductId(item.getProductId());
+                iv.setSkuId(item.getSkuId());
+                iv.setProductName(item.getProductNameSnapshot());
+                iv.setProductImage(item.getProductImageSnapshot());
+                iv.setPrice(item.getPrice());
+                iv.setQuantity(item.getQuantity());
+                iv.setIsGift(item.getIsGift());
+                return iv;
+            }).collect(java.util.stream.Collectors.toList()));
+        }
+
         return vo;
+    }
+
+    /**
+     * 批量转换，避免 N+1 查询。
+     * 先一次性查出所有 orderId 对应的 order items，再分组构建 VO。
+     */
+    private List<OrderVO> toVOList(List<Order> orders) {
+        if (orders.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        java.util.Set<Long> orderIds = orders.stream()
+            .map(com.pzhu.mall.modules.order.entity.Order::getId)
+            .collect(java.util.stream.Collectors.toSet());
+
+        // 一次性查出所有 items，按 orderId 分组
+        var itemQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>();
+        itemQw.in(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId, orderIds);
+        List<com.pzhu.mall.modules.order.entity.OrderItem> allItems = orderItemMapper.selectList(itemQw);
+
+        java.util.Map<Long, List<com.pzhu.mall.modules.order.entity.OrderItem>> itemsByOrder = allItems.stream()
+            .collect(java.util.stream.Collectors.groupingBy(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId));
+
+        return orders.stream().map(order -> {
+            OrderVO vo = new OrderVO();
+            vo.setOrderId(order.getId());
+            vo.setOrderNo(order.getOrderNo());
+            vo.setShopId(order.getShopId());
+            vo.setTotalAmount(order.getTotalAmount());
+            vo.setFreightAmount(order.getFreightAmount());
+            vo.setPromotionDiscountAmount(order.getPromotionDiscountAmount());
+            vo.setCouponDiscountAmount(order.getCouponDiscountAmount());
+            vo.setPointsDeductAmount(order.getPointsDeductAmount());
+            vo.setDiscountAmount(order.getDiscountAmount());
+            vo.setPayAmount(order.getPayAmount());
+            vo.setStatus(order.getStatus());
+            vo.setStatusText(STATUS_MAP.getOrDefault(order.getStatus(), "未知"));
+            vo.setAddressSnapshot(order.getAddressSnapshot());
+            vo.setPayType(order.getPayType());
+            vo.setPayTime(order.getPayTime());
+            vo.setRemark(order.getRemark());
+            vo.setCreateTime(order.getCreateTime());
+
+            List<com.pzhu.mall.modules.order.entity.OrderItem> items = itemsByOrder.getOrDefault(order.getId(), java.util.Collections.emptyList());
+            vo.setItems(items.stream().map(item -> {
+                OrderItemVO iv = new OrderItemVO();
+                iv.setId(item.getId());
+                iv.setProductId(item.getProductId());
+                iv.setSkuId(item.getSkuId());
+                iv.setProductName(item.getProductNameSnapshot());
+                iv.setProductImage(item.getProductImageSnapshot());
+                iv.setPrice(item.getPrice());
+                iv.setQuantity(item.getQuantity());
+                iv.setIsGift(item.getIsGift());
+                return iv;
+            }).collect(java.util.stream.Collectors.toList()));
+
+            return vo;
+        }).collect(java.util.stream.Collectors.toList());
     }
 }

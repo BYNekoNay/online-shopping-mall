@@ -3,20 +3,8 @@
     <aside class="sidebar">
       <div class="logo">商家后台</div>
       <el-menu :default-active="currentRoute" router>
-        <el-menu-item index="/merchant/shop/info">
-          <el-icon><Shop /></el-icon><span>店铺管理</span>
-        </el-menu-item>
-        <el-menu-item index="/merchant/products">
-          <el-icon><Goods /></el-icon><span>商品管理</span>
-        </el-menu-item>
-        <el-menu-item index="/merchant/orders">
-          <el-icon><Document /></el-icon><span>订单管理</span>
-        </el-menu-item>
-        <el-menu-item index="/merchant/refunds">
-          <el-icon><RefreshRight /></el-icon><span>售后处理</span>
-        </el-menu-item>
-        <el-menu-item index="/merchant/statistics">
-          <el-icon><TrendCharts /></el-icon><span>数据统计</span>
+        <el-menu-item v-for="item in menuItems" :key="item.index" :index="item.index">
+          <el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span>
         </el-menu-item>
       </el-menu>
     </aside>
@@ -33,16 +21,53 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { Shop, Goods, Document, RefreshRight, TrendCharts } from '@element-plus/icons-vue'
+import { useMerchantStore } from '@/store/merchant'
+import { Shop, Goods, Document, RefreshRight, TrendCharts, EditPen } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const merchantStore = useMerchantStore()
 const currentRoute = computed(() => route.path)
 const nickname = computed(() => userStore.nickname)
+const shopStatus = computed(() => merchantStore.shopStatus)
+const menuItems = computed(() => {
+  if (shopStatus.value === 0) return [{ index: '/merchant/apply-pending', icon: EditPen, title: '审核中' }]
+  if (shopStatus.value === 2) return [{ index: '/merchant/apply', icon: EditPen, title: '重新入驻' }]
+  return [
+    { index: '/merchant/shop/info', icon: Shop, title: '店铺管理' },
+    { index: '/merchant/products', icon: Goods, title: '商品管理' },
+    { index: '/merchant/orders', icon: Document, title: '订单管理' },
+    { index: '/merchant/refunds', icon: RefreshRight, title: '售后处理' },
+    { index: '/merchant/statistics', icon: TrendCharts, title: '数据统计' },
+  ]
+})
+
+const redirectMap = {
+  0: '/merchant/apply-pending',
+  2: '/merchant/apply',
+  3: '/merchant/apply-pending', // disabled reuses pending page with different message
+}
+
+onMounted(async () => {
+  if (shopStatus.value === -1) {
+    await merchantStore.fetchApplyStatus()
+  }
+  // After loading status, redirect if not approved
+  if (shopStatus.value !== 1 && shopStatus.value !== -1) {
+    router.replace(redirectMap[shopStatus.value] || '/merchant/apply')
+  }
+})
+
+// Watch for status changes (e.g. after re-submitting application)
+watch(shopStatus, (newStatus) => {
+  if (newStatus !== 1 && newStatus !== -1 && route.path !== redirectMap[newStatus]) {
+    router.replace(redirectMap[newStatus] || '/merchant/apply')
+  }
+})
 
 function handleLogout() {
   userStore.logout()

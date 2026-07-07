@@ -38,9 +38,11 @@ const typeMap = { 1: '下单获取', 2: '订单抵扣', 3: '兑换' }
 
 onMounted(async () => {
   try {
-    const data = await request.getPoints()
+    const data = await request.get('/user/points')
     points.value = data.points
-    records.value = data.records || []
+    records.value = []
+    const recordsRes = await request.get('/user/points/records', { params: { pageNum: 1, pageSize: 50 } })
+    records.value = recordsRes.records || []
   } catch {
     // error handled
   }

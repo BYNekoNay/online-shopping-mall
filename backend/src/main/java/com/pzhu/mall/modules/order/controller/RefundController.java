@@ -5,6 +5,7 @@ import com.pzhu.mall.modules.order.dto.RefundApplyDTO;
 import com.pzhu.mall.modules.order.dto.RefundAuditDTO;
 import com.pzhu.mall.modules.order.service.RefundService;
 import com.pzhu.mall.modules.order.vo.RefundVO;
+import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
@@ -19,6 +20,7 @@ import java.util.List;
 @Tag(name = "退款退货")
 @RestController
 @RequestMapping("/api/refunds")
+@RequireRole(1)
 public class RefundController {
 
     @Resource
@@ -38,6 +40,7 @@ public class RefundController {
     }
 
     @Operation(summary = "商家审核退款")
+    @RequireRole(2)
     @PutMapping("/{id}/audit")
     public Result<Void> audit(@PathVariable Long id, @Validated @RequestBody RefundAuditDTO dto) {
         refundService.audit(id, dto.getApproved(), dto.getHandleRemark());

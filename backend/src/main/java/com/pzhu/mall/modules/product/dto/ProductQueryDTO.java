@@ -13,6 +13,7 @@ public class ProductQueryDTO {
     private Integer status;
     private java.math.BigDecimal minPrice;
     private java.math.BigDecimal maxPrice;
+    private String sort; // sales / price_asc / price_desc / new
 
     public Integer getPageNum() { return pageNum; }
     public void setPageNum(Integer pageNum) { this.pageNum = pageNum; }
@@ -30,4 +31,6 @@ public class ProductQueryDTO {
     public void setMinPrice(java.math.BigDecimal minPrice) { this.minPrice = minPrice; }
     public java.math.BigDecimal getMaxPrice() { return maxPrice; }
     public void setMaxPrice(java.math.BigDecimal maxPrice) { this.maxPrice = maxPrice; }
+    public String getSort() { return sort; }
+    public void setSort(String sort) { this.sort = sort; }
 }

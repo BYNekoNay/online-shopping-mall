@@ -8,6 +8,7 @@ import com.pzhu.mall.modules.user.entity.Address;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
 import com.pzhu.mall.security.JwtUtil;
+import com.pzhu.mall.common.config.RedisKeyPrefix;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,28 +24,46 @@ public class UserService {
     private final UserMapper userMapper;
     private final AddressService addressService;
     private final JwtUtil jwtUtil;
+    private final LoginAttemptService loginAttemptService;
 
-    public UserService(UserMapper userMapper, AddressService addressService, JwtUtil jwtUtil) {
+    public UserService(UserMapper userMapper, AddressService addressService, JwtUtil jwtUtil, LoginAttemptService loginAttemptService) {
         this.userMapper = userMapper;
         this.addressService = addressService;
         this.jwtUtil = jwtUtil;
+        this.loginAttemptService = loginAttemptService;
     }
 
     /**
      * 用户注册。
      */
     @Transactional
-    public Long register(String username, String rawPassword, String nickname) {
+    public Long register(String username, String rawPassword, String nickname, String phone, String email) {
         LambdaQueryWrapper<User> qw = new LambdaQueryWrapper<>();
         qw.eq(User::getUsername, username).eq(User::getIsDeleted, 0);
         if (userMapper.selectCount(qw) > 0) {
             throw new BusinessException(ErrorCode.USERNAME_EXISTS);
+        }
+        if (phone != null && !phone.isBlank()) {
+            LambdaQueryWrapper<User> pw = new LambdaQueryWrapper<>();
+            pw.eq(User::getPhone, phone).eq(User::getIsDeleted, 0);
+            if (userMapper.selectCount(pw) > 0) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "Phone already registered");
+            }
+        }
+        if (email != null && !email.isBlank()) {
+            LambdaQueryWrapper<User> ew = new LambdaQueryWrapper<>();
+            ew.eq(User::getEmail, email).eq(User::getIsDeleted, 0);
+            if (userMapper.selectCount(ew) > 0) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "Email already registered");
+            }
         }
 
         User user = new User();
         user.setUsername(username);
         user.setPassword(ENCODER.encode(rawPassword));
         user.setNickname(nickname != null ? nickname : username);
+        user.setPhone(phone);
+        user.setEmail(email);
         user.setRole(1); // 消费者
         user.setStatus(1);
         user.setPoints(0);
@@ -57,16 +76,22 @@ public class UserService {
      * 用户登录，返回 JWT Token。
      */
     public String login(String username, String rawPassword) {
+        // 检查是否被锁定
+        loginAttemptService.checkAllowed(username);
+
         LambdaQueryWrapper<User> qw = new LambdaQueryWrapper<>();
         qw.eq(User::getUsername, username).eq(User::getIsDeleted, 0);
         User user = userMapper.selectOne(qw);
 
         if (user == null || !ENCODER.matches(rawPassword, user.getPassword())) {
+            loginAttemptService.recordFailure(username);
             throw new BusinessException(ErrorCode.USERNAME_OR_PASSWORD_ERROR);
         }
         if (user.getStatus() == 0) {
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
         }
+        // 登录成功，清除失败计数
+        loginAttemptService.clear(username);
         return jwtUtil.generateToken(user.getId(), user.getRole());
     }
 

@@ -1,0 +1,437 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1783354586411,
+  "projectRoot": "D:\\codegitee\\online-shopping-mall\\frontend",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=18.0.0",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vue",
+        "version": "3.4.21",
+        "category": "frontend"
+      },
+      {
+        "name": "vite",
+        "version": "5.2.0",
+        "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "1.4.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": "Node.js 18.0.0"
+  },
+  "build": {
+    "buildCommand": "cd D:/codegitee/online-shopping-mall/frontend && npm run build 2>&1 | tail -5",
+    "testCommand": "cd D:/codegitee/online-shopping-mall/frontend && npx vitest run 2>&1 | tail -15",
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview",
+      "test": "vitest run"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": "ES modules",
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1783354586361,
+      "keyFiles": [
+        "index.html"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 2,
+      "lastAccessed": 1783354586362,
+      "keyFiles": [
+        "App.vue",
+        "main.js"
+      ]
+    },
+    "dist\\assets": {
+      "path": "dist\\assets",
+      "purpose": "Static assets",
+      "fileCount": 69,
+      "lastAccessed": 1783354586393,
+      "keyFiles": [
+        "Addresses-BmMOx0gR.css",
+        "Addresses-Czrf9FVl.js",
+        "admin-kyFgd9Lg.js"
+      ]
+    },
+    "src\\api": {
+      "path": "src\\api",
+      "purpose": "API routes",
+      "fileCount": 7,
+      "lastAccessed": 1783354586394,
+      "keyFiles": [
+        "admin.js",
+        "cart.js",
+        "merchant.js"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 1,
+      "lastAccessed": 1783354586394,
+      "keyFiles": [
+        "RecommendList.vue"
+      ]
+    },
+    "src\\utils": {
+      "path": "src\\utils",
+      "purpose": "Utility functions",
+      "fileCount": 1,
+      "lastAccessed": 1783354586395,
+      "keyFiles": [
+        "request.js"
+      ]
+    },
+    "src\\views": {
+      "path": "src\\views",
+      "purpose": "View templates",
+      "fileCount": 0,
+      "lastAccessed": 1783354586396,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src\\views\\admin\\product\\List.vue",
+      "accessCount": 18,
+      "lastAccessed": 1783400546487,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\merchant\\product\\List.vue",
+      "accessCount": 17,
+      "lastAccessed": 1783400529343,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 15,
+      "lastAccessed": 1783400663672,
+      "type": "directory"
+    },
+    {
+      "path": "src\\views\\consumer\\order\\Confirm.vue",
+      "accessCount": 14,
+      "lastAccessed": 1783400076122,
+      "type": "file"
+    },
+    {
+      "path": "src\\router\\index.js",
+      "accessCount": 12,
+      "lastAccessed": 1783399654426,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\consumer\\cart\\Index.vue",
+      "accessCount": 10,
+      "lastAccessed": 1783400069507,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\merchant\\product\\Edit.vue",
+      "accessCount": 10,
+      "lastAccessed": 1783400143053,
+      "type": "file"
+    },
+    {
+      "path": "src\\api\\merchant.js",
+      "accessCount": 9,
+      "lastAccessed": 1783395689474,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 9,
+      "lastAccessed": 1783399671231,
+      "type": "directory"
+    },
+    {
+      "path": "src\\views\\consumer\\order\\List.vue",
+      "accessCount": 9,
+      "lastAccessed": 1783400070263,
+      "type": "file"
+    },
+    {
+      "path": "src\\api\\order.js",
+      "accessCount": 8,
+      "lastAccessed": 1783395690593,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\merchant\\order\\List.vue",
+      "accessCount": 8,
+      "lastAccessed": 1783400075165,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\merchant\\order\\Refunds.vue",
+      "accessCount": 8,
+      "lastAccessed": 1783400075829,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\consumer\\product\\Detail.vue",
+      "accessCount": 7,
+      "lastAccessed": 1783400107097,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\consumer\\search\\Index.vue",
+      "accessCount": 7,
+      "lastAccessed": 1783400142625,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\consumer\\order\\Pay.vue",
+      "accessCount": 6,
+      "lastAccessed": 1783395640985,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\common\\Login.vue",
+      "accessCount": 6,
+      "lastAccessed": 1783399642935,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\consumer\\category\\Index.vue",
+      "accessCount": 6,
+      "lastAccessed": 1783400107618,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\cart.js",
+      "accessCount": 5,
+      "lastAccessed": 1783392708371,
+      "type": "file"
+    },
+    {
+      "path": "src\\views",
+      "accessCount": 5,
+      "lastAccessed": 1783393065373,
+      "type": "directory"
+    },
+    {
+      "path": "src\\api\\admin.js",
+      "accessCount": 5,
+      "lastAccessed": 1783395690950,
+      "type": "file"
+    },
+    {
+      "path": "src\\api\\cart.js",
+      "accessCount": 4,
+      "lastAccessed": 1783393149468,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\merchant.js",
+      "accessCount": 3,
+      "lastAccessed": 1783389665052,
+      "type": "file"
+    },
+    {
+      "path": "src\\layouts\\MerchantLayout.vue",
+      "accessCount": 3,
+      "lastAccessed": 1783389665797,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\user.js",
+      "accessCount": 3,
+      "lastAccessed": 1783389725844,
+      "type": "file"
+    },
+    {
+      "path": "src\\api",
+      "accessCount": 3,
+      "lastAccessed": 1783395683811,
+      "type": "directory"
+    },
+    {
+      "path": "src\\mock\\product.js",
+      "accessCount": 2,
+      "lastAccessed": 1783383948541,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock",
+      "accessCount": 2,
+      "lastAccessed": 1783384602249,
+      "type": "directory"
+    },
+    {
+      "path": "src\\mock\\order.js",
+      "accessCount": 2,
+      "lastAccessed": 1783384929840,
+      "type": "file"
+    },
+    {
+      "path": "src\\router",
+      "accessCount": 2,
+      "lastAccessed": 1783388853174,
+      "type": "directory"
+    },
+    {
+      "path": "src\\utils\\request.js",
+      "accessCount": 2,
+      "lastAccessed": 1783388960069,
+      "type": "file"
+    },
+    {
+      "path": "src\\views\\merchant\\product",
+      "accessCount": 2,
+      "lastAccessed": 1783388986451,
+      "type": "directory"
+    },
+    {
+      "path": "src\\__tests__",
+      "accessCount": 1,
+      "lastAccessed": 1783355081213,
+      "type": "directory"
+    },
+    {
+      "path": "vite.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1783355115145,
+      "type": "file"
+    },
+    {
+      "path": "vitest.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1783355115947,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\app.js",
+      "accessCount": 1,
+      "lastAccessed": 1783355130627,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1783355135957,
+      "type": "file"
+    },
+    {
+      "path": ".env.development",
+      "accessCount": 1,
+      "lastAccessed": 1783355143034,
+      "type": "file"
+    },
+    {
+      "path": ".env.production",
+      "accessCount": 1,
+      "lastAccessed": 1783355143522,
+      "type": "file"
+    },
+    {
+      "path": ".env.mock",
+      "accessCount": 1,
+      "lastAccessed": 1783355144204,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\shop.js",
+      "accessCount": 1,
+      "lastAccessed": 1783383319863,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\RecommendList.vue",
+      "accessCount": 1,
+      "lastAccessed": 1783383723365,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\admin.js",
+      "accessCount": 1,
+      "lastAccessed": 1783383963699,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\coupon.js",
+      "accessCount": 1,
+      "lastAccessed": 1783384615453,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\recommend.js",
+      "accessCount": 1,
+      "lastAccessed": 1783384617487,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\freight.js",
+      "accessCount": 1,
+      "lastAccessed": 1783384617846,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\refund.js",
+      "accessCount": 1,
+      "lastAccessed": 1783384684289,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\behavior.js",
+      "accessCount": 1,
+      "lastAccessed": 1783384685435,
+      "type": "file"
+    },
+    {
+      "path": "src\\mock\\logistics.js",
+      "accessCount": 1,
+      "lastAccessed": 1783384686802,
+      "type": "file"
+    },
+    {
+      "path": "src\\main.js",
+      "accessCount": 1,
+      "lastAccessed": 1783384693720,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

@@ -5,13 +5,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pzhu.mall.common.result.PageResult;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.common.enums.ProductStatus;
 import com.pzhu.mall.modules.product.dto.ProductQueryDTO;
 import com.pzhu.mall.modules.product.entity.Category;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.product.mapper.CategoryMapper;
+import com.pzhu.mall.modules.behavior.service.BehaviorService;
 import com.pzhu.mall.modules.product.vo.ProductVO;
+import com.pzhu.mall.modules.product.vo.SkuVO;
 import com.pzhu.mall.modules.product.vo.CategoryVO;
+import com.pzhu.mall.modules.product.mapper.SkuMapper;
 import com.pzhu.mall.modules.statistics.mapper.SearchHistoryMapper;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +36,21 @@ public class ProductService {
     private CategoryMapper categoryMapper;
 
     @Resource
+    private SkuMapper skuMapper;
+
+    @Resource
     private SearchHistoryMapper searchHistoryMapper;
+
+    @Resource
+    private BehaviorService behaviorService;
+
+    public ProductMapper getProductMapper() {
+        return productMapper;
+    }
+
+    public SkuMapper getSkuMapper() {
+        return skuMapper;
+    }
 
     /**
      * 分页查询商品列表。
@@ -62,6 +80,15 @@ public class ProductService {
             qw.le(Product::getPrice, query.getMaxPrice());
         }
         qw.orderByDesc(Product::getCreateTime);
+        if ("sales".equals(query.getSort())) {
+            qw.orderByDesc(Product::getSales);
+        } else if ("price_asc".equals(query.getSort())) {
+            qw.orderByAsc(Product::getPrice);
+        } else if ("price_desc".equals(query.getSort())) {
+            qw.orderByDesc(Product::getPrice);
+        } else if ("new".equals(query.getSort())) {
+            qw.orderByDesc(Product::getCreateTime);
+        }
 
         Page<Product> page = new Page<>(query.getPageNum(), query.getPageSize());
         Page<Product> result = productMapper.selectPage(page, qw);
@@ -81,10 +108,18 @@ public class ProductService {
         if (product == null || product.getIsDeleted() == 1) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
-        return toVO(product);
+        ProductVO vo = toVO(product);
+
+        // 记录浏览行为（behaviorType=1）
+        Long currentUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        if (currentUserId != null) {
+            behaviorService.record(currentUserId, productId, 1);
+        }
+
+        return vo;
     }
 
-    private ProductVO toVO(Product product) {
+    public ProductVO toVO(Product product) {
         ProductVO vo = new ProductVO();
         vo.setId(product.getId());
         vo.setShopId(product.getShopId());
@@ -99,6 +134,31 @@ public class ProductService {
         vo.setSales(product.getSales());
         vo.setStatus(product.getStatus());
         vo.setCreateTime(product.getCreateTime());
+
+        // Load category name
+        Category category = categoryMapper.selectById(product.getCategoryId());
+        if (category != null) {
+            vo.setCategoryName(category.getName());
+        }
+
+        // Load sku list
+        var skuQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.product.entity.Sku>();
+        skuQw.eq(com.pzhu.mall.modules.product.entity.Sku::getProductId, product.getId())
+             .eq(com.pzhu.mall.modules.product.entity.Sku::getIsDeleted, 0);
+        List<com.pzhu.mall.modules.product.entity.Sku> skus = skuMapper.selectList(skuQw);
+        if (skus != null) {
+            vo.setSkuList(skus.stream().map(sku -> {
+                SkuVO sv = new SkuVO();
+                sv.setId(sku.getId());
+                sv.setProductId(sku.getProductId());
+                sv.setSpecJson(sku.getSpecJson());
+                sv.setPrice(sku.getPrice());
+                sv.setStock(sku.getStock());
+                sv.setImage(sku.getImage());
+                return sv;
+            }).collect(java.util.stream.Collectors.toList()));
+        }
+
         return vo;
     }
 
@@ -106,7 +166,8 @@ public class ProductService {
         // 搜索历史记录（异步，暂直接调用）
         try {
             var history = new com.pzhu.mall.modules.statistics.entity.SearchHistory();
-            history.setUserId(0L); // 未登录时记录为 0
+            Long currentUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+            history.setUserId(currentUserId != null ? currentUserId : 0L);
             history.setKeyword(keyword);
             searchHistoryMapper.insert(history);
         } catch (Exception e) {

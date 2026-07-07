@@ -1,0 +1,56 @@
+package com.pzhu.mall.modules.marketing.controller;
+
+import com.pzhu.mall.common.result.Result;
+import com.pzhu.mall.modules.marketing.entity.Promotion;
+import com.pzhu.mall.modules.marketing.mapper.PromotionMapper;
+import com.pzhu.mall.modules.marketing.service.PromotionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 促销活动消费者端控制器。
+ */
+@Tag(name = "促销活动（消费者）")
+@RestController
+@RequestMapping("/api/promotions")
+public class PromotionController {
+
+    @Resource
+    private PromotionService promotionService;
+
+    @Resource
+    private PromotionMapper promotionMapper;
+
+    @Operation(summary = "获取当前生效的促销活动列表（消费者）")
+    @GetMapping("/active")
+    public Result<List<Promotion>> active() {
+        List<Promotion> promotions = promotionService.listActive();
+        return Result.success(promotions);
+    }
+
+    @Operation(summary = "按 scope 查询促销活动")
+    @GetMapping("/active/scope")
+    public Result<List<Promotion>> activeByScope(
+            @RequestParam String scope,
+            @RequestParam(required = false) Long scopeId) {
+        List<Promotion> promotions;
+        if (scopeId != null) {
+            promotions = promotionMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
+                            .eq(Promotion::getStatus, 1)
+                            .eq(Promotion::getScope, scope)
+                            .eq(Promotion::getScopeId, scopeId)
+                            .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
+                            .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
+            );
+        } else {
+            promotions = promotionService.listActive();
+        }
+        return Result.success(promotions);
+    }
+}
