@@ -4,9 +4,11 @@ import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.common.config.RedisKeyPrefix;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -22,13 +24,17 @@ public class LoginAttemptService {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /** Lua 脚本：原子性地自增计数并在首次创建时设置过期时间 */
+    private static final DefaultRedisScript<Long> INCR_EXPIRE_SCRIPT = new DefaultRedisScript<>(
+        "local val = redis.call('INCR', KEYS[1]); " +
+        "if val == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; " +
+        "return val;",
+        Long.class
+    );
+
     public void recordFailure(String username) {
         String key = RedisKeyPrefix.LOGIN_FAIL + ":" + username;
-        Long count = stringRedisTemplate.opsForValue().increment(key);
-        if (count == 1) {
-            // 首次失败，设置过期时间
-            stringRedisTemplate.expire(key, LOCK_SECONDS, TimeUnit.SECONDS);
-        }
+        stringRedisTemplate.execute(INCR_EXPIRE_SCRIPT, Collections.singletonList(key), String.valueOf(LOCK_SECONDS));
     }
 
     public void clear(String username) {

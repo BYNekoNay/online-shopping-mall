@@ -54,9 +54,13 @@ public class AdminSystemController {
             qw.eq(OperationLog::getOperatorId, operatorId);
         }
         if (startTime != null && endTime != null) {
-            LocalDateTime s = LocalDateTime.parse(startTime + " 00:00:00");
-            LocalDateTime e = LocalDateTime.parse(endTime + " 23:59:59");
-            qw.between(OperationLog::getCreateTime, s, e);
+            try {
+                LocalDateTime s = LocalDateTime.parse(startTime + " 00:00:00");
+                LocalDateTime e = LocalDateTime.parse(endTime + " 23:59:59");
+                qw.between(OperationLog::getCreateTime, s, e);
+            } catch (java.time.format.DateTimeParseException ex) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "日期格式错误，正确格式：yyyy-MM-dd");
+            }
         }
 
         Page<OperationLog> page = new Page<>(pageNum, pageSize);

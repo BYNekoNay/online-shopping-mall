@@ -120,10 +120,10 @@ async function submit() {
   delete payload.discount
   try {
     if (editing.value && form.value.id) {
-      await updateCoupon(form.value.id, payload)
+      await request.updateCoupon(form.value.id, payload)
       ElMessage.success('Updated')
     } else {
-      await createCoupon(payload)
+      await request.createCoupon(payload)
       ElMessage.success('Created')
     }
     dialogVisible.value = false
@@ -134,7 +134,7 @@ async function submit() {
 async function offlineRow(row) {
   try {
     await ElMessageBox.confirm('确认下线该优惠券？', '提示', { type: 'warning' })
-    await offlineCoupon(row.id)
+    await request.offlineCoupon(row.id)
     ElMessage.success('已下线')
     load()
   } catch {}
@@ -143,7 +143,7 @@ async function offlineRow(row) {
 async function deleteRow(row) {
   try {
     await ElMessageBox.confirm('确认删除该优惠券？', '提示', { type: 'warning' })
-    await deleteCoupon(row.id)
+    await request.deleteCoupon(row.id)
     ElMessage.success('已删除')
     load()
   } catch {}

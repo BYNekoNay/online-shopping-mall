@@ -16,6 +16,7 @@ import com.pzhu.mall.modules.user.entity.Address;
 import com.pzhu.mall.modules.user.mapper.AddressMapper;
 import com.pzhu.mall.modules.logistics.service.FreightService;
 import com.pzhu.mall.security.LoginUserContext;
+import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,7 @@ import java.util.List;
 @Tag(name = "订单估价")
 @RestController
 @RequestMapping("/api/orders/estimate")
+@RequireRole(1)
 public class OrderEstimateController {
 
     @Resource

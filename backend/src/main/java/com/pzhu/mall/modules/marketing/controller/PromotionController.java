@@ -28,18 +28,11 @@ public class PromotionController {
 
     @Operation(summary = "获取当前生效的促销活动列表（消费者）")
     @GetMapping("/active")
-    public Result<List<Promotion>> active() {
-        List<Promotion> promotions = promotionService.listActive();
-        return Result.success(promotions);
-    }
-
-    @Operation(summary = "按 scope 查询促销活动")
-    @GetMapping("/active/scope")
-    public Result<List<Promotion>> activeByScope(
-            @RequestParam String scope,
+    public Result<List<Promotion>> active(
+            @RequestParam(required = false) String scope,
             @RequestParam(required = false) Long scopeId) {
         List<Promotion> promotions;
-        if (scopeId != null) {
+        if (scope != null && scopeId != null) {
             promotions = promotionMapper.selectList(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
                             .eq(Promotion::getStatus, 1)
@@ -53,4 +46,5 @@ public class PromotionController {
         }
         return Result.success(promotions);
     }
+
 }

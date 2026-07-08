@@ -130,9 +130,9 @@ onMounted(async () => {
     addresses.value = []
   }
 
-  // 加载可用优惠券
+  // 加载可用优惠券（仅未使用的）
   try {
-    const coupons = await couponRequest.getUserCoupons()
+    const coupons = await couponRequest.getUserCoupons({ status: 0 })
     availableCoupons.value = coupons || []
   } catch {
     availableCoupons.value = []

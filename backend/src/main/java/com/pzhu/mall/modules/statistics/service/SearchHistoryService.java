@@ -1,8 +1,6 @@
 package com.pzhu.mall.modules.statistics.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.pzhu.mall.common.exception.BusinessException;
-import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.statistics.entity.SearchHistory;
 import com.pzhu.mall.modules.statistics.mapper.SearchHistoryMapper;
 import org.springframework.stereotype.Service;

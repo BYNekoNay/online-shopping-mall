@@ -3,6 +3,7 @@ package com.pzhu.mall.modules.marketing.controller;
 import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.modules.marketing.entity.Promotion;
 import com.pzhu.mall.modules.marketing.service.PromotionService;
+import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ import java.util.List;
 @Tag(name = "促销活动（管理端）")
 @RestController
 @RequestMapping("/api/admin/promotions")
+@RequireRole(3)
 public class AdminPromotionController {
 
     @Resource

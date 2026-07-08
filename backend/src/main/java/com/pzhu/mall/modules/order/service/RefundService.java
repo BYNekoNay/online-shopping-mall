@@ -1,5 +1,6 @@
 package com.pzhu.mall.modules.order.service;
 
+import com.pzhu.mall.common.config.RedisKeyPrefix;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.marketing.service.PointsService;
@@ -11,11 +12,15 @@ import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
 import com.pzhu.mall.modules.order.mapper.RefundMapper;
 import com.pzhu.mall.modules.order.vo.RefundVO;
+import com.pzhu.mall.security.LoginUserContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -36,8 +41,14 @@ public class RefundService {
     @Resource
     private PointsService pointsService;
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    /** 退款幂等 key 过期时间（3 天） */
+    private static final long REFUND_IDEMPOTENT_TTL_HOURS = 72;
+
     /**
-     * 申请退款。
+     * 申请退款（幂等：同一订单 + 同一 orderItemId 不允许重复提交）。
      * <p>
      * 校验规则：
      * <ul>
@@ -45,7 +56,15 @@ public class RefundService {
      *   <li>赠品行（is_gift=1）不允许单独退款。</li>
      * </ul>
      */
+    @Transactional(rollbackFor = Exception.class)
     public void apply(RefundApplyDTO dto) {
+        // 0. 幂等校验（Redis SET NX）
+        String idempotentKey = RedisKeyPrefix.ORDER + ":refund:apply:" + dto.getOrderId() + ":" + (dto.getOrderItemId() != null ? dto.getOrderItemId() : "all");
+        Boolean alreadyApplied = stringRedisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", REFUND_IDEMPOTENT_TTL_HOURS, TimeUnit.HOURS);
+        if (alreadyApplied != null && !alreadyApplied) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "已提交过退款申请，请勿重复操作");
+        }
+
         // 1. 校验退款金额不超过订单实付金额
         Order order = orderMapper.selectById(dto.getOrderId());
         if (order == null) {
@@ -86,9 +105,11 @@ public class RefundService {
      * 审核通过时：
      * <ul>
      *   <li>更新退款状态为已通过。</li>
+     *   <li>同步更新订单状态为"已退款"（status=7）。</li>
      *   <li>调用 PointsService.clawback 扣回该订单产生的积分。</li>
      * </ul>
      */
+    @Transactional(rollbackFor = Exception.class)
     public void audit(Long refundId, Boolean approved, String handleRemark) {
         Refund refund = refundMapper.selectById(refundId);
         if (refund == null) {
@@ -98,18 +119,36 @@ public class RefundService {
         refund.setHandleRemark(handleRemark);
         refundMapper.updateById(refund);
 
-        // 审核通过：扣回积分
         if (approved) {
+            // 同步更新订单状态为"已退款"
+            Order order = orderMapper.selectById(refund.getOrderId());
+            if (order != null && order.getStatus() != 7) {
+                order.setStatus(7);
+                orderMapper.updateById(order);
+            }
+            // 扣回积分
             pointsService.clawback(refund.getOrderId());
         }
     }
 
     /**
      * 获取当前用户的退款列表。
+     * <p>通过当前用户的订单 ID 过滤退款记录，避免用户看到他人退款信息。</p>
      */
     public List<RefundVO> listByUser() {
+        Long userId = LoginUserContext.getCurrentUserId();
+        // 先查出当前用户的所有订单 ID
+        List<Long> userOrderIds = orderMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
+                .select(Order::getId)
+                .eq(Order::getUserId, userId)
+        ).stream().map(Order::getId).collect(java.util.stream.Collectors.toList());
+        if (userOrderIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
         List<Refund> list = refundMapper.selectList(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Refund>()
+                .in(Refund::getOrderId, userOrderIds)
                 .orderByDesc(Refund::getCreateTime)
         );
         return list.stream().map(this::toVO).collect(Collectors.toList());

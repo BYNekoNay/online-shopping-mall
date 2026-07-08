@@ -23,6 +23,7 @@ import javax.annotation.Resource;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
 
 /**
  * 商家端商品管理控制器。
@@ -56,7 +57,7 @@ public class MerchantProductController {
         // 校验商品归属当前商家店铺
         Long merchantUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         Long shopId = shopService.getMerchantShopIdOrThrow(merchantUserId);
-        if (!product.getShopId().equals(shopId)) {
+        if (!Objects.equals(product.getShopId(), shopId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         return Result.success(product);
@@ -108,7 +109,7 @@ public class MerchantProductController {
         }
         Long merchantUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         Long shopId = shopService.getMerchantShopIdOrThrow(merchantUserId);
-        if (!product.getShopId().equals(shopId)) {
+        if (!Objects.equals(product.getShopId(), shopId)) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
 
@@ -158,10 +159,14 @@ public class MerchantProductController {
 
         for (Long productId : dto.getProductIds()) {
             Product product = productService.getProductMapper().selectById(productId);
-            if (product == null || !product.getShopId().equals(shopId)) {
+            if (product == null || !Objects.equals(product.getShopId(), shopId)) {
                 continue;
             }
             if ("on".equals(dto.getAction())) {
+                // 仅允许待审核(PENDING=2)的商品上架，禁止从审核拒绝(REJECTED=3)直接上架绕过审核
+                if (ProductStatus.of(product.getStatus()) != ProductStatus.PENDING) {
+                    continue;
+                }
                 product.setStatus(ProductStatus.ONLINE.getCode());
             } else if ("off".equals(dto.getAction())) {
                 product.setStatus(ProductStatus.OFFLINE.getCode());

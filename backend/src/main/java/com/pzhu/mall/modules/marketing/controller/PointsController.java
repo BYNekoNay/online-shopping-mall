@@ -1,11 +1,10 @@
 package com.pzhu.mall.modules.marketing.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
 import com.pzhu.mall.modules.marketing.entity.PointsRecord;
-import com.pzhu.mall.modules.marketing.mapper.PointsRecordMapper;
 import com.pzhu.mall.modules.marketing.service.PointsService;
 import com.pzhu.mall.security.LoginUserContext;
 import com.pzhu.mall.security.RequireRole;
@@ -14,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,9 +26,6 @@ public class PointsController {
 
     @Resource
     private UserMapper userMapper;
-
-    @Resource
-    private PointsRecordMapper pointsRecordMapper;
 
     @Resource
     private PointsService pointsService;
@@ -50,11 +45,10 @@ public class PointsController {
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "20") Integer pageSize) {
         Long userId = LoginUserContext.getCurrentUserId();
-        long total = pointsService.countRecords(userId);
-        List<PointsRecord> records = pointsService.listRecords(userId, pageNum, pageSize);
+        Page<PointsRecord> page = pointsService.listRecords(userId, pageNum, pageSize);
         return Result.success(Map.of(
-                "records", records,
-                "total", total,
+                "records", page.getRecords(),
+                "total", page.getTotal(),
                 "pageNum", pageNum,
                 "pageSize", pageSize
         ));

@@ -27,6 +27,7 @@ const router = useRouter()
 const orderDetail = ref({})
 const payType = ref(1)
 const paying = ref(false)
+const payResult = ref(null)
 
 onMounted(async () => {
   try {
@@ -39,7 +40,8 @@ onMounted(async () => {
 async function handlePay() {
   paying.value = true
   try {
-    await request.payOrder(route.params.id, { payType: payType.value })
+    const res = await request.payOrder(route.params.id, { payType: payType.value })
+    payResult.value = res
     ElMessage.success('Payment successful')
     router.push('/orders')
   } catch {

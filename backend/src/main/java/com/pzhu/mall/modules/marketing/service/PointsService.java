@@ -1,19 +1,21 @@
 package com.pzhu.mall.modules.marketing.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
 import com.pzhu.mall.modules.marketing.entity.PointsRecord;
 import com.pzhu.mall.modules.marketing.mapper.PointsRecordMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -43,7 +45,7 @@ public class PointsService {
             return new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO};
         }
         int points = user.getPoints() != null ? user.getPoints() : 0;
-        BigDecimal byPoints = new BigDecimal(points).divide(new BigDecimal(100), 2, BigDecimal.ROUND_DOWN);
+        BigDecimal byPoints = new BigDecimal(points).divide(new BigDecimal(100), 2, RoundingMode.DOWN);
         BigDecimal byAmount = goodsAmount.multiply(new BigDecimal("0.5"));
         BigDecimal deduct = byPoints.min(byAmount);
         int pointsNeeded = deduct.multiply(new BigDecimal(100)).intValue();
@@ -52,14 +54,17 @@ public class PointsService {
 
     /**
      * 下单时扣除积分。
+     * <p>校验 pointsUsed 不超过用户当前可用积分，防止扣成负数。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public void settleDeduct(Long userId, int pointsUsed, Long orderId) {
         User user = userMapper.selectById(userId);
         if (user == null) return;
         int currentPoints = user.getPoints() != null ? user.getPoints() : 0;
-        int newPoints = Math.max(0, currentPoints - pointsUsed);
-        user.setPoints(newPoints);
+        if (pointsUsed > currentPoints) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "积分不足，无法抵扣");
+        }
+        user.setPoints(currentPoints - pointsUsed);
         userMapper.updateById(user);
 
         PointsRecord record = new PointsRecord();
@@ -69,7 +74,7 @@ public class PointsService {
         record.setRelatedOrderId(orderId);
         record.setCreateTime(LocalDateTime.now());
         pointsRecordMapper.insert(record);
-        log.info("[积分] 用户={} 订单={} 抵扣积分={} 剩余={}", userId, orderId, pointsUsed, newPoints);
+        log.info("[积分] 用户={} 订单={} 抵扣积分={} 剩余={}", userId, orderId, pointsUsed, currentPoints - pointsUsed);
     }
 
     /**
@@ -125,33 +130,13 @@ public class PointsService {
     }
 
     /**
-     * 查询积分变动流水（分页）。
+     * 查询积分变动流水（分页，使用 MyBatis-Plus selectPage 避免 OOM）。
      */
-    public List<PointsRecord> listRecords(Long userId, int pageNum, int pageSize) {
-        int offset = (pageNum - 1) * pageSize;
-        // 使用 MyBatis-Plus 的 selectPage 或手写分页
-        // 简化处理：先获取总数，再截取分页数据
+    public Page<PointsRecord> listRecords(Long userId, int pageNum, int pageSize) {
+        Page<PointsRecord> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<PointsRecord> qw = new LambdaQueryWrapper<>();
         qw.eq(PointsRecord::getUserId, userId)
           .orderByDesc(PointsRecord::getCreateTime);
-
-        // 获取分页数据
-        List<PointsRecord> all = pointsRecordMapper.selectList(qw);
-        int total = all.size();
-        int fromIndex = Math.min(offset, total);
-        int toIndex = Math.min(fromIndex + pageSize, total);
-        if (fromIndex >= toIndex) {
-            return List.of();
-        }
-        return all.subList(fromIndex, toIndex);
-    }
-
-    /**
-     * 查询积分变动流水总数（用于分页）。
-     */
-    public long countRecords(Long userId) {
-        return pointsRecordMapper.selectCount(
-                new LambdaQueryWrapper<PointsRecord>().eq(PointsRecord::getUserId, userId)
-        );
+        return pointsRecordMapper.selectPage(page, qw);
     }
 }

@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 @Service
 public class ProductService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProductService.class);
+
     @Resource
     private ProductMapper productMapper;
 
@@ -172,7 +174,6 @@ public class ProductService {
     }
 
     private void recordSearchHistory(String keyword) {
-        // 搜索历史记录（异步，暂直接调用）
         try {
             var history = new com.pzhu.mall.modules.statistics.entity.SearchHistory();
             Long currentUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
@@ -180,7 +181,7 @@ public class ProductService {
             history.setKeyword(keyword);
             searchHistoryMapper.insert(history);
         } catch (Exception e) {
-            // 搜索历史记录失败不影响主流程
+            log.warn("记录搜索历史失败, keyword={}", keyword, e);
         }
     }
 }

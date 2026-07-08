@@ -78,19 +78,17 @@ const form = ref({
 onMounted(async () => {
   // 加载分类列表
   try {
-    const res = await request.getCategoriesTree ? [] : []
-    const apiRes = await fetch('/api/products/categories/tree').then(r => r.json())
+    const apiRes = await request.getCategoriesTree()
     categories.value = apiRes.records || apiRes || []
   } catch {
     categories.value = []
   }
 
-  // 编辑模式：加载商品详情
+  // 编辑模式：加载商品详情（使用商家端接口）
   if (route.query.id) {
     isEdit.value = true
     try {
-      const prodRes = await fetch(`/api/products/${route.query.id}`).then(r => r.json())
-      const p = prodRes.records || prodRes
+      const p = await request.getProductDetail(route.query.id)
       form.value.name = p.name
       form.value.categoryId = p.categoryId
       form.value.price = p.price

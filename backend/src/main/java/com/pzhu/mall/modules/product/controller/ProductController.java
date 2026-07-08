@@ -35,18 +35,17 @@ public class ProductController {
     @Resource
     private ReviewService reviewService;
 
-    @Operation(summary = "商品列表/搜索")
+    @Operation(summary = "商品列表/搜索（search 参数由 ProductQueryDTO.keyword 传递）")
     @GetMapping
     public Result<PageResult<ProductVO>> list(ProductQueryDTO query) {
-        PageResult<ProductVO> result = productService.listPage(query);
-        return Result.success(result);
+        return Result.success(productService.listPage(query));
     }
 
-    @Operation(summary = "商品搜索（独立端点，供前端搜索页调用）")
+    /** @deprecated search 端点与 list 完全重复，保留仅用于前端兼容，后续应统一使用 GET /api/products */
+    @Operation(summary = "商品搜索（别名，等价于 list）")
     @GetMapping("/search")
     public Result<PageResult<ProductVO>> search(ProductQueryDTO query) {
-        PageResult<ProductVO> result = productService.listPage(query);
-        return Result.success(result);
+        return list(query);
     }
 
     @Operation(summary = "商品详情")

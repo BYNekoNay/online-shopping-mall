@@ -3,11 +3,13 @@ package com.pzhu.mall.modules.order.component;
 import com.pzhu.mall.common.config.RedisKeyPrefix;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
-import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
-import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
 import com.pzhu.mall.modules.product.entity.Sku;
 import com.pzhu.mall.modules.product.mapper.SkuMapper;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -29,11 +31,13 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class StockService {
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private static final Logger log = LoggerFactory.getLogger(StockService.class);
 
     @Resource
-    private OrderMapper orderMapper;
+    private RedissonClient redissonClient;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Resource
     private SkuMapper skuMapper;
@@ -66,50 +70,64 @@ public class StockService {
     }
 
     /**
-     * 预扣减库存。
+     * 预扣减库存（使用 Redisson 分布式锁，自动续期）。
      *
      * @return true 扣减成功，false 库存不足
      */
     public boolean deduct(Long skuId, int quantity) {
-        String lockKey = lockKey(skuId);
         String stockKey = stockKey(skuId);
+        RLock lock = redissonClient.getLock(lockKey(skuId));
 
-        // 简易分布式锁（非 Redisson，用于演示；生产环境应替换为 RedissonClient）
-        Boolean locked = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "1", lockLeaseSeconds, TimeUnit.SECONDS);
-        if (locked == null || !locked) {
+        try {
+            // 尝试获取锁，等待 lockWaitSeconds 秒，锁自动释放 lockLeaseSeconds 秒（看门狗自动续期）
+            if (!lock.tryLock(lockWaitSeconds, lockLeaseSeconds, TimeUnit.SECONDS)) {
+                throw new BusinessException(ErrorCode.SYSTEM_BUSY);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new BusinessException(ErrorCode.SYSTEM_BUSY);
         }
+
         try {
             // 懒加载：Redis 中无此 key 时从数据库加载
             if (!stringRedisTemplate.hasKey(stockKey)) {
                 loadFromDb(skuId);
             }
-            Long stock = stringRedisTemplate.opsForValue().increment(stockKey, -quantity);
-            // increment 返回值是新值，如果之前为 null 则返回 -quantity（实际不存在的情况已由 hasKey 处理）
-            // 重新获取当前值判断
             String currentStr = stringRedisTemplate.opsForValue().get(stockKey);
             long current = currentStr != null ? Long.parseLong(currentStr) : 0;
-            if (current < 0) {
-                // 库存不足，回滚
-                stringRedisTemplate.opsForValue().increment(stockKey, quantity);
+            if (current < quantity) {
+                // 库存不足
                 return false;
             }
+            stringRedisTemplate.opsForValue().increment(stockKey, -quantity);
+            // 重新计算扣减后剩余库存
+            long remaining = current - quantity;
             // 低库存预警
-            if (current <= alertThreshold) {
-                org.slf4j.LoggerFactory.getLogger(StockService.class)
-                    .warn("Low stock alert: skuId={}, remaining={}, threshold={}", skuId, current, alertThreshold);
+            if (remaining <= alertThreshold) {
+                log.warn("Low stock alert: skuId={}, remaining={}, threshold={}", skuId, remaining, alertThreshold);
             }
             return true;
         } finally {
-            stringRedisTemplate.delete(lockKey);
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 
     /**
-     * 归还预扣减的库存。
+     * 归还预扣减的库存（使用 Redisson 分布式锁）。
      */
     public void rollback(Long skuId, int quantity) {
+        if (quantity <= 0) return;
         String stockKey = stockKey(skuId);
-        stringRedisTemplate.opsForValue().increment(stockKey, quantity);
+        RLock lock = redissonClient.getLock(lockKey(skuId));
+        lock.lock();
+        try {
+            stringRedisTemplate.opsForValue().increment(stockKey, quantity);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 }

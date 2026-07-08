@@ -39,7 +39,7 @@ public class CouponService {
      * WHERE id=? AND received_count < stock}。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void receive(Long userId, Long couponId) {
+    public Long receive(Long userId, Long couponId) {
         Coupon coupon = couponMapper.selectById(couponId);
         if (coupon == null || coupon.getIsDeleted() == 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
@@ -68,7 +68,8 @@ public class CouponService {
         uc.setStatus(0);
         uc.setCreateTime(LocalDateTime.now());
         userCouponMapper.insert(uc);
-        log.info("[优惠券] 用户={} 领取优惠券={} 成功", userId, couponId);
+        log.info("[优惠券] 用户={} 领取优惠券={} 成功 userCouponId={}", userId, couponId, uc.getId());
+        return uc.getId();
     }
 
     /**

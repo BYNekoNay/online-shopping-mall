@@ -73,7 +73,7 @@ public class OrderController {
     }
 
     @Operation(summary = "评价订单项")
-    @PostMapping("/items/{orderItemId}/review")
+    @PostMapping("/{orderItemId}/review")
     public Result<Void> review(@PathVariable Long orderItemId, @RequestBody ReviewDTO dto) {
         orderService.review(orderItemId, dto.getRating(), dto.getContent());
         return Result.success();

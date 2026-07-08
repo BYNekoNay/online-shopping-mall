@@ -64,4 +64,14 @@ export function getTopProducts() {
   return request.get('/merchant/statistics/top-products')
 }
 
-export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getRefunds, auditRefund, getSalesStatistics, getTopProducts }
+/** 获取商品分类树（用于商品编辑表单的分类选择器） */
+export function getCategoriesTree() {
+  return request.get('/products/categories/tree')
+}
+
+/** 获取商品详情（商家端，校验店铺归属） */
+export function getProductDetail(id) {
+  return request.get(`/merchant/products/${id}`)
+}
+
+export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getRefunds, auditRefund, getSalesStatistics, getTopProducts, getCategoriesTree, getProductDetail }

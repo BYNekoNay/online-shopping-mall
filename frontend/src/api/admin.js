@@ -57,19 +57,19 @@ export function getLogs(params) {
 }
 
 export function getDicts() {
-  return request.get('/admin/dicts')
+  return request.get('/admin/system/dicts')
 }
 
 export function createDict(data) {
-  return request.post('/admin/dicts', data)
+  return request.post('/admin/system/dicts', data)
 }
 
 export function updateDict(id, data) {
-  return request.put(`/admin/dicts/${id}`, data)
+  return request.put(`/admin/system/dicts/${id}`, data)
 }
 
 export function deleteDict(id) {
-  return request.delete(`/admin/dicts/${id}`)
+  return request.delete(`/admin/system/dicts/${id}`)
 }
 
 export function getConfig(key) {

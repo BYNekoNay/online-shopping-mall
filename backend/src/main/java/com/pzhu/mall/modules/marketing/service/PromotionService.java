@@ -21,6 +21,7 @@ import java.util.List;
 public class PromotionService {
 
     private static final Logger log = LoggerFactory.getLogger(PromotionService.class);
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Resource
     private PromotionMapper promotionMapper;
@@ -48,8 +49,7 @@ public class PromotionService {
             return BigDecimal.ZERO;
         }
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            java.util.Map<String, Object> rule = mapper.readValue(p.getRuleJson(), java.util.Map.class);
+            java.util.Map<String, Object> rule = OBJECT_MAPPER.readValue(p.getRuleJson(), java.util.Map.class);
             return switch (p.getType()) {
                 case 1 -> { // 限时折扣：ruleJson={"discountPercent":0.8}
                     double percent = ((Number) rule.getOrDefault("discountPercent", 1.0)).doubleValue();
@@ -108,6 +108,7 @@ public class PromotionService {
         return promotionMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
                         .eq(Promotion::getStatus, 1)
+                        .eq(Promotion::getIsDeleted, 0)
                         .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
                         .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
         );

@@ -58,7 +58,7 @@
       <artifactId>spring-boot-starter-data-redis</artifactId>
     </dependency>
 
-    <!-- Distributed Lock: Redisson（排除 spring-data 集成模块，避免与 Spring Boot 2.7 不兼容） -->
+    <!-- Distributed Lock: Redisson（排除与 Spring Boot 2.7 不兼容的 spring-data-32，显式引入兼容的 spring-data-27） -->
     <dependency>
       <groupId>org.redisson</groupId>
       <artifactId>redisson-spring-boot-starter</artifactId>
@@ -69,6 +69,11 @@
           <artifactId>redisson-spring-data-32</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.redisson</groupId>
+      <artifactId>redisson-spring-data-27</artifactId>
+      <version>3.27.2</version>
     </dependency>
 
     <!-- JWT -->

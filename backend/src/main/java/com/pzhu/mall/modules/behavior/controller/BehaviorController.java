@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.Valid;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -43,38 +44,45 @@ public class BehaviorController {
     @Operation(summary = "记录行为（浏览/收藏/购买/评价）")
     @PostMapping("/record")
     public Result<Void> record(@RequestBody BehaviorRecordDTO dto) {
-        behaviorService.record(dto.getUserId(), dto.getProductId(), dto.getBehaviorType());
+        // 已登录用户使用 LoginUserContext 中的 userId，忽略前端传入的 userId（防越权伪造）
+        Long userId = LoginUserContext.getCurrentUserId() != null
+                ? LoginUserContext.getCurrentUserId()
+                : dto.getUserId();
+        behaviorService.record(userId, dto.getProductId(), dto.getBehaviorType());
         return Result.success();
     }
 
     @Operation(summary = "推荐位曝光埋点")
+    @RequireRole(1)
     @PostMapping("/recommend-exposure")
-    public Result<Void> recommendExposure(@RequestBody RecommendExposureDTO dto) {
+    public Result<Void> recommendExposure(@Valid @RequestBody RecommendExposureDTO dto) {
         behaviorService.recordRecommendExposure(dto);
         return Result.success();
     }
 
     @Operation(summary = "推荐位点击埋点（记为浏览行为 type=1）")
+    @RequireRole(1)
     @PostMapping("/recommend-click")
-    public Result<Void> recommendClick(@RequestBody RecommendClickDTO dto) {
+    public Result<Void> recommendClick(@Valid @RequestBody RecommendClickDTO dto) {
         behaviorService.recordRecommendClick(dto);
         return Result.success();
     }
 
     @Operation(summary = "页面进入上报")
     @PostMapping("/page-view")
-    public Result<Long> pageEnter(@RequestBody PageViewDTO dto) {
+    public Result<Long> pageEnter(@Valid @RequestBody PageViewDTO dto) {
         return Result.success(behaviorService.recordPageEnter(dto));
     }
 
     @Operation(summary = "页面离开回填")
     @PutMapping("/page-view/{id}/leave")
-    public Result<Void> pageLeave(@PathVariable Long id, @RequestBody PageLeaveDTO dto) {
+    public Result<Void> pageLeave(@PathVariable Long id, @Valid @RequestBody PageLeaveDTO dto) {
         behaviorService.recordPageLeave(id, dto.getStayDuration());
         return Result.success();
     }
 
     @Operation(summary = "我的收藏列表")
+    @RequireRole(1)
     @GetMapping("/favorites")
     public Result<List<Product>> favorites() {
         Long userId = LoginUserContext.getCurrentUserId();
@@ -91,6 +99,7 @@ public class BehaviorController {
     }
 
     @Operation(summary = "收藏商品")
+    @RequireRole(1)
     @PostMapping("/favorites/{productId}")
     public Result<Void> favorite(@PathVariable Long productId) {
         Long userId = LoginUserContext.getCurrentUserId();
@@ -99,6 +108,7 @@ public class BehaviorController {
     }
 
     @Operation(summary = "取消收藏")
+    @RequireRole(1)
     @DeleteMapping("/favorites/{productId}")
     public Result<Void> unfavorite(@PathVariable Long productId) {
         Long userId = LoginUserContext.getCurrentUserId();

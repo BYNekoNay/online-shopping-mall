@@ -156,10 +156,10 @@ async function submit() {
   delete payload.packagePrice
   try {
     if (editing.value && form.value.id) {
-      await updatePromotion(form.value.id, payload)
+      await request.updatePromotion(form.value.id, payload)
       ElMessage.success('Updated')
     } else {
-      await createPromotion(payload)
+      await request.createPromotion(payload)
       ElMessage.success('Created')
     }
     dialogVisible.value = false
@@ -170,7 +170,7 @@ async function submit() {
 async function offlineRow(row) {
   try {
     await ElMessageBox.confirm('确认下线该促销活动？', '提示', { type: 'warning' })
-    await offlinePromotion(row.id)
+    await request.offlinePromotion(row.id)
     ElMessage.success('已下线')
     load()
   } catch {}
@@ -179,7 +179,7 @@ async function offlineRow(row) {
 async function deleteRow(row) {
   try {
     await ElMessageBox.confirm('确认删除该促销活动？', '提示', { type: 'warning' })
-    await deletePromotion(row.id)
+    await request.deletePromotion(row.id)
     ElMessage.success('已删除')
     load()
   } catch {}

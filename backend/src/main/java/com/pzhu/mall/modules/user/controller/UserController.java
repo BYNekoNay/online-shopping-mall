@@ -10,6 +10,10 @@ import com.pzhu.mall.modules.user.service.AddressService;
 import com.pzhu.mall.modules.user.service.UserService;
 import com.pzhu.mall.modules.user.vo.LoginVO;
 import com.pzhu.mall.modules.user.vo.UserProfileVO;
+import com.pzhu.mall.modules.user.mapper.UserMapper;
+import com.pzhu.mall.common.exception.BusinessException;
+import com.pzhu.mall.common.enums.ErrorCode;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.pzhu.mall.security.LoginUserContext;
 import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +40,9 @@ public class UserController {
     private AddressService addressService;
 
     @Resource
+    private UserMapper userMapper;
+
+    @Resource
     private com.pzhu.mall.modules.statistics.service.SearchHistoryService searchHistoryService;
 
     @Operation(summary = "用户注册")
@@ -49,7 +56,12 @@ public class UserController {
     @PostMapping("/auth/login")
     public Result<LoginVO> login(@Validated @RequestBody LoginDTO dto) {
         String token = userService.login(dto.getUsername(), dto.getPassword());
-        User user = userService.getById(LoginUserContext.getCurrentUserId());
+        // 登录成功后重新查询用户（白名单端点不会填充 LoginUserContext）
+        User user = userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getUsername, dto.getUsername()).eq(User::getIsDeleted, 0));
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USERNAME_OR_PASSWORD_ERROR);
+        }
         LoginVO vo = new LoginVO();
         vo.setToken(token);
         vo.setUserId(user.getId());

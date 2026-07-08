@@ -21,16 +21,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(jwtInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
-                        "/api/auth/register",
-                        "/api/auth/login",
-                        "/api/products",
-                        "/api/products/search",
-                        "/api/products/*",
-                        "/api/recommend/guess-you-like",
-                        "/api/recommend/similar/*",
-                        "/api/promotions/active",
-                        "/api/upload/image",
-                        "/api/behavior/page-view",
+                        // 完全公开路径（不含可选登录需求），拦截器不会执行
                         "/doc.html",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",

@@ -4,12 +4,11 @@ import com.pzhu.mall.modules.user.entity.Address;
 import com.pzhu.mall.modules.user.mapper.AddressMapper;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
-import com.pzhu.mall.security.LoginUserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class AddressService {
@@ -53,7 +52,7 @@ public class AddressService {
     @Transactional
     public void update(Long userId, Long addressId, Address data) {
         Address exist = addressMapper.selectById(addressId);
-        if (exist == null || !exist.getUserId().equals(userId)) {
+        if (exist == null || !Objects.equals(exist.getUserId(), userId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         if (data.getIsDefault() != null && data.getIsDefault() == 1) {
@@ -72,7 +71,7 @@ public class AddressService {
     @Transactional
     public void delete(Long userId, Long addressId) {
         Address exist = addressMapper.selectById(addressId);
-        if (exist == null || !exist.getUserId().equals(userId)) {
+        if (exist == null || !Objects.equals(exist.getUserId(), userId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         addressMapper.deleteById(addressId);

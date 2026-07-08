@@ -4,17 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
-import com.pzhu.mall.modules.user.entity.Address;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
 import com.pzhu.mall.security.JwtUtil;
-import com.pzhu.mall.common.config.RedisKeyPrefix;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 public class UserService {
@@ -107,17 +102,16 @@ public class UserService {
     }
 
     /**
-     * 更新用户个人信息。
+     * 更新用户个人信息（仅更新非 null 字段，避免覆盖已有数据）。
      */
     @Transactional
     public void updateProfile(Long userId, String nickname, String avatar, String phone, String email) {
         LambdaUpdateWrapper<User> uw = new LambdaUpdateWrapper<>();
-        uw.set(User::getNickname, nickname)
-          .set(User::getAvatar, avatar)
-          .set(User::getPhone, phone)
-          .set(User::getEmail, email)
-          .eq(User::getId, userId)
-          .eq(User::getIsDeleted, 0);
+        if (nickname != null) uw.set(User::getNickname, nickname);
+        if (avatar != null) uw.set(User::getAvatar, avatar);
+        if (phone != null) uw.set(User::getPhone, phone);
+        if (email != null) uw.set(User::getEmail, email);
+        uw.eq(User::getId, userId).eq(User::getIsDeleted, 0);
         userMapper.update(null, uw);
     }
 }

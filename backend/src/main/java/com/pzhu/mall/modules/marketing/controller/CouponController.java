@@ -1,6 +1,5 @@
 package com.pzhu.mall.modules.marketing.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.pzhu.mall.common.result.Result;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.common.exception.BusinessException;
@@ -8,11 +7,8 @@ import com.pzhu.mall.modules.marketing.entity.Coupon;
 import com.pzhu.mall.modules.marketing.entity.UserCoupon;
 import com.pzhu.mall.modules.marketing.mapper.UserCouponMapper;
 import com.pzhu.mall.modules.marketing.mapper.CouponMapper;
-import com.pzhu.mall.modules.marketing.mapper.PromotionMapper;
 import com.pzhu.mall.modules.marketing.service.CouponService;
-import com.pzhu.mall.modules.marketing.service.PromotionService;
 import com.pzhu.mall.modules.marketing.vo.UserCouponVO;
-import com.pzhu.mall.modules.marketing.entity.Promotion;
 import com.pzhu.mall.security.LoginUserContext;
 import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,16 +32,10 @@ public class CouponController {
     private CouponService couponService;
 
     @Resource
-    private PromotionService promotionService;
-
-    @Resource
     private UserCouponMapper userCouponMapper;
 
     @Resource
     private CouponMapper couponMapper;
-
-    @Resource
-    private PromotionMapper promotionMapper;
 
     // ==================== 消费者端 ====================
 
@@ -63,8 +52,8 @@ public class CouponController {
     @PostMapping("/coupons/{id}/receive")
     public Result<java.util.Map<String, Long>> receive(@PathVariable Long id) {
         Long userId = LoginUserContext.getCurrentUserId();
-        couponService.receive(userId, id);
-        return Result.success(java.util.Map.of("userCouponId", id));
+        Long userCouponId = couponService.receive(userId, id);
+        return Result.success(java.util.Map.of("userCouponId", userCouponId));
     }
 
     @Operation(summary = "我的优惠券列表（消费者）")
@@ -94,28 +83,6 @@ public class CouponController {
         }).collect(Collectors.toList());
 
         return Result.success(vos);
-    }
-
-    @Operation(summary = "进行中促销活动列表")
-    @GetMapping("/promotions/active")
-    public Result<List<Promotion>> activePromotions(
-            @RequestParam(required = false) String scope,
-            @RequestParam(required = false) Long scopeId) {
-        List<Promotion> promotions;
-        if (scope != null && scopeId != null) {
-            // 按 scope 和 scopeId 精确查询
-            promotions = promotionMapper.selectList(
-                    new LambdaQueryWrapper<Promotion>()
-                            .eq(Promotion::getStatus, 1)
-                            .eq(Promotion::getScope, scope)
-                            .eq(Promotion::getScopeId, scopeId)
-                            .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
-                            .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
-            );
-        } else {
-            promotions = promotionService.listActive();
-        }
-        return Result.success(promotions);
     }
 
     // ==================== 管理员端 ====================
@@ -160,36 +127,4 @@ public class CouponController {
         return Result.success();
     }
 
-    @Operation(summary = "创建促销活动")
-    @RequireRole(3)
-    @PostMapping("/admin/promotions")
-    public Result<Void> createPromotion(@RequestBody Promotion promotion) {
-        promotionService.create(promotion);
-        return Result.success();
-    }
-
-    @Operation(summary = "更新促销活动")
-    @RequireRole(3)
-    @PutMapping("/admin/promotions/{id}")
-    public Result<Void> updatePromotion(@PathVariable Long id, @RequestBody Promotion promotion) {
-        promotion.setId(id);
-        promotionService.update(promotion);
-        return Result.success();
-    }
-
-    @Operation(summary = "提前下线促销活动")
-    @RequireRole(3)
-    @PutMapping("/admin/promotions/{id}/offline")
-    public Result<Void> offlinePromotion(@PathVariable Long id) {
-        promotionService.offline(id);
-        return Result.success();
-    }
-
-    @Operation(summary = "删除促销活动")
-    @RequireRole(3)
-    @DeleteMapping("/admin/promotions/{id}")
-    public Result<Void> deletePromotion(@PathVariable Long id) {
-        promotionService.delete(id);
-        return Result.success();
-    }
 }

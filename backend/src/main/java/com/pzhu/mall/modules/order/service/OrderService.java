@@ -97,6 +97,9 @@ public class OrderService {
     @Resource
     private com.pzhu.mall.modules.logistics.mapper.LogisticsMapper logisticsMapper;
 
+    @Resource
+    private OrderGroupProcessor orderGroupProcessor;
+
     /**
      * 提交订单（核心链路）。
      * <p>
@@ -205,7 +208,7 @@ public class OrderService {
             boolean applyPoints = !pointsProcessed && Boolean.TRUE.equals(dto.getUsePoints());
             List<OrderVO> groupOrders;
             try {
-                groupOrders = processOrderGroup(userId, shopId, groupItems, addressSnapshot, address.getProvince(), dto, applyPoints);
+                groupOrders = orderGroupProcessor.processGroup(userId, shopId, groupItems, addressSnapshot, address.getProvince(), dto, applyPoints);
             } catch (Exception e) {
                 // 事务回滚后，归还 Redis 预扣减的库存
                 for (int i = 0; i < deductedSkus.size(); i++) {
@@ -233,114 +236,6 @@ public class OrderService {
         }
 
         return allOrders;
-    }
-
-    /**
-     * 处理单个店铺分组（独立事务）。
-     * <p>
-     * 内部保证：创建 Order → 批量插入 OrderItem → 积分抵扣结算 → 标记优惠券已使用，
-     * 任一环节失败时整个分组回滚，调用方负责 Redis 库存归还。
-     *
-     * @param applyPoints 是否应用积分抵扣（仅第一个成功分组传 true）
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public List<OrderVO> processOrderGroup(Long userId, Long shopId,
-                                           List<ProductItemDTO> groupItems,
-                                           String addressSnapshot,
-                                           String province,
-                                           CreateOrderDTO dto,
-                                           boolean applyPoints) {
-        List<OrderVO> result = new ArrayList<>();
-
-        // 4.1 计算商品金额
-        BigDecimal goodsAmount = BigDecimal.ZERO;
-        List<OrderItem> orderItems = new ArrayList<>();
-        for (ProductItemDTO item : groupItems) {
-            Product product = productMapper.selectById(item.getProductId());
-            Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
-            BigDecimal unitPrice = sku != null ? sku.getPrice() : product.getPrice();
-            BigDecimal itemAmount = unitPrice.multiply(new BigDecimal(item.getQuantity()));
-            goodsAmount = goodsAmount.add(itemAmount);
-
-            OrderItem oi = new OrderItem();
-            oi.setProductId(item.getProductId());
-            oi.setSkuId(item.getSkuId());
-            oi.setProductNameSnapshot(product.getName());
-            oi.setProductImageSnapshot(sku != null ? sku.getImage() : product.getMainImage());
-            oi.setPrice(unitPrice);
-            oi.setQuantity(item.getQuantity());
-            oi.setIsGift(0);
-            orderItems.add(oi);
-        }
-
-        // 4.2 计算运费
-        BigDecimal freightAmount = freightService.calculate(shopId, province, goodsAmount);
-
-        // 4.3 促销优惠
-        BigDecimal promotionDiscount = promotionService.calculateDiscount(shopId, goodsAmount);
-
-        // 4.4 优惠券抵扣（按店铺分组金额计算）
-        BigDecimal couponDiscount = BigDecimal.ZERO;
-        if (dto.getCouponId() != null) {
-            couponDiscount = couponService.calculateDiscount(dto.getCouponId(), goodsAmount);
-        }
-
-        // 4.5 积分抵扣（仅第一个成功分组处理一次）
-        BigDecimal pointsDeduct = BigDecimal.ZERO;
-        Integer pointsUsed = 0;
-        if (applyPoints && Boolean.TRUE.equals(dto.getUsePoints())) {
-            java.math.BigDecimal[] deductResult = pointsService.calculateDeduct(userId, goodsAmount);
-            pointsDeduct = deductResult[0];
-            pointsUsed = deductResult[1].intValue();
-        }
-
-        // 4.6 实付金额
-        BigDecimal payAmount = goodsAmount.add(freightAmount)
-                .subtract(promotionDiscount)
-                .subtract(couponDiscount)
-                .subtract(pointsDeduct);
-
-        // 4.8 创建订单
-        Order order = new Order();
-        order.setOrderNo(orderNoGenerator.generate());
-        order.setUserId(userId);
-        order.setShopId(shopId);
-        order.setTotalAmount(goodsAmount.add(freightAmount));
-        order.setFreightAmount(freightAmount);
-        order.setPromotionDiscountAmount(promotionDiscount);
-        order.setCouponDiscountAmount(couponDiscount);
-        order.setPointsDeductAmount(pointsDeduct);
-        order.setDiscountAmount(promotionDiscount.add(couponDiscount).add(pointsDeduct));
-        order.setPayAmount(payAmount);
-        order.setStatus(0); // 待付款
-        order.setAddressSnapshot(addressSnapshot);
-        order.setRemark(dto.getRemark());
-        order.setIsDeleted(0);
-        orderMapper.insert(order);
-
-        // 4.9 批量插入订单明细
-        for (OrderItem oi : orderItems) {
-            oi.setOrderId(order.getId());
-            orderItemMapper.insert(oi);
-        }
-
-        // 4.10 积分抵扣记录
-        if (pointsUsed > 0) {
-            pointsService.settleDeduct(userId, pointsUsed, order.getId());
-        }
-
-        // 4.11 标记优惠券已使用
-        if (dto.getCouponId() != null) {
-            couponService.markUsed(dto.getCouponId(), order.getId());
-        }
-
-        // 4.12 记录购买行为（behaviorType=3）
-        for (OrderItem oi : orderItems) {
-            behaviorService.record(userId, oi.getProductId(), 3);
-        }
-
-        result.add(toVO(order));
-        return result;
     }
 
     /**
@@ -447,8 +342,8 @@ public class OrderService {
             }
         }
 
-        // 释放优惠券
-        if (order.getDiscountAmount() != null && order.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
+        // 释放优惠券（检查 couponDiscountAmount 而非 discountAmount，后者包含促销折扣和积分抵扣）
+        if (order.getCouponDiscountAmount() != null && order.getCouponDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
             couponService.releaseByOrderId(orderId);
         }
 
