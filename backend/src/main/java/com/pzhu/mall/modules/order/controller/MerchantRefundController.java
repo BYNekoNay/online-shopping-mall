@@ -46,26 +46,16 @@ public class MerchantRefundController {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         Long shopId = shopService.getMerchantShopIdOrThrow(userId);
 
-        // 先获取该店铺所有订单 ID
-        var orderQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.Order>();
-        orderQw.eq(com.pzhu.mall.modules.order.entity.Order::getShopId, shopId)
-              .eq(com.pzhu.mall.modules.order.entity.Order::getIsDeleted, 0);
-        List<com.pzhu.mall.modules.order.entity.Order> shopOrders = orderMapper.selectList(orderQw);
-        java.util.Set<Long> shopOrderIds = shopOrders.stream()
-            .map(com.pzhu.mall.modules.order.entity.Order::getId)
-            .collect(java.util.stream.Collectors.toSet());
-
-        // 分页查询所有退款，再按店铺过滤
+        // 使用子查询在数据库中过滤该店铺的退款记录，避免内存分页问题
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<Refund> page =
             new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
-        List<Refund> pageResult = refundMapper.selectPage(
-            page,
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Refund>()
-                .orderByDesc(Refund::getCreateTime)
-        ).getRecords();
+        var refundQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Refund>();
+        refundQw.inSql(Refund::getOrderId,
+                "SELECT id FROM `order` WHERE shop_id = " + shopId + " AND is_deleted = 0")
+              .orderByDesc(Refund::getCreateTime);
+        List<Refund> pageResult = refundMapper.selectPage(page, refundQw).getRecords();
 
         List<RefundVO> filtered = pageResult.stream()
-            .filter(r -> shopOrderIds.contains(r.getOrderId()))
             .map(refundService::toVO)
             .collect(Collectors.toList());
 
@@ -75,7 +65,9 @@ public class MerchantRefundController {
     @Operation(summary = "审核退款")
     @PutMapping("/{id}/audit")
     public Result<Void> audit(@PathVariable Long id, @RequestBody AuditDTO dto) {
-        refundService.audit(id, dto.getApproved(), dto.getHandleRemark());
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        Long shopId = shopService.getMerchantShopIdOrThrow(userId);
+        refundService.audit(id, dto.getApproved(), dto.getHandleRemark(), shopId);
         return Result.success();
     }
 

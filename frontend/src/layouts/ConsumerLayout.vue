@@ -22,6 +22,8 @@
               </el-badge>
             </router-link>
             <router-link to="/orders" class="action-link">我的订单</router-link>
+            <router-link v-if="role === 3" to="/admin/dashboard" class="action-link action-admin">管理后台</router-link>
+            <router-link v-if="role === 2" to="/merchant/products" class="action-link action-admin">商家中心</router-link>
             <el-dropdown trigger="click">
               <span class="user-dropdown">
                 <el-avatar :size="32" class="user-avatar">{{ nickname?.charAt(0) || 'U' }}</el-avatar>
@@ -70,6 +72,7 @@ import { ArrowDown, ShoppingCart } from '@element-plus/icons-vue'
 const router = useRouter()
 const userStore = useUserStore()
 const token = computed(() => userStore.token)
+const role = computed(() => userStore.role)
 const nickname = computed(() => userStore.nickname)
 
 function handleLogout() {
@@ -157,6 +160,14 @@ function handleLogout() {
   font-weight: 500;
 }
 .action-register:hover { color: #fff; opacity: 0.9; }
+.action-admin {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #DC2626, #991B1B);
+  color: #fff;
+  border-radius: 20px;
+  font-weight: 500;
+}
+.action-admin:hover { color: #fff; opacity: 0.9; }
 .user-dropdown {
   display: flex;
   align-items: center;

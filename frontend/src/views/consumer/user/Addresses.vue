@@ -3,7 +3,7 @@
     <el-card>
       <div class="header">
         <h3>收货地址</h3>
-        <el-button type="primary" @click="showForm = true">新增地址</el-button>
+        <el-button type="primary" @click="showForm = true; editingId = null; form = { receiver: '', phone: '', province: '', city: '', district: '', detail: '', isDefault: false }">新增地址</el-button>
       </div>
       <el-dialog v-model="showForm" :title="editingId ? '编辑地址' : '新增地址'">
         <el-form :model="form" label-width="100px">
@@ -68,17 +68,21 @@ const provinces = [
 ]
 
 onMounted(async () => {
-  addresses.value = await request.getAddresses()
+  try {
+    addresses.value = await request.getAddresses()
+  } catch {
+    addresses.value = []
+  }
 })
 
 async function saveAddress() {
   try {
     if (editingId.value) {
       await request.updateAddress(editingId.value, form.value)
-      ElMessage.success('Updated')
+      ElMessage.success('已更新')
     } else {
       await request.addAddress(form.value)
-      ElMessage.success('Added')
+      ElMessage.success('已添加')
     }
     showForm.value = false
     addresses.value = await request.getAddresses()
@@ -96,7 +100,7 @@ function editAddress(row) {
 async function deleteAddress(id) {
   await request.deleteAddress(id)
   addresses.value = addresses.value.filter(a => a.id !== id)
-  ElMessage.success('Deleted')
+  ElMessage.success('删除成功')
 }
 </script>
 

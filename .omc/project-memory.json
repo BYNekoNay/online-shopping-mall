@@ -97,15 +97,33 @@
   "hotPaths": [
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\order\\service\\OrderService.java",
-      "accessCount": 22,
-      "lastAccessed": 1783437244150,
+      "accessCount": 26,
+      "lastAccessed": 1783437934572,
       "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall",
-      "accessCount": 10,
-      "lastAccessed": 1783436854488,
+      "accessCount": 12,
+      "lastAccessed": 1783469827931,
       "type": "directory"
+    },
+    {
+      "path": "frontend\\src",
+      "accessCount": 10,
+      "lastAccessed": 1783437903383,
+      "type": "directory"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\recommend\\service\\RecommendCalculateService.java",
+      "accessCount": 8,
+      "lastAccessed": 1783437959068,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\user\\controller\\UserController.java",
+      "accessCount": 8,
+      "lastAccessed": 1783469847162,
+      "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\user\\service\\LoginAttemptService.java",
@@ -114,15 +132,15 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\recommend\\service\\RecommendCalculateService.java",
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\recommend\\service\\RecommendService.java",
       "accessCount": 7,
-      "lastAccessed": 1783436782838,
+      "lastAccessed": 1783437958462,
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\recommend\\service\\RecommendService.java",
-      "accessCount": 6,
-      "lastAccessed": 1783436820632,
+      "path": "backend\\src\\main\\resources\\application.yml",
+      "accessCount": 7,
+      "lastAccessed": 1783469127950,
       "type": "file"
     },
     {
@@ -132,15 +150,39 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\resources\\application.yml",
+      "path": "backend\\src\\main\\resources",
+      "accessCount": 6,
+      "lastAccessed": 1783469254863,
+      "type": "directory"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\user\\service\\UserService.java",
+      "accessCount": 6,
+      "lastAccessed": 1783469839186,
+      "type": "file"
+    },
+    {
+      "path": "docs\\15-开发到部署执行计划.md",
       "accessCount": 5,
-      "lastAccessed": 1783436664168,
+      "lastAccessed": 1783437784052,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\recommend\\controller\\RecommendController.java",
+      "accessCount": 5,
+      "lastAccessed": 1783438400278,
       "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\admin\\controller\\AdminUserController.java",
-      "accessCount": 4,
-      "lastAccessed": 1783429689846,
+      "accessCount": 5,
+      "lastAccessed": 1783438412326,
+      "type": "file"
+    },
+    {
+      "path": "docs\\09-接口规范.md",
+      "accessCount": 5,
+      "lastAccessed": 1783441008592,
       "type": "file"
     },
     {
@@ -150,21 +192,15 @@
       "type": "directory"
     },
     {
-      "path": "docs\\15-开发到部署执行计划.md",
+      "path": "backend\\src\\main\\resources\\application-prod.yml",
       "accessCount": 4,
-      "lastAccessed": 1783436534034,
+      "lastAccessed": 1783437892261,
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\recommend\\controller\\RecommendController.java",
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\behavior\\controller\\BehaviorController.java",
       "accessCount": 4,
-      "lastAccessed": 1783436815573,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\user\\service\\UserService.java",
-      "accessCount": 3,
-      "lastAccessed": 1783429636651,
+      "lastAccessed": 1783437926290,
       "type": "file"
     },
     {
@@ -186,46 +222,46 @@
       "type": "file"
     },
     {
-      "path": "docs\\09-接口规范.md",
-      "accessCount": 3,
-      "lastAccessed": 1783435850218,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\resources\\application-prod.yml",
-      "accessCount": 3,
-      "lastAccessed": 1783436677295,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\behavior\\controller\\BehaviorController.java",
-      "accessCount": 3,
-      "lastAccessed": 1783436764468,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src",
-      "accessCount": 3,
-      "lastAccessed": 1783436799659,
-      "type": "directory"
-    },
-    {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\order",
       "accessCount": 3,
       "lastAccessed": 1783436856131,
       "type": "directory"
     },
     {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\config\\RedisKeyPrefix.java",
+      "accessCount": 3,
+      "lastAccessed": 1783437802920,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules",
+      "accessCount": 3,
+      "lastAccessed": 1783437828187,
+      "type": "directory"
+    },
+    {
+      "path": "backend\\src\\main\\resources\\application-dev.yml",
+      "accessCount": 3,
+      "lastAccessed": 1783437890506,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtInterceptor.java",
+      "accessCount": 3,
+      "lastAccessed": 1783469734266,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\exception\\GlobalExceptionHandler.java",
+      "accessCount": 3,
+      "lastAccessed": 1783469743357,
+      "type": "file"
+    },
+    {
       "path": "backend\\src",
       "accessCount": 2,
       "lastAccessed": 1783429487487,
       "type": "directory"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\config\\RedisKeyPrefix.java",
-      "accessCount": 2,
-      "lastAccessed": 1783429623875,
-      "type": "file"
     },
     {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\CorsConfig.java",
@@ -258,16 +294,46 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\resources\\application-dev.yml",
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\enums\\ErrorCode.java",
       "accessCount": 2,
-      "lastAccessed": 1783436664786,
+      "lastAccessed": 1783437803388,
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\resources",
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\WebMvcConfig.java",
       "accessCount": 2,
-      "lastAccessed": 1783436839331,
+      "lastAccessed": 1783437837351,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\utils\\request.js",
+      "accessCount": 2,
+      "lastAccessed": 1783437866629,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\RoleCheckAspect.java",
+      "accessCount": 2,
+      "lastAccessed": 1783437869396,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\product\\controller\\MerchantProductController.java",
+      "accessCount": 2,
+      "lastAccessed": 1783438409362,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\user",
+      "accessCount": 2,
+      "lastAccessed": 1783469708303,
       "type": "directory"
+    },
+    {
+      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\LoginUserContext.java",
+      "accessCount": 2,
+      "lastAccessed": 1783469727987,
+      "type": "file"
     },
     {
       "path": "docs\\06-测试计划.md",
@@ -279,18 +345,6 @@
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\RequireRole.java",
       "accessCount": 1,
       "lastAccessed": 1783429389648,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\LoginUserContext.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429390589,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtInterceptor.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429391882,
       "type": "file"
     },
     {
@@ -306,57 +360,9 @@
       "type": "file"
     },
     {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\enums\\ErrorCode.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429398312,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\common\\exception\\GlobalExceptionHandler.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429403380,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\RoleCheckAspect.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429404783,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\user",
-      "accessCount": 1,
-      "lastAccessed": 1783429428865,
-      "type": "directory"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules",
-      "accessCount": 1,
-      "lastAccessed": 1783429431036,
-      "type": "directory"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\user\\controller\\UserController.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429437260,
-      "type": "file"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\modules\\product\\controller\\MerchantProductController.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429438452,
-      "type": "file"
-    },
-    {
       "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\security\\JwtUtil.java",
       "accessCount": 1,
       "lastAccessed": 1783429448971,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\utils\\request.js",
-      "accessCount": 1,
-      "lastAccessed": 1783429464500,
       "type": "file"
     },
     {
@@ -364,12 +370,6 @@
       "accessCount": 1,
       "lastAccessed": 1783429473608,
       "type": "directory"
-    },
-    {
-      "path": "backend\\src\\main\\java\\com\\pzhu\\mall\\config\\WebMvcConfig.java",
-      "accessCount": 1,
-      "lastAccessed": 1783429479094,
-      "type": "file"
     },
     {
       "path": "frontend\\src\\mock",

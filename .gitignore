@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 build/
+backend/target/
 
 # Environment
 .env.local
@@ -30,3 +31,15 @@ dump.rdb
 
 # Maven
 backend/target/
+
+# Temp files
+_tmp_*
+*.err
+
+# IDE state
+.omc/
+
+# Runtime
+query
+user-check.txt
+backend/user-check.txt

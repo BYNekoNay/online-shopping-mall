@@ -3,15 +3,11 @@
     <el-card>
       <h3>浏览历史</h3>
       <div v-if="records.length === 0" class="empty-state">
-        <el-empty description="暂无浏览记录" />
+        <el-empty description="暂无搜索记录" />
       </div>
       <div v-else class="history-list">
-        <div v-for="item in records" :key="item.id" class="history-item" @click="$router.push(`/product/${item.productId}`)">
-          <div class="history-image"><img :src="item.mainImage" :alt="item.name" /></div>
-          <div class="history-info">
-            <div class="history-name">{{ item.name }}</div>
-            <div class="history-price">¥{{ item.price }}</div>
-          </div>
+        <div v-for="item in records" :key="item.id" class="history-item" @click="goSearch(item.keyword)">
+          <div class="history-keyword">{{ item.keyword }}</div>
           <div class="history-time">{{ formatTime(item.createTime) }}</div>
         </div>
       </div>
@@ -21,20 +17,23 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@/api/user'
 
+const router = useRouter()
 const records = ref([])
 
 async function loadHistory() {
   try {
     const data = await request.getSearchHistory()
-    records.value = (data || []).map(h => ({
-      ...h,
-      productId: h.relatedProductId || h.productId
-    }))
+    records.value = data || []
   } catch {
     records.value = []
   }
+}
+
+function goSearch(keyword) {
+  router.push({ path: '/search', query: { keyword } })
 }
 
 function formatTime(t) {
@@ -81,16 +80,13 @@ onMounted(loadHistory)
 .history-info {
   flex: 1;
 }
-.history-name {
-  font-size: 14px;
-  color: #333;
+.history-keyword {
+  font-size: 15px;
+  color: #409eff;
   margin-bottom: 4px;
+  cursor: pointer;
 }
-.history-price {
-  color: #f56c6c;
-  font-weight: bold;
-  font-size: 14px;
-}
+.history-keyword:hover { text-decoration: underline; }
 .history-time {
   color: #999;
   font-size: 12px;

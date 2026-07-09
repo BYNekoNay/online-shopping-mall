@@ -4,18 +4,24 @@ import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.logistics.entity.FreightTemplate;
 import com.pzhu.mall.modules.logistics.mapper.FreightTemplateMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 运费服务。
  */
 @Service
 public class FreightService {
+
+    private static final Logger log = LoggerFactory.getLogger(FreightService.class);
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Resource
     private FreightTemplateMapper freightTemplateMapper;
@@ -62,18 +68,19 @@ public class FreightService {
         // 解析 region_rule_json
         if (template.getRegionRuleJson() != null && !template.getRegionRuleJson().isEmpty()) {
             try {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                List<Map<String, Object>> rules = mapper.readValue(template.getRegionRuleJson(), List.class);
+                List<Map<String, Object>> rules = MAPPER.readValue(template.getRegionRuleJson(), List.class);
                 for (Map<String, Object> rule : rules) {
-                    if (region.equals(rule.get("region"))) {
-                        return new BigDecimal(rule.getOrDefault("fee", 0).toString());
+                    Object regionObj = rule.get("region");
+                    if (regionObj != null && Objects.equals(region, regionObj.toString())) {
+                        Object feeObj = rule.getOrDefault("fee", 0);
+                        return new BigDecimal(feeObj.toString());
                     }
                 }
             } catch (Exception e) {
-                // ignore, fallback to default
+                log.warn("[运费] 解析 region_rule_json 失败 shopId={} rule={}", shopId, template.getRegionRuleJson(), e);
             }
         }
-        return template.getDefaultFee();
+        return template.getDefaultFee() != null ? template.getDefaultFee() : BigDecimal.ZERO;
     }
 
     /**

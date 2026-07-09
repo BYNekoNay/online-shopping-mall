@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd D:/codegitee/online-shopping-mall/backend && mvn compile -q 2>&1\",\"timeout\":60000,\"description\":\"Check compilation after adding AdminPromotionController\"}",
-  "error": "Exit code 1\n[ERROR] COMPILATION ERROR : \r\n[ERROR] /D:/codegitee/online-shopping-mall/backend/src/main/java/com/pzhu/mall/modules/marketing/controller/PromotionController.java:[64,8] �� AdminPromotionController �ǹ�����, Ӧ����Ϊ AdminPromotionController.java ���ļ�������\r\n[ERROR] /D:/codegitee/online-shopping-mall/backend/src/main/java/com/pzhu/mall/modules/marketing/controller/PromotionController.java:[72,54] �Ҳ�������\n  ����:   ���� listAll()\n  λ��: ����Ϊcom.pzhu.mall.modules.marketing.service.Pro...",
-  "timestamp": "2026-07-07T15:15:27.840Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"command\":\"cmd.exe /c \\\"cd /d D:\\\\codegitee\\\\online-shopping-mall && git add backend/src/main/java/com/pzhu/mall/modules/product/vo/ProductVO.java backend/src/main/java/com/pzhu/mall/modules/product/...",
+  "error": "Exit code 127\n/usr/bin/bash: export TEMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' TMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' && shopt -u extglob 2>/dev/null || true && eval 'cmd.exe /c \"cd /d D:\\codegitee\\online-shopping-mall && git add backend/src/main/java/com/pzhu/mall/modules/product/vo/ProductVO.java backend/src/main/java/com/pzhu/mall/modules/product/service/ProductService.java backend/src/main/java/com/pzhu/mall/modules/statistics/service/SearchHistoryService.java backend/src/main/java/com/pz...",
+  "timestamp": "2026-07-07T16:26:03.639Z",
+  "retry_count": 4
 }

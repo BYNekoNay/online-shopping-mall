@@ -34,6 +34,11 @@ public class SecurityHeadersFilter {
             httpResp.setHeader("X-Content-Type-Options", "nosniff");
             httpResp.setHeader("X-Frame-Options", "DENY");
             httpResp.setHeader("X-XSS-Protection", "1; mode=block");
+            // M11 修复：追加缺失的安全响应头
+            httpResp.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+            httpResp.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+            httpResp.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+            httpResp.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;");
             chain.doFilter(request, response);
         }
     }

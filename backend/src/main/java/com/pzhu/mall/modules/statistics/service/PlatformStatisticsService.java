@@ -4,6 +4,8 @@ import com.pzhu.mall.modules.behavior.entity.PageViewLog;
 import com.pzhu.mall.modules.behavior.entity.UserBehavior;
 import com.pzhu.mall.modules.behavior.mapper.PageViewLogMapper;
 import com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper;
+import com.pzhu.mall.modules.cart.entity.Cart;
+import com.pzhu.mall.modules.cart.mapper.CartMapper;
 import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.recommend.entity.RecommendResult;
@@ -46,6 +48,9 @@ public class PlatformStatisticsService {
     @Resource
     private UserMapper userMapper;
 
+    @Resource
+    private CartMapper cartMapper;
+
     /**
      * 平台看板总览指标。
      */
@@ -71,26 +76,49 @@ public class PlatformStatisticsService {
                         .ge(User::getCreateTime, dayStart)
         );
 
-        // 推荐点击率（近7天）— 用 selectList 计数，避免调用不存在的 selectCount
+        // 推荐点击率（近7天）— 使用 selectCount 聚合查询
         LocalDateTime weekAgo = now.minusDays(7);
-        List<RecommendResult> exposures = recommendResultMapper.selectList(
+        long exposureCount = recommendResultMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<RecommendResult>()
                         .ge(RecommendResult::getGenerateTime, weekAgo)
-                        .last("LIMIT 50000")
         );
-        List<UserBehavior> clicks = userBehaviorMapper.selectList(
+        long clickCount = userBehaviorMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserBehavior>()
                         .eq(UserBehavior::getBehaviorType, 1)
                         .ge(UserBehavior::getCreateTime, weekAgo)
-                        .last("LIMIT 50000")
         );
-        String recommendCtr = !exposures.isEmpty() ? String.format("%.2f%%", clicks.size() * 100.0 / exposures.size()) : "0.00%";
+        String recommendCtr = exposureCount > 0 ? String.format("%.2f%%", clickCount * 100.0 / exposureCount) : "0.00%";
+
+        // 转化率（浏览商品用户中下单用户占比）— R3-C3: 用 selectList + in-memory distinct 替代 selectCount 去重
+        List<UserBehavior> browseBehaviors = userBehaviorMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserBehavior>()
+                        .eq(UserBehavior::getBehaviorType, 1)
+                        .select(UserBehavior::getUserId)
+        );
+        long browseUserCount = browseBehaviors.stream()
+                .map(UserBehavior::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+
+        List<Order> orderUsers = orderMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
+                        .eq(Order::getIsDeleted, 0)
+                        .select(Order::getUserId)
+        );
+        long orderUserCount = orderUsers.stream()
+                .map(Order::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+        double conversionRate = browseUserCount == 0 ? 0 :
+                (double) orderUserCount / browseUserCount;
 
         Map<String, Object> result = new HashMap<>();
         result.put("gmv", gmv);
         result.put("orderCount", todayOrders);
         result.put("newUserCount", newUserCount);
-        result.put("conversionRate", 0.12);
+        result.put("conversionRate", BigDecimal.valueOf(conversionRate).setScale(4, RoundingMode.HALF_UP).doubleValue());
         result.put("recommendCtr", recommendCtr);
         return result;
     }
@@ -104,21 +132,24 @@ public class PlatformStatisticsService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
-        // PV / UV — 用 selectList 取日志，内存中聚合
+        // PV / UV — 使用 selectCount 统计
+        long pv = pageViewLogMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PageViewLog>()
+                        .ge(PageViewLog::getEnterTime, start)
+                        .le(PageViewLog::getEnterTime, end)
+        );
+        // UV 需要去重，用 selectList 仅查 userId 字段（数据量通常不大，且分页范围有限）
         List<PageViewLog> logs = pageViewLogMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PageViewLog>()
                         .ge(PageViewLog::getEnterTime, start)
                         .le(PageViewLog::getEnterTime, end)
-                        .last("LIMIT 50000")
+                        .select(PageViewLog::getUserId, PageViewLog::getSessionId, PageViewLog::getStayDuration)
         );
-        int pv = logs.size();
-        Set<Long> uniqueUsers = new HashSet<>();
-        Set<String> uniqueSessions = new HashSet<>();
-        for (PageViewLog l : logs) {
-            if (l.getUserId() != null) uniqueUsers.add(l.getUserId());
-            if (l.getSessionId() != null) uniqueSessions.add(l.getSessionId());
-        }
-        int uv = uniqueUsers.size();
+        int uv = (int) logs.stream()
+                .map(PageViewLog::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
 
         // 跳出率：session 内仅有 1 条记录的会话数 / 总会话数
         Map<String, Long> sessionCounts = logs.stream()
@@ -134,29 +165,34 @@ public class PlatformStatisticsService {
                 .orElse(0.0);
         int avgStayDuration = (int) Math.round(avgStay);
 
-        // 转化漏斗（用 selectList 去重计数）
-        List<UserBehavior> views = userBehaviorMapper.selectList(
+        // 转化漏斗（使用聚合查询）
+        long viewCount = userBehaviorMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserBehavior>()
                         .eq(UserBehavior::getBehaviorType, 1)
                         .ge(UserBehavior::getCreateTime, start)
                         .le(UserBehavior::getCreateTime, end)
-                        .last("LIMIT 50000")
         );
-        Set<Long> viewUsers = views.stream().map(UserBehavior::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
-        int viewCount = viewUsers.size();
 
-        List<Order> orders = orderMapper.selectList(
+        long orderCount = orderMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
                         .eq(Order::getIsDeleted, 0)
                         .ge(Order::getCreateTime, start)
                         .le(Order::getCreateTime, end)
-                        .last("LIMIT 50000")
         );
-        Set<Long> orderUsers = orders.stream().map(Order::getUserId).collect(Collectors.toSet());
-        int orderCount = orderUsers.size();
-        int payCount = (int) orders.stream().filter(o -> o.getPayTime() != null).count();
+        long payCount = orderMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
+                        .eq(Order::getIsDeleted, 0)
+                        .ge(Order::getCreateTime, start)
+                        .le(Order::getCreateTime, end)
+                        .isNotNull(Order::getPayTime)
+        );
 
-        int cartCount = Math.max(orderCount * 3, 50);
+        // 购物车人数：从购物车表真实统计
+        long cartCount = cartMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Cart>()
+                        .ge(Cart::getCreateTime, start)
+                        .le(Cart::getCreateTime, end)
+        );
 
         Map<String, Object> result = new HashMap<>();
         result.put("pv", pv);

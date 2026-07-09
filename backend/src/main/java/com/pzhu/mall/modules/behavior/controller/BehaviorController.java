@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.validation.Valid;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -29,7 +31,6 @@ import java.util.stream.Collectors;
 @Tag(name = "用户行为")
 @RestController
 @RequestMapping("/api/behavior")
-@RequireRole(1)
 public class BehaviorController {
 
     @Resource
@@ -91,11 +92,26 @@ public class BehaviorController {
           .eq(UserBehavior::getBehaviorType, 2) // 2=收藏
           .orderByDesc(UserBehavior::getCreateTime);
         List<UserBehavior> behaviors = userBehaviorMapper.selectList(qw);
-        List<Product> products = behaviors.stream()
-            .map(b -> productMapper.selectById(b.getProductId()))
-            .filter(p -> p != null && p.getIsDeleted() == 0)
-            .collect(Collectors.toList());
-        return Result.success(products);
+
+        if (behaviors.isEmpty()) {
+            return Result.success(java.util.Collections.emptyList());
+        }
+
+        // 批量加载商品信息（消除 N+1 查询）
+        List<Long> productIds = behaviors.stream()
+                .map(UserBehavior::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        List<Product> products = productMapper.selectBatchIds(productIds);
+        // 按收藏顺序返回，过滤已删除商品
+        Map<Long, Product> productMap = products.stream()
+                .filter(p -> p.getIsDeleted() == 0)
+                .collect(Collectors.toMap(Product::getId, p -> p, (a, b) -> a));
+        List<Product> ordered = behaviors.stream()
+                .map(b -> productMap.get(b.getProductId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        return Result.success(ordered);
     }
 
     @Operation(summary = "收藏商品")

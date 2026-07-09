@@ -16,13 +16,18 @@ import com.pzhu.mall.modules.product.vo.ProductVO;
 import com.pzhu.mall.security.RequireRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Objects;
 
 /**
@@ -30,7 +35,7 @@ import java.util.Objects;
  */
 @Tag(name = "商家商品管理")
 @RestController
-@RequestMapping("/merchant/products")
+@RequestMapping("/api/merchant/products")
 @RequireRole(2)
 public class MerchantProductController {
 
@@ -81,27 +86,30 @@ public class MerchantProductController {
         product.setStock(dto.getStock());
         product.setStatus(ProductStatus.PENDING.getCode()); // 默认待审核
         product.setIsDeleted(0);
-        productService.getProductMapper().insert(product);
 
-        // 保存 SKU 列表
+        // 构造 SKU 列表
+        List<Sku> skuList = null;
         if (dto.getSkus() != null && !dto.getSkus().isEmpty()) {
+            skuList = new ArrayList<>();
             for (SkuDTO skuDto : dto.getSkus()) {
                 Sku sku = new Sku();
-                sku.setProductId(product.getId());
                 sku.setSpecJson(skuDto.getSpecJson());
                 sku.setPrice(skuDto.getPrice());
                 sku.setStock(skuDto.getStock());
                 sku.setImage(skuDto.getImage());
-                sku.setIsDeleted(0);
-                productService.getSkuMapper().insert(sku);
+                skuList.add(sku);
             }
         }
+
+        // 使用事务保护创建商品和 SKU
+        product = productService.createWithSkus(product, skuList);
 
         return Result.success(productService.toVO(product));
     }
 
     @Operation(summary = "更新商品")
     @PutMapping("/{id}")
+    @Transactional
     public Result<ProductVO> update(@PathVariable Long id, @Validated @RequestBody CreateProductDTO dto) {
         Product product = productService.getProductMapper().selectById(id);
         if (product == null) {
@@ -153,30 +161,43 @@ public class MerchantProductController {
 
     @Operation(summary = "批量上下架/删除")
     @PutMapping("/batch")
-    public Result<Void> batchOperate(@Validated @RequestBody BatchOperateDTO dto) {
+    @Transactional
+    public Result<Map<String, Object>> batchOperate(@Validated @RequestBody BatchOperateDTO dto) {
         Long merchantUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         Long shopId = shopService.getMerchantShopIdOrThrow(merchantUserId);
 
+        List<String> failed = new ArrayList<>();
+        int successCount = 0;
         for (Long productId : dto.getProductIds()) {
             Product product = productService.getProductMapper().selectById(productId);
             if (product == null || !Objects.equals(product.getShopId(), shopId)) {
+                failed.add("商品 " + productId + " 不存在或不属于当前店铺");
                 continue;
             }
-            if ("on".equals(dto.getAction())) {
-                // 仅允许待审核(PENDING=2)的商品上架，禁止从审核拒绝(REJECTED=3)直接上架绕过审核
-                if (ProductStatus.of(product.getStatus()) != ProductStatus.PENDING) {
-                    continue;
+            try {
+                if ("on".equals(dto.getAction())) {
+                    if (ProductStatus.of(product.getStatus()) != ProductStatus.PENDING) {
+                        failed.add("商品 " + productId + " 非待审核状态，无法上架");
+                        continue;
+                    }
+                    product.setStatus(ProductStatus.ONLINE.getCode());
+                } else if ("off".equals(dto.getAction())) {
+                    product.setStatus(ProductStatus.OFFLINE.getCode());
+                } else if ("delete".equals(dto.getAction())) {
+                    product.setIsDeleted(1);
                 }
-                product.setStatus(ProductStatus.ONLINE.getCode());
-            } else if ("off".equals(dto.getAction())) {
-                product.setStatus(ProductStatus.OFFLINE.getCode());
-            } else if ("delete".equals(dto.getAction())) {
-                product.setIsDeleted(1);
+                productService.getProductMapper().updateById(product);
+                successCount++;
+            } catch (Exception e) {
+                failed.add("商品 " + productId + " 操作失败");
             }
-            productService.getProductMapper().updateById(product);
         }
 
-        return Result.success();
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", successCount);
+        result.put("failed", failed);
+        result.put("failedCount", failed.size());
+        return Result.success(result);
     }
 
     // ---- DTOs ----
@@ -198,13 +219,17 @@ public class MerchantProductController {
     }
 
     public static class CreateProductDTO {
+        @NotNull
         private Long categoryId;
+        @NotBlank
         private String name;
         private String mainImage;
         private String images;
         private String detail;
+        @NotNull
         private java.math.BigDecimal price;
         private java.math.BigDecimal originalPrice;
+        @NotNull
         private Integer stock;
         private List<SkuDTO> skus;
 
@@ -229,7 +254,9 @@ public class MerchantProductController {
     }
 
     public static class BatchOperateDTO {
+        @NotEmpty
         private List<Long> productIds;
+        @NotBlank
         private String action; // on / off / delete
 
         public List<Long> getProductIds() { return productIds; }

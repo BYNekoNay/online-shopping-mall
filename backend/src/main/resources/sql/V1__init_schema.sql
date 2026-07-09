@@ -147,7 +147,10 @@ CREATE TABLE `orders` (
   `shop_id` BIGINT UNSIGNED NOT NULL,
   `total_amount` DECIMAL(10,2) NOT NULL COMMENT '订单总金额（商品金额+运费）',
   `freight_amount` DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '运费金额',
-  `discount_amount` DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '优惠金额',
+  `discount_amount` DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '优惠金额（汇总）',
+  `promotion_discount_amount` DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '促销活动抵扣金额',
+  `coupon_discount_amount` DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '优惠券抵扣金额',
+  `points_deduct_amount` DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '积分抵扣金额',
   `pay_amount` DECIMAL(10,2) NOT NULL COMMENT '实付金额',
   `status` TINYINT NOT NULL DEFAULT 0 COMMENT '0-待付款，1-待发货，2-已发货，3-已收货，4-已完成，5-已取消，6-退款中，7-已退款',
   `address_snapshot` JSON NOT NULL COMMENT '下单时收货地址快照',
@@ -406,6 +409,14 @@ CREATE TABLE `dict` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_type_key` (`dict_type`,`dict_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据字典表';
+
+CREATE TABLE `system_config` (
+  `config_key` VARCHAR(100) NOT NULL COMMENT '配置键',
+  `config_value` VARCHAR(500) DEFAULT NULL COMMENT '配置值',
+  `description` VARCHAR(200) DEFAULT NULL COMMENT '配置说明',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统参数配置表';
 
 -- ============================================================
 -- 初始化数据

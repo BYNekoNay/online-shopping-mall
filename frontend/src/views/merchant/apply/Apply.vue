@@ -19,7 +19,7 @@
         <el-form-item label="营业执照图片" required>
           <el-upload action="/api/upload/image" :show-file-list="false" :on-success="onLicenseUpload">
             <img v-if="form.licenseImage" :src="form.licenseImage" class="license-preview" />
-            <el-button v-else>Upload License</el-button>
+            <el-button v-else>上传营业执照</el-button>
           </el-upload>
         </el-form-item>
         <el-form-item label="申请说明">
@@ -46,7 +46,7 @@ async function submitApply() {
   submitting.value = true
   try {
     await request.applyShop(form.value)
-    ElMessage.success('Application submitted')
+    ElMessage.success('申请已提交')
   } catch (e) {
     // handled
   } finally {
@@ -55,7 +55,7 @@ async function submitApply() {
 }
 
 function onLicenseUpload(response) {
-  form.value.licenseImage = response.url || response.data?.url
+  form.value.licenseImage = response?.url || (typeof response === 'string' ? response : response?.data?.url) || ''
 }
 </script>
 

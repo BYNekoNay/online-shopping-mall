@@ -14,6 +14,21 @@
       </el-carousel>
     </section>
 
+    <!-- 限时活动 -->
+    <section v-if="promotions.length > 0" class="promotions-section">
+      <div class="section-header">
+        <div class="header-accent promotion-accent"></div>
+        <h3 class="promotion-title">🔥 限时活动</h3>
+      </div>
+      <div class="promotion-list">
+        <div v-for="promo in promotions" :key="promo.id" class="promotion-card">
+          <div class="promotion-tag">{{ typeMap[promo.type] }}</div>
+          <div class="promotion-name">{{ promo.name }}</div>
+          <div class="promotion-desc">{{ promo.description }}</div>
+        </div>
+      </div>
+    </section>
+
     <!-- 分类导航（卡片网格） -->
     <section class="category-section">
       <div class="section-header">
@@ -46,10 +61,13 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/api/product'
+import { getActivePromotions } from '@/api/promotion'
 import RecommendList from '@/components/RecommendList.vue'
 
 const router = useRouter()
 const categories = ref([])
+const promotions = ref([])
+const typeMap = { 1: '折扣', 2: '满减', 3: '满赠', 4: '套餐' }
 
 const banners = [
   { title: 'AI 智能推荐', desc: '基于协同过滤算法，为你发现好物', bg: 'linear-gradient(135deg, #4F46E5, #7C3AED)' },
@@ -62,6 +80,12 @@ onMounted(async () => {
     categories.value = await request.getCategories()
   } catch {
     categories.value = []
+  }
+  try {
+    const res = await getActivePromotions({ scope: 'GLOBAL', scopeId: 0 })
+    promotions.value = res || []
+  } catch {
+    promotions.value = []
   }
 })
 
@@ -126,6 +150,60 @@ function goCategory(id) {
 .ai-title {
   display: flex;
   align-items: center;
+}
+/* 限时活动 */
+.promotions-section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin: 28px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.promotion-accent {
+  background: linear-gradient(180deg, #f56c6c, #e6a23c);
+}
+.promotion-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0F172A;
+}
+.promotion-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.promotion-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s;
+  cursor: default;
+}
+.promotion-card:hover {
+  border-color: #f56c6c;
+  box-shadow: 0 4px 12px rgba(245,108,108,0.1);
+  transform: translateY(-2px);
+}
+.promotion-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #f56c6c, #e6a23c);
+  margin-bottom: 10px;
+}
+.promotion-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+.promotion-desc {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
 }
 /* 分类 */
 .category-section {

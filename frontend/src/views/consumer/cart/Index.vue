@@ -14,7 +14,7 @@
           </div>
         </template>
         <div v-for="item in items" :key="item.id" class="cart-item">
-          <el-checkbox v-model="item.selected" @change="toggleSelect(item)" />
+          <el-checkbox :model-value="item.selected" @change="toggleSelect(item)" />
           <img :src="item.productImage" class="cart-item-image" />
           <div class="cart-item-info">
             <div>{{ item.productName }}</div>
@@ -72,8 +72,8 @@ async function handleClear() {
   for (const item of items.value) {
     await request.deleteCartItem(item.id)
   }
-  cartStore.items = []
-  ElMessage.success('Cleared')
+  cartStore.clear()
+  ElMessage.success('已清空')
 }
 
 function goCheckout() {

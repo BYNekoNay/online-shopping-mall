@@ -10,6 +10,11 @@ export function getUserCoupons(params) {
   return request.get('/user/coupons', { params })
 }
 
+/** 领取优惠券 */
+export function receiveCoupon(id) {
+  return request.post(`/coupons/${id}/receive`)
+}
+
 export function getPoints() {
   return request.get('/user/points')
 }
@@ -18,4 +23,4 @@ export function getPointsRecords(params) {
   return request.get('/user/points/records', { params })
 }
 
-export default { getAvailableCoupons, getUserCoupons, getPoints, getPointsRecords }
+export default { getAvailableCoupons, getUserCoupons, receiveCoupon, getPoints, getPointsRecords }

@@ -100,7 +100,7 @@ public class RefundService {
     }
 
     /**
-     * 商家审核退款。
+     * 商家审核退款（校验店铺归属）。
      * <p>
      * 审核通过时：
      * <ul>
@@ -108,23 +108,47 @@ public class RefundService {
      *   <li>同步更新订单状态为"已退款"（status=7）。</li>
      *   <li>调用 PointsService.clawback 扣回该订单产生的积分。</li>
      * </ul>
+     *
+     * @param shopId 商家店铺 ID，用于校验退款订单归属
      */
     @Transactional(rollbackFor = Exception.class)
-    public void audit(Long refundId, Boolean approved, String handleRemark) {
+    public void audit(Long refundId, Boolean approved, String handleRemark, Long shopId) {
         Refund refund = refundMapper.selectById(refundId);
         if (refund == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        refund.setStatus(approved ? 1 : 2);
-        refund.setHandleRemark(handleRemark);
-        refundMapper.updateById(refund);
+        if (refund.getStatus() != 0) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+
+        // 校验订单店铺归属
+        Order order = orderMapper.selectById(refund.getOrderId());
+        if (order == null || !order.getShopId().equals(shopId)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+
+        // M7 修复：原子更新，WHERE status=0 防重复审核
+        int newStatus = Boolean.TRUE.equals(approved) ? 1 : 2;
+        boolean updated = refundMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Refund>()
+                        .set(Refund::getStatus, newStatus)
+                        .set(Refund::getHandleRemark, handleRemark)
+                        .eq(Refund::getId, refundId)
+                        .eq(Refund::getStatus, 0)
+        ) > 0;
+        if (!updated) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
 
         if (approved) {
-            // 同步更新订单状态为"已退款"
-            Order order = orderMapper.selectById(refund.getOrderId());
-            if (order != null && order.getStatus() != 7) {
-                order.setStatus(7);
-                orderMapper.updateById(order);
+            // 同步更新订单状态为"已退款"（原子更新，WHERE status != 7 防重复）
+            if (order.getStatus() != 7) {
+                orderMapper.update(null,
+                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
+                                .set(Order::getStatus, 7)
+                                .eq(Order::getId, order.getId())
+                                .ne(Order::getStatus, 7)
+                );
             }
             // 扣回积分
             pointsService.clawback(refund.getOrderId());

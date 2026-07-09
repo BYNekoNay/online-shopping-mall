@@ -63,7 +63,8 @@ async function loadProducts(categoryId) {
   try {
     const params = {}
     if (categoryId) params.categoryId = categoryId
-    products.value = await request.getProducts(params)
+    const data = await request.getProducts(params)
+    products.value = data.records || data || []
   } catch {
     products.value = []
   }

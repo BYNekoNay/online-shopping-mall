@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useUserStore } from '@/store/user'
 
 const routes = [
   {
@@ -40,9 +41,11 @@ const routes = [
   },
   {
     path: '/merchant',
+    redirect: '/merchant/products',
     component: () => import('@/layouts/MerchantLayout.vue'),
     meta: { requiresAuth: true, roles: [2] },
     children: [
+      { path: '', redirect: '/merchant/products' },
       { path: 'apply', name: 'MerchantApply', component: () => import('@/views/merchant/apply/Apply.vue') },
       { path: 'apply-pending', name: 'MerchantApplyPending', component: () => import('@/views/merchant/apply/Pending.vue') },
       { path: 'shop/info', name: 'MerchantShopInfo', component: () => import('@/views/merchant/shop/Info.vue') },
@@ -52,14 +55,17 @@ const routes = [
       { path: 'products/edit', name: 'MerchantProductEdit', component: () => import('@/views/merchant/product/Edit.vue') },
       { path: 'orders', name: 'MerchantOrders', component: () => import('@/views/merchant/order/List.vue') },
       { path: 'refunds', name: 'MerchantRefunds', component: () => import('@/views/merchant/order/Refunds.vue') },
+      { path: 'orders/:id', name: 'MerchantOrderDetail', component: () => import('@/views/merchant/order/List.vue') },
       { path: 'statistics', name: 'MerchantStatistics', component: () => import('@/views/merchant/statistics/Dashboard.vue') },
     ],
   },
   {
     path: '/admin',
+    redirect: '/admin/dashboard',
     component: () => import('@/layouts/AdminLayout.vue'),
     meta: { requiresAuth: true, roles: [3] },
     children: [
+      { path: '', redirect: '/admin/dashboard' },
       { path: 'dashboard', name: 'AdminDashboard', component: () => import('@/views/admin/dashboard/Index.vue') },
       { path: 'users', name: 'AdminUsers', component: () => import('@/views/admin/user/List.vue') },
       { path: 'products', name: 'AdminProducts', component: () => import('@/views/admin/product/List.vue') },
@@ -80,15 +86,9 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
-  const userStore = JSON.parse(localStorage.getItem('user') || '{}')
-
-  // 收集当前路由及所有父级路由的 meta
-  let requiresAuth = false
-  let allowedRoles = null
-  for (const record of to.matched) {
-    if (record.meta.requiresAuth) requiresAuth = true
-    if (record.meta.roles) allowedRoles = record.meta.roles
-  }
+  const userStore = useUserStore()
+  const requiresAuth = to.matched.some(r => r.meta.requiresAuth)
+  const allowedRoles = to.matched.map(r => r.meta.roles).find(Boolean)
 
   if (requiresAuth && !userStore.token) {
     next({ path: '/login', query: { redirect: to.fullPath } })

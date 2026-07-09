@@ -157,10 +157,10 @@ async function submit() {
   try {
     if (editing.value && form.value.id) {
       await request.updatePromotion(form.value.id, payload)
-      ElMessage.success('Updated')
+      ElMessage.success('更新成功')
     } else {
       await request.createPromotion(payload)
-      ElMessage.success('Created')
+      ElMessage.success('创建成功')
     }
     dialogVisible.value = false
     load()

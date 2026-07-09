@@ -5,8 +5,7 @@
     <select id="selectTimeoutUnpaidOrders" resultType="com.pzhu.mall.modules.order.entity.Order">
         SELECT * FROM orders
         WHERE status = 0
-          AND create_time &lt; #{now}
-          AND TIMESTAMPDIFF(MINUTE, create_time, #{now}) &gt;= #{timeoutMinutes}
+          AND create_time &lt;= DATE_SUB(#{now}, INTERVAL #{timeoutMinutes} MINUTE)
           AND is_deleted = 0
         ORDER BY create_time ASC
         LIMIT 100

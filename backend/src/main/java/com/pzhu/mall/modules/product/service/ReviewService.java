@@ -3,12 +3,15 @@ package com.pzhu.mall.modules.product.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.entity.OrderItem;
 import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
+import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.product.entity.Review;
 import com.pzhu.mall.modules.product.mapper.ReviewMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,9 @@ public class ReviewService {
     @Resource
     private OrderItemMapper orderItemMapper;
 
+    @Resource
+    private OrderMapper orderMapper;
+
     /**
      * 提交评价。
      */
@@ -43,7 +49,13 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
 
-        // 幂等：同一 orderItemId 只能评价一次
+        // 校验订单项归属当前用户（IDOR 防护）
+        Order order = orderMapper.selectById(item.getOrderId());
+        if (order == null || !order.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权评价该订单项");
+        }
+
+        // 幂等：同一 orderItemId 只能评价一次（数据库 UNIQUE 约束兜底）
         Long existing = reviewMapper.selectCount(
                 new LambdaQueryWrapper<Review>().eq(Review::getOrderItemId, orderItemId)
         );
@@ -59,7 +71,11 @@ public class ReviewService {
         review.setContent(content);
         review.setImages(imagesJson);
         review.setCreateTime(LocalDateTime.now());
-        reviewMapper.insert(review);
+        try {
+            reviewMapper.insert(review);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该订单项已评价");
+        }
 
         log.info("[评价] 用户{}评价订单项{} 评分{} 商品{}", userId, orderItemId, rating, item.getProductId());
     }

@@ -16,8 +16,8 @@ export function auditProduct(id, data) {
   return request.put(`/admin/products/${id}/audit`, data)
 }
 
-export function offlineProduct(id, data) {
-  return request.put(`/admin/products/${id}/offline`, data)
+export function offlineProduct(id) {
+  return request.put(`/admin/products/${id}/offline`)
 }
 
 export function getCategories() {

@@ -53,6 +53,11 @@ public class PromotionService {
             return switch (p.getType()) {
                 case 1 -> { // 限时折扣：ruleJson={"discountPercent":0.8}
                     double percent = ((Number) rule.getOrDefault("discountPercent", 1.0)).doubleValue();
+                    // M10 修复：校验折扣比例范围（0.01~0.99），防止异常配置
+                    if (percent <= 0.0 || percent >= 1.0) {
+                        log.warn("[促销] 折扣比例异常 promotionId={} discountPercent={}", p.getId(), percent);
+                        yield BigDecimal.ZERO;
+                    }
                     BigDecimal pct = BigDecimal.valueOf(percent);
                     yield goodsAmount.multiply(BigDecimal.ONE.subtract(pct));
                 }
@@ -84,13 +89,14 @@ public class PromotionService {
      * 查询店铺当前生效的促销活动。
      */
     public List<Promotion> listActiveByShop(Long shopId) {
+        LocalDateTime now = LocalDateTime.now();
         return promotionMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
                         .eq(Promotion::getStatus, 1)
                         .eq(Promotion::getScope, "SHOP")
                         .eq(Promotion::getScopeId, shopId)
-                        .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
-                        .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
+                        .le(Promotion::getStartTime, now)
+                        .ge(Promotion::getEndTime, now)
         );
     }
 
@@ -105,12 +111,13 @@ public class PromotionService {
      * 查询所有进行中促销（消费者端）。
      */
     public List<Promotion> listActive() {
+        LocalDateTime now = LocalDateTime.now();
         return promotionMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
                         .eq(Promotion::getStatus, 1)
                         .eq(Promotion::getIsDeleted, 0)
-                        .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
-                        .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
+                        .le(Promotion::getStartTime, now)
+                        .ge(Promotion::getEndTime, now)
         );
     }
 

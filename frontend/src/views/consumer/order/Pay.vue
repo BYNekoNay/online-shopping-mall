@@ -33,7 +33,7 @@ onMounted(async () => {
   try {
     orderDetail.value = await request.getOrderDetail(route.params.id)
   } catch {
-    ElMessage.error('Failed to load order')
+    ElMessage.error('加载订单失败')
   }
 })
 
@@ -42,7 +42,7 @@ async function handlePay() {
   try {
     const res = await request.payOrder(route.params.id, { payType: payType.value })
     payResult.value = res
-    ElMessage.success('Payment successful')
+    ElMessage.success('支付成功')
     router.push('/orders')
   } catch {
     // error handled

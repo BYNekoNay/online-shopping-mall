@@ -1,6 +1,7 @@
 package com.pzhu.mall.modules.recommend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pzhu.mall.common.config.RedisKeyPrefix;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
@@ -13,6 +14,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,22 +61,22 @@ public class RecommendService {
 
         // 2. 未登录或无缓存：读 recommend_result 表
         List<RecommendResult> dbResults;
+        Page<RecommendResult> page = new Page<>(1, limit);
         if (userId != null) {
-            dbResults = recommendResultMapper.selectList(
+            recommendResultMapper.selectPage(page,
                     new LambdaQueryWrapper<RecommendResult>()
                             .eq(RecommendResult::getUserId, userId)
                             .orderByDesc(RecommendResult::getScore)
-                            .last("LIMIT " + limit)
             );
         } else {
             // 未登录：全局热门兜底（user_id IS NULL）
-            dbResults = recommendResultMapper.selectList(
+            recommendResultMapper.selectPage(page,
                     new LambdaQueryWrapper<RecommendResult>()
                             .isNull(RecommendResult::getUserId)
                             .orderByDesc(RecommendResult::getScore)
-                            .last("LIMIT " + limit)
             );
         }
+        dbResults = page.getRecords();
 
         if (!dbResults.isEmpty()) {
             List<Long> productIds = dbResults.stream()
@@ -91,13 +94,13 @@ public class RecommendService {
 
         // 3. 数据库无结果：返回热门商品兜底
         log.info("[推荐-猜你喜欢] 用户={} 无推荐结果，使用热门兜底", userId);
-        List<Product> hotProducts = productMapper.selectList(
+        Page<Product> hotPage = new Page<>(1, limit);
+        productMapper.selectPage(hotPage,
                 new LambdaQueryWrapper<Product>()
                         .eq(Product::getStatus, 1)
                         .orderByDesc(Product::getSales)
-                        .last("LIMIT " + limit)
         );
-        return hotProducts.stream()
+        return hotPage.getRecords().stream()
                 .map(p -> RecommendVO.from(p, 0.0, 4))
                 .collect(Collectors.toList());
     }
@@ -111,26 +114,28 @@ public class RecommendService {
     public List<RecommendVO> similar(Long productId, Integer num) {
         int limit = num != null ? num : DEFAULT_RECOMMEND_NUM;
 
-        List<RecommendResult> results = recommendResultMapper.selectList(
+        Page<RecommendResult> resultPage = new Page<>(1, limit);
+        recommendResultMapper.selectPage(resultPage,
                 new LambdaQueryWrapper<RecommendResult>()
                         .eq(RecommendResult::getProductId, productId)
                         .orderByDesc(RecommendResult::getScore)
-                        .last("LIMIT " + limit)
         );
+        List<RecommendResult> results = resultPage.getRecords();
 
         if (results.isEmpty()) {
             // 兜底：同分类热门商品
             Product current = productMapper.selectById(productId);
             if (current != null) {
                 log.info("[推荐-相似商品] 商品={} 无相似结果，使用同分类热门兜底", productId);
-                return productMapper.selectList(
+                Page<Product> similarHotPage = new Page<>(1, limit);
+                productMapper.selectPage(similarHotPage,
                         new LambdaQueryWrapper<Product>()
                                 .eq(Product::getCategoryId, current.getCategoryId())
                                 .ne(Product::getId, productId)
                                 .eq(Product::getStatus, 1)
                                 .orderByDesc(Product::getSales)
-                                .last("LIMIT " + limit)
-                ).stream()
+                );
+                return similarHotPage.getRecords().stream()
                         .map(p -> RecommendVO.from(p, 0.0, 4))
                         .collect(Collectors.toList());
             }
@@ -158,16 +163,26 @@ public class RecommendService {
         if (members == null || members.isEmpty()) {
             return List.of();
         }
-        List<Long> productIds = members.stream()
-                .map(Long::parseLong)
-                .collect(Collectors.toList());
+        List<Long> productIds = new ArrayList<>();
+        for (String member : members) {
+            try {
+                productIds.add(Long.parseLong(member));
+            } catch (NumberFormatException e) {
+                log.warn("[推荐-Redis] 跳过非数字 member: key={}, value={}", key, member);
+            }
+        }
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
         List<Product> products = productMapper.selectBatchIds(productIds);
-        // 重建 score 映射（Redis 中 score 即为排序依据）
-        List<Long> finalProductIds = productIds;
+        // 构建位置映射（selectBatchIds 返回无序，用 Map 替代 O(n²) 的 indexOf）
+        Map<Long, Integer> positionMap = new HashMap<>();
+        for (int i = 0; i < productIds.size(); i++) {
+            positionMap.put(productIds.get(i), i);
+        }
         return products.stream()
                 .map(p -> {
-                    // 用商品在列表中的逆序位置作为近似 score（越靠前分数越高）
-                    int idx = finalProductIds.indexOf(p.getId());
+                    int idx = positionMap.getOrDefault(p.getId(), -1);
                     double score = idx >= 0 ? (double) (limit - idx) / limit : 0.0;
                     return RecommendVO.from(p, score, 3);
                 })
@@ -199,12 +214,13 @@ public class RecommendService {
      * 写入热门商品 Redis 缓存。
      */
     public void cacheHotProducts() {
-        List<Product> hotProducts = productMapper.selectList(
+        Page<Product> hotPage = new Page<>(1, 50);
+        productMapper.selectPage(hotPage,
                 new LambdaQueryWrapper<Product>()
                         .eq(Product::getStatus, 1)
                         .orderByDesc(Product::getSales)
-                        .last("LIMIT 50")
         );
+        List<Product> hotProducts = hotPage.getRecords();
         stringRedisTemplate.delete(HOT_PRODUCTS_KEY);
         for (int i = 0; i < hotProducts.size(); i++) {
             stringRedisTemplate.opsForZSet().add(

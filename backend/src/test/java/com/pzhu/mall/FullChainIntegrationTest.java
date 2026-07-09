@@ -6,7 +6,6 @@ import com.pzhu.mall.modules.cart.controller.CartController;
 import com.pzhu.mall.modules.order.controller.OrderController;
 import com.pzhu.mall.modules.recommend.controller.RecommendController;
 import com.pzhu.mall.modules.statistics.controller.MerchantStatisticsController;
-import com.pzhu.mall.modules.order.controller.RefundController;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 

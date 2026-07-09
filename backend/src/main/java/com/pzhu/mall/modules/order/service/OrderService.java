@@ -25,9 +25,13 @@ import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.product.mapper.SkuMapper;
 import com.pzhu.mall.modules.user.entity.Address;
 import com.pzhu.mall.modules.user.mapper.AddressMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -40,6 +44,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class OrderService {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
     @Resource
     private OrderNoGenerator orderNoGenerator;
@@ -103,11 +109,17 @@ public class OrderService {
     /**
      * 提交订单（核心链路）。
      * <p>
-     * 按店铺拆单后每组独立执行，每组通过独立的 {@code @Transactional} 方法处理，
+     * 按店铺拆单后每组独立执行，每组通过 {@link OrderGroupProcessor#processGroup} 在独立事务中处理，
      * 单组因库存不足等原因失败时，已成功创建的子订单不回滚（符合设计文档要求）。
      * 每组内部通过 Redis 预扣减 + 失败手动回滚保证一致性。
+     * <p>
+     * 注意：本方法不标注 {@code @Transactional}，因为：
+     * <ul>
+     *   <li>Redis 库存预扣减操作不应在数据库事务范围内（违反 §10 "Redis 操作放在事务外"）；</li>
+     *   <li>每组已由 {@code OrderGroupProcessor} 在自己的数据库事务中独立执行；</li>
+     *   <li>购物车删除等操作不阻塞下单事务。</li>
+     * </ul>
      */
-    @Transactional(rollbackFor = Exception.class)
     public List<OrderVO> createOrder(CreateOrderDTO dto) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
 
@@ -127,10 +139,11 @@ public class OrderService {
         // 1. 获取商品列表
         List<ProductItemDTO> items = dto.getProductItems();
         if (items == null || items.isEmpty()) {
-            // 从购物车读取
+            // 从购物车读取（校验归属：只读取当前用户的购物车项）
             List<Cart> carts = cartMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Cart>()
                     .in(Cart::getId, dto.getCartItemIds())
+                    .eq(Cart::getUserId, userId)
             );
             items = carts.stream().map(c -> {
                 ProductItemDTO p = new ProductItemDTO();
@@ -206,9 +219,11 @@ public class OrderService {
 
             // 4.8 调用独立事务方法处理该分组（insert order + orderItems + 积分/优惠券 + 购物车清理）
             boolean applyPoints = !pointsProcessed && Boolean.TRUE.equals(dto.getUsePoints());
+            boolean shouldDeleteCart = !cartDeleted && dto.getCartItemIds() != null;
             List<OrderVO> groupOrders;
             try {
-                groupOrders = orderGroupProcessor.processGroup(userId, shopId, groupItems, addressSnapshot, address.getProvince(), dto, applyPoints);
+                groupOrders = orderGroupProcessor.processGroup(userId, shopId, groupItems, addressSnapshot, address.getProvince(), dto, applyPoints,
+                        shouldDeleteCart ? dto.getCartItemIds() : null);
             } catch (Exception e) {
                 // 事务回滚后，归还 Redis 预扣减的库存
                 for (int i = 0; i < deductedSkus.size(); i++) {
@@ -223,16 +238,14 @@ public class OrderService {
             if (applyPoints) {
                 pointsProcessed = true;
             }
-            // 删除已提交的购物车项（仅处理一次）
-            if (dto.getCartItemIds() != null && !cartDeleted) {
-                cartMapper.deleteBatchIds(dto.getCartItemIds());
+            if (shouldDeleteCart) {
                 cartDeleted = true;
             }
         }
 
-        // 汇总部分失败的提示
+        // 汇总部分失败的提示（C5 修复：返回成功订单+记录警告，不再抛异常导致成功订单不可见）
         if (!failedShops.isEmpty()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, String.join("；", failedShops) + "，其余订单已创建");
+            log.warn("订单部分失败: {}", String.join("；", failedShops));
         }
 
         return allOrders;
@@ -279,19 +292,28 @@ public class OrderService {
     }
 
     /**
-     * 商家端：发货。
+     * 商家端：发货（校验订单店铺归属，原子更新防并发）。
      */
     @Transactional
-    public void ship(Long orderId, String logisticsCompany, String trackingNo) {
+    public void ship(Long orderId, String logisticsCompany, String trackingNo, Long shopId) {
         Order order = orderMapper.selectById(orderId);
-        if (order == null) {
+        if (order == null || !order.getShopId().equals(shopId)) {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
         if (order.getStatus() != 1) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
-        order.setStatus(2); // 已发货
-        orderMapper.updateById(order);
+
+        // M5 修复：原子更新，WHERE status=1 防重复发货
+        boolean updated = orderMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
+                        .set(Order::getStatus, 2)
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getStatus, 1)
+        ) > 0;
+        if (!updated) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
 
         // 写入物流记录
         com.pzhu.mall.modules.logistics.entity.Logistics logistics = new com.pzhu.mall.modules.logistics.entity.Logistics();
@@ -318,19 +340,29 @@ public class OrderService {
 
     /**
      * 取消订单。
+     * <p>使用原子 UPDATE（WHERE status=0）防止 TOCTOU 竞态条件，确保并发安全。</p>
      */
     @Transactional
     public void cancelOrder(Long orderId) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+
+        // 先读取订单（用于校验归属及后续优惠券/积分处理）
         Order order = orderMapper.selectById(orderId);
         if (order == null || !order.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
-        if (order.getStatus() != 0) {
+
+        // 原子更新：只在 status=0（待付款）时更新为 status=5（已取消）
+        boolean updated = orderMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
+                        .set(Order::getStatus, 5)
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getStatus, 0)
+        ) > 0;
+
+        if (!updated) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
-        order.setStatus(5); // 已取消
-        orderMapper.updateById(order);
 
         // 库存归还
         var itemQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>();
@@ -354,7 +386,7 @@ public class OrderService {
     }
 
     /**
-     * 确认收货。
+     * 确认收货（原子更新，仅允许从"已发货"状态确认）。
      */
     @Transactional
     public void confirmReceive(Long orderId) {
@@ -363,8 +395,20 @@ public class OrderService {
         if (order == null || !order.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
-        order.setStatus(4); // 已完成
-        orderMapper.updateById(order);
+        if (order.getStatus() != 2) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+
+        // M6 修复：原子更新，WHERE status=2 防止跳过中间状态
+        boolean updated = orderMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
+                        .set(Order::getStatus, 4)
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getStatus, 2)
+        ) > 0;
+        if (!updated) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
     }
 
     /**
@@ -379,16 +423,44 @@ public class OrderService {
         if (order.getStatus() != 0) {
             throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
         }
-        // 幂等保护：通过 Redis 标记已支付
+
+        // 幂等快速失败：事务内检查 Redis 是否已标记已支付（C4 修复：Redis 不可用时降级放行）
         String payKey = RedisKeyPrefix.ORDER + ":paid:" + orderId;
-        Boolean paid = stringRedisTemplate.opsForValue().setIfAbsent(payKey, "1", 30, java.util.concurrent.TimeUnit.DAYS);
-        if (paid == null || !paid) {
+        Boolean alreadyPaid;
+        try {
+            alreadyPaid = stringRedisTemplate.hasKey(payKey);
+        } catch (Exception e) {
+            log.warn("Redis unavailable during payment idempotency check, proceeding with DB guard", e);
+            alreadyPaid = false;
+        }
+        if (Boolean.TRUE.equals(alreadyPaid)) {
             throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
         }
-        order.setStatus(1); // 待发货
-        order.setPayType(payType);
-        order.setPayTime(LocalDateTime.now());
-        orderMapper.updateById(order);
+
+        // 原子更新订单状态（C2 修复：WHERE status=0 防 pay/cancel 竞态）
+        boolean updated = orderMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
+                        .set(Order::getStatus, 1)
+                        .set(Order::getPayType, payType)
+                        .set(Order::getPayTime, LocalDateTime.now())
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getStatus, 0)
+        ) > 0;
+        if (!updated) {
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
+        }
+
+        // 事务提交后设置 Redis 幂等标记（C1 修复：避免事务回滚后标记残留）
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    stringRedisTemplate.opsForValue().setIfAbsent(payKey, "1", 30, java.util.concurrent.TimeUnit.DAYS);
+                } catch (Exception e) {
+                    log.error("Failed to set Redis payment marker after commit, orderId={}", orderId, e);
+                }
+            }
+        });
 
         // 真实库存扣减（数据库原子操作，利用 WHERE stock >= ? 防超卖）
         var itemQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>();
@@ -396,7 +468,17 @@ public class OrderService {
         List<com.pzhu.mall.modules.order.entity.OrderItem> items = orderItemMapper.selectList(itemQw);
         for (com.pzhu.mall.modules.order.entity.OrderItem item : items) {
             if (item.getSkuId() != null) {
-                skuMapper.deductStock(item.getSkuId(), item.getQuantity());
+                boolean ok = skuMapper.deductStock(item.getSkuId(), item.getQuantity());
+                if (!ok) {
+                    throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH, "商品库存不足");
+                }
+                // 同步更新 Product.stock（保证 Product.stock 与 Sku.stock 一致）
+                com.pzhu.mall.modules.product.entity.Product product = productMapper.selectById(item.getProductId());
+                if (product != null && product.getStock() != null) {
+                    int newStock = Math.max(0, product.getStock() - item.getQuantity());
+                    product.setStock(newStock);
+                    productMapper.updateById(product);
+                }
             }
         }
 

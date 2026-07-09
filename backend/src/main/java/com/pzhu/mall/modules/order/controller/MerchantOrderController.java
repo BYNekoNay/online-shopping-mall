@@ -47,7 +47,9 @@ public class MerchantOrderController {
     @Operation(summary = "发货")
     @PutMapping("/{id}/ship")
     public Result<Void> ship(@PathVariable Long id, @RequestBody ShipDTO dto) {
-        orderService.ship(id, dto.getLogisticsCompany(), dto.getTrackingNo());
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        Long shopId = shopService.getMerchantShopIdOrThrow(userId);
+        orderService.ship(id, dto.getLogisticsCompany(), dto.getTrackingNo(), shopId);
         return Result.success();
     }
 

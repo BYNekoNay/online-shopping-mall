@@ -6,10 +6,10 @@ import com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.recommend.entity.RecommendResult;
-import com.pzhu.mall.modules.recommend.mapper.RecommendResultMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
@@ -81,7 +81,7 @@ public class RecommendCalculateService {
     private ProductMapper productMapper;
 
     @Resource
-    private RecommendResultMapper recommendResultMapper;
+    private RecommendResultService recommendResultService;
 
     /**
      * 全量重算所有活跃用户的推荐结果。
@@ -91,13 +91,25 @@ public class RecommendCalculateService {
         long start = System.currentTimeMillis();
         log.info("[推荐-全量计算] 开始全量推荐计算...");
 
-        // 1. 加载全量行为数据（仅加载有效行为类型 1-4）
-        List<UserBehavior> allBehaviors = userBehaviorMapper.selectList(
-                new LambdaQueryWrapper<UserBehavior>()
-                        .in(UserBehavior::getBehaviorType, 1, 2, 3, 4)
-                        .orderByAsc(UserBehavior::getUserId)
-        );
-        log.info("[推荐-全量计算] 加载行为数据 {} 条", allBehaviors.size());
+        // 1. 分页加载全量行为数据（避免 OOM）
+        List<UserBehavior> allBehaviors = new ArrayList<>();
+        int pageNum = 1;
+        int pageSize = 1000;
+        List<UserBehavior> pageData;
+        long maxRows = 500_000L; // R3: 50万条以上记录日志告警
+        do {
+            Page<UserBehavior> page = new Page<>(pageNum++, pageSize);
+            pageData = userBehaviorMapper.selectPage(page,
+                    new LambdaQueryWrapper<UserBehavior>()
+                            .in(UserBehavior::getBehaviorType, 1, 2, 3, 4)
+                            .orderByAsc(UserBehavior::getUserId)
+            ).getRecords();
+            allBehaviors.addAll(pageData);
+        } while (pageData.size() == pageSize);
+        log.info("[推荐-全量计算] 加载行为数据 {} 条（分页加载）", allBehaviors.size());
+        if (allBehaviors.size() > maxRows) {
+            log.warn("[推荐-全量计算] 行为数据量 {} 超过阈值 {}，可能导致 OOM 或长时间计算", allBehaviors.size(), maxRows);
+        }
 
         // 2. 构建评分矩阵（稀疏存储：userId -> (productId -> score)）
         Map<Long, Map<Long, Double>> ratingMatrix = buildRatingMatrix(allBehaviors);
@@ -171,14 +183,12 @@ public class RecommendCalculateService {
         // 注意：纯新用户（无 user_behavior 记录）不在 ratingMatrix 中
         // 他们的推荐结果将在查询时动态返回热门兜底，无需在此预生成
 
-        // 9. 批量写入数据库（先清旧数据，再逐条插入）
+        // 9. 批量写入数据库（清旧数据 + batch insert，事务保护）
         if (!allResults.isEmpty()) {
-            int deleted = recommendResultMapper.delete(new LambdaQueryWrapper<>());
-            log.info("[推荐-全量计算] 清除旧推荐结果 {} 条", deleted);
+            boolean removed = recommendResultService.remove(new LambdaQueryWrapper<>());
+            log.info("[推荐-全量计算] 清除旧推荐结果 {}", removed);
 
-            for (RecommendResult r : allResults) {
-                recommendResultMapper.insert(r);
-            }
+            recommendResultService.saveBatch(allResults, 500);
             log.info("[推荐-全量计算] 写入新推荐结果 {} 条", allResults.size());
         }
 
@@ -705,11 +715,14 @@ public class RecommendCalculateService {
             return;
         }
 
-        // 2. 加载全量数据计算相似度
+        // 2. 加载全量数据计算相似度（R3: 加阈值检查，超量记录告警）
         List<UserBehavior> allBehaviors = userBehaviorMapper.selectList(
                 new LambdaQueryWrapper<UserBehavior>()
                         .in(UserBehavior::getBehaviorType, 1, 2, 3, 4)
         );
+        if (allBehaviors.size() > 100_000) {
+            log.warn("[推荐-单用户计算] 全量行为数据 {} 条，单用户增量计算可能性能不足，建议使用全量重算定时任务", allBehaviors.size());
+        }
         Map<Long, Map<Long, Double>> fullMatrix = buildRatingMatrix(allBehaviors);
 
         List<Product> allProducts = productMapper.selectList(
@@ -732,15 +745,15 @@ public class RecommendCalculateService {
             results = buildHybridResults(userId, userRatings, fullMatrix, userSim, itemSim, productMap);
         }
 
-        // 4. 写入数据库（先删旧数据再插入）
+        // 4. 写入数据库（先删旧数据再批量插入）
         if (!results.isEmpty()) {
-            recommendResultMapper.delete(
+            recommendResultService.remove(
                     new LambdaQueryWrapper<RecommendResult>().eq(RecommendResult::getUserId, userId)
             );
             for (RecommendResult r : results) {
                 r.setGenerateTime(LocalDateTime.now());
-                recommendResultMapper.insert(r);
             }
+            recommendResultService.saveBatch(results);
             log.info("[推荐-单用户计算] 用户={} 生成{}条推荐，耗时={}ms",
                     userId, results.size(), System.currentTimeMillis() - start);
         } else {

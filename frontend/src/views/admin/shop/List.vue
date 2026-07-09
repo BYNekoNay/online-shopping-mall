@@ -78,7 +78,8 @@ async function audit(row, approved) {
   try {
     const action = approved ? '通过' : '拒绝'
     await ElMessageBox.confirm(`确认${action}店铺 ${row.name}？`, '提示', { type: 'warning' })
-    await request.auditShop(row.id, { approved, reason: approved ? '' : '不符合入驻要求' })
+    const payload = approved ? { approved } : { approved, reason: '不符合入驻要求' }
+    await request.auditShop(row.id, payload)
     ElMessage.success('操作成功')
     load()
   } catch {}

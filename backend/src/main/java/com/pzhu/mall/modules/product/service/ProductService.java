@@ -18,6 +18,7 @@ import com.pzhu.mall.modules.product.vo.CategoryVO;
 import com.pzhu.mall.modules.product.mapper.SkuMapper;
 import com.pzhu.mall.modules.statistics.mapper.SearchHistoryMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -58,7 +59,23 @@ public class ProductService {
     }
 
     /**
-     * 分页查询商品列表。
+     * 创建商品及其 SKU 列表（事务保护）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Product createWithSkus(Product product, List<com.pzhu.mall.modules.product.entity.Sku> skus) {
+        productMapper.insert(product);
+        if (skus != null && !skus.isEmpty()) {
+            for (com.pzhu.mall.modules.product.entity.Sku sku : skus) {
+                sku.setProductId(product.getId());
+                sku.setIsDeleted(0);
+                skuMapper.insert(sku);
+            }
+        }
+        return product;
+    }
+
+    /**
+     * 分页查询商品列表（批量加载 Category 和 SKU 消除 N+1）。
      */
     public PageResult<ProductVO> listPage(ProductQueryDTO query) {
         LambdaQueryWrapper<Product> qw = new LambdaQueryWrapper<>();
@@ -98,8 +115,36 @@ public class ProductService {
         Page<Product> page = new Page<>(query.getPageNum(), query.getPageSize());
         Page<Product> result = productMapper.selectPage(page, qw);
 
+        // m3 修复：批量加载 Category 和 SKU，消除 N+1 查询
+        java.util.Set<Long> categoryIds = result.getRecords().stream()
+                .map(Product::getCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        java.util.Map<Long, String> categoryNameMap = new HashMap<>();
+        if (!categoryIds.isEmpty()) {
+            List<Category> categories = categoryMapper.selectBatchIds(categoryIds);
+            for (Category c : categories) {
+                categoryNameMap.put(c.getId(), c.getName());
+            }
+        }
+
+        java.util.Set<Long> productIds = result.getRecords().stream()
+                .map(Product::getId)
+                .collect(Collectors.toSet());
+        java.util.Map<Long, List<com.pzhu.mall.modules.product.entity.Sku>> skuMap;
+        if (!productIds.isEmpty()) {
+            var skuQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.product.entity.Sku>();
+            skuQw.in(com.pzhu.mall.modules.product.entity.Sku::getProductId, productIds)
+                 .eq(com.pzhu.mall.modules.product.entity.Sku::getIsDeleted, 0);
+            List<com.pzhu.mall.modules.product.entity.Sku> allSkus = skuMapper.selectList(skuQw);
+            skuMap = allSkus.stream()
+                    .collect(Collectors.groupingBy(com.pzhu.mall.modules.product.entity.Sku::getProductId));
+        } else {
+            skuMap = new HashMap<>();
+        }
+
         List<ProductVO> voList = result.getRecords().stream()
-                .map(this::toVO)
+                .map(p -> toVO(p, categoryNameMap.get(p.getCategoryId()), skuMap.get(p.getId())))
                 .collect(Collectors.toList());
 
         return new PageResult<>(result.getTotal(), query.getPageNum(), query.getPageSize(), result.getPages(), voList);
@@ -131,6 +176,14 @@ public class ProductService {
     }
 
     public ProductVO toVO(Product product) {
+        return toVO(product, null, null);
+    }
+
+    /**
+     * m3 修复：批量构建 VO，使用预加载的 categoryName 和 skuList，消除 N+1 查询。
+     */
+    ProductVO toVO(Product product, String preloadedCategoryName,
+                   List<com.pzhu.mall.modules.product.entity.Sku> preloadedSkus) {
         ProductVO vo = new ProductVO();
         vo.setId(product.getId());
         vo.setShopId(product.getShopId());
@@ -146,17 +199,24 @@ public class ProductService {
         vo.setStatus(product.getStatus());
         vo.setCreateTime(product.getCreateTime());
 
-        // Load category name
-        Category category = categoryMapper.selectById(product.getCategoryId());
-        if (category != null) {
-            vo.setCategoryName(category.getName());
+        // 使用预加载的 category 名称（若未预加载则回退单独查询）
+        if (preloadedCategoryName != null) {
+            vo.setCategoryName(preloadedCategoryName);
+        } else {
+            Category category = categoryMapper.selectById(product.getCategoryId());
+            if (category != null) {
+                vo.setCategoryName(category.getName());
+            }
         }
 
-        // Load sku list
-        var skuQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.product.entity.Sku>();
-        skuQw.eq(com.pzhu.mall.modules.product.entity.Sku::getProductId, product.getId())
-             .eq(com.pzhu.mall.modules.product.entity.Sku::getIsDeleted, 0);
-        List<com.pzhu.mall.modules.product.entity.Sku> skus = skuMapper.selectList(skuQw);
+        // 使用预加载的 SKU 列表（若未预加载则回退单独查询）
+        List<com.pzhu.mall.modules.product.entity.Sku> skus = preloadedSkus;
+        if (skus == null) {
+            var skuQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.product.entity.Sku>();
+            skuQw.eq(com.pzhu.mall.modules.product.entity.Sku::getProductId, product.getId())
+                 .eq(com.pzhu.mall.modules.product.entity.Sku::getIsDeleted, 0);
+            skus = skuMapper.selectList(skuQw);
+        }
         if (skus != null) {
             vo.setSkuList(skus.stream().map(sku -> {
                 SkuVO sv = new SkuVO();

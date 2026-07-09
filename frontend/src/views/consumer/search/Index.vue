@@ -47,7 +47,8 @@ const results = ref([])
 
 async function doSearch() {
   try {
-    results.value = await request.searchProducts({ keyword: keyword.value, sort: sort.value })
+    const data = await request.searchProducts({ keyword: keyword.value, sort: sort.value })
+    results.value = data.records || data || []
   } catch {
     results.value = []
   }

@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRecommendations, getSimilarProducts } from '@/api/recommend'
 import { recommendExposure, recommendClick } from '@/api/behavior'

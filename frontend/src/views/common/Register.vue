@@ -39,7 +39,7 @@ const loading = ref(false)
 const form = ref({ username: '', nickname: '', password: '', confirmPassword: '' })
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }, { min: 3, message: '用户名至少3个字符', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }, { min: 6, message: '密码至少6个字符', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }, { min: 8, message: '密码至少8个字符', trigger: 'blur' }],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: (rule, value, callback) => { if (value !== form.value.password) callback(new Error('两次密码不一致')); else callback() }, trigger: 'blur' }

@@ -32,44 +32,55 @@ public class JwtInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String uri = request.getRequestURI();
 
-        if (isWhiteListed(uri)) {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                try {
-                    if (!jwtUtil.isExpired(token)) {
-                        var claims = jwtUtil.parseToken(token);
-                        Long userId = Long.parseLong(claims.getSubject());
-                        Integer role = claims.get("role", Integer.class);
-                        LoginUserContext.set(userId, role);
-                    }
-                } catch (Exception e) {
-                    // optional login failed, continue as anonymous
-                }
-            }
-            return true;
-        }
-
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
-        }
-
-        String token = authHeader.substring(7);
-        if (jwtUtil.isExpired(token)) {
-            throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
-        }
-
         try {
-            var claims = jwtUtil.parseToken(token);
-            Long userId = Long.parseLong(claims.getSubject());
-            Integer role = claims.get("role", Integer.class);
-            LoginUserContext.set(userId, role);
-        } catch (Exception e) {
-            throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
-        }
+            if (isWhiteListed(uri)) {
+                String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    String token = authHeader.substring(7);
+                    try {
+                        if (!jwtUtil.isExpired(token)) {
+                            var claims = jwtUtil.parseToken(token);
+                            Long userId = Long.parseLong(claims.getSubject());
+                            Integer role = claims.get("role", Integer.class);
+                            LoginUserContext.set(userId, role);
+                        }
+                    } catch (Exception e) {
+                        // optional login failed, continue as anonymous
+                    }
+                }
+                return true;
+            }
 
-        return true;
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
+            }
+
+            String token = authHeader.substring(7);
+            try {
+                if (jwtUtil.isExpired(token)) {
+                    throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
+                }
+            } catch (IllegalArgumentException e) {
+                // isExpired() 对签名/格式无效 Token 抛出 IllegalArgumentException，统一转为 UNAUTHORIZED
+                throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
+            }
+
+            try {
+                var claims = jwtUtil.parseToken(token);
+                Long userId = Long.parseLong(claims.getSubject());
+                Integer role = claims.get("role", Integer.class);
+                LoginUserContext.set(userId, role);
+            } catch (Exception e) {
+                throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
+            }
+
+            return true;
+        } catch (Exception e) {
+            // Ensure cleanup before rethrowing to prevent ThreadLocal leaks
+            LoginUserContext.clear();
+            throw e;
+        }
     }
 
     @Override
@@ -80,8 +91,17 @@ public class JwtInterceptor implements HandlerInterceptor {
 
     private boolean isWhiteListed(String uri) {
         for (String pattern : WHITE_LIST) {
-            if (pattern.endsWith("/") && uri.startsWith(pattern)) return true;
-            if (uri.equals(pattern)) return true;
+            if (pattern.endsWith("/")) {
+                // 前缀匹配时，确保后续路径不是 admin/ 等受保护路径（M1 修复：toLowerCase 防大小写绕过）
+                if (uri.startsWith(pattern)) {
+                    String remaining = uri.substring(pattern.length());
+                    if (!remaining.isEmpty() && !remaining.toLowerCase().startsWith("admin")) {
+                        return true;
+                    }
+                }
+            } else if (uri.equals(pattern)) {
+                return true;
+            }
         }
         return false;
     }

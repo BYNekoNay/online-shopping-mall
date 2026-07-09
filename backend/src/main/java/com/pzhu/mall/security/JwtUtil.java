@@ -22,7 +22,12 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        byte[] keyBytes = secret.getBytes();
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException(
+                    "JWT secret must be at least 256 bits (32 bytes), current: " + keyBytes.length + " bytes");
+        }
+        this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(Long userId, int role) {
@@ -44,6 +49,10 @@ public class JwtUtil {
                 .getBody();
     }
 
+    /**
+     * 检查 Token 是否过期。
+     * <p>M2 修复：仅 ExpiredJwtException 视为过期；签名/格式错误单独抛出，不混淆为"过期"。</p>
+     */
     public boolean isExpired(String token) {
         try {
             Claims claims = parseToken(token);
@@ -51,7 +60,8 @@ public class JwtUtil {
         } catch (ExpiredJwtException e) {
             return true;
         } catch (JwtException e) {
-            return true;
+            // 签名无效/格式错误等：不作为"过期"处理，抛出让调用方区分
+            throw new IllegalArgumentException("Invalid JWT token", e);
         }
     }
 

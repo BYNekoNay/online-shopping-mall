@@ -26,6 +26,8 @@ public class CouponService {
 
     private static final Logger log = LoggerFactory.getLogger(CouponService.class);
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+
     @Resource
     private CouponMapper couponMapper;
 
@@ -89,7 +91,7 @@ public class CouponService {
             return BigDecimal.ZERO;
         }
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.ObjectMapper mapper = MAPPER;
             java.util.Map<String, Object> rule = mapper.readValue(coupon.getDiscountRule(), java.util.Map.class);
             int threshold = ((Number) rule.getOrDefault("threshold", 0)).intValue();
             int discount = ((Number) rule.getOrDefault("discount", 0)).intValue();
@@ -110,7 +112,7 @@ public class CouponService {
             return BigDecimal.ZERO;
         }
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.ObjectMapper mapper = MAPPER;
             java.util.Map<String, Object> rule = mapper.readValue(discountRule, java.util.Map.class);
             int threshold = ((Number) rule.getOrDefault("threshold", 0)).intValue();
             int discount = ((Number) rule.getOrDefault("discount", 0)).intValue();
@@ -124,19 +126,44 @@ public class CouponService {
     }
 
     /**
-     * 标记优惠券已使用。
+     * 计算优惠券抵扣金额（通过 UserCoupon ID 查询关联的 Coupon 模板）。
+     *
+     * <p>与 {@link #calculateDiscount(Long, BigDecimal)} 的区别在于
+     * 此方法先通过 UserCoupon 记录找到对应的 Coupon 模板。
+     */
+    public BigDecimal calculateDiscountByUserCoupon(Long userCouponId, BigDecimal goodsAmount) {
+        UserCoupon uc = userCouponMapper.selectById(userCouponId);
+        if (uc == null) return BigDecimal.ZERO;
+        return calculateDiscount(uc.getCouponId(), goodsAmount);
+    }
+
+    /**
+     * 标记优惠券已使用（校验归属）。
+     *
+     * @param userCouponId UserCoupon 记录 ID
+     * @param orderId      关联订单 ID
+     * @param userId       当前用户 ID（用于归属校验）
      */
     @Transactional(rollbackFor = Exception.class)
-    public void markUsed(Long userCouponId, Long orderId) {
-        UserCoupon uc = new UserCoupon();
-        uc.setStatus(1);
-        uc.setUseTime(LocalDateTime.now());
-        uc.setRelatedOrderId(orderId);
+    public void markUsed(Long userCouponId, Long orderId, Long userId) {
+        // 先查询 UserCoupon 记录，校验归属
+        UserCoupon uc = userCouponMapper.selectById(userCouponId);
+        if (uc == null) {
+            throw new BusinessException(ErrorCode.COUPON_UNAVAILABLE);
+        }
+        if (!uc.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.COUPON_UNAVAILABLE);
+        }
+
+        // 原子性标记已使用
+        UserCoupon update = new UserCoupon();
+        update.setStatus(1);
+        update.setUseTime(LocalDateTime.now());
+        update.setRelatedOrderId(orderId);
         LambdaUpdateWrapper<UserCoupon> uw = new LambdaUpdateWrapper<>();
         uw.eq(UserCoupon::getId, userCouponId)
-          .eq(UserCoupon::getStatus, 0)
-          .last("LIMIT 1");
-        userCouponMapper.update(uc, uw);
+          .eq(UserCoupon::getStatus, 0);
+        userCouponMapper.update(update, uw);
     }
 
     /**

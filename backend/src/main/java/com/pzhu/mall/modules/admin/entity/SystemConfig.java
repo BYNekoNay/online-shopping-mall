@@ -1,12 +1,17 @@
 package com.pzhu.mall.modules.admin.entity;
 
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
 /**
  * 系统参数配置实体（对应 system_config 表）。
  */
+@TableName("system_config")
 public class SystemConfig {
 
+    @TableId
     private String configKey;
     private String configValue;
     private String description;

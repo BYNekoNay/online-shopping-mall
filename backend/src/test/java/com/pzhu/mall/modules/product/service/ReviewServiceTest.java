@@ -2,8 +2,10 @@ package com.pzhu.mall.modules.product.service;
 
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.entity.OrderItem;
 import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
+import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.product.entity.Review;
 import com.pzhu.mall.modules.product.mapper.ReviewMapper;
 import org.junit.jupiter.api.Test;
@@ -20,15 +22,22 @@ class ReviewServiceTest {
     void submit_success() {
         ReviewMapper reviewMapper = mock(ReviewMapper.class);
         OrderItemMapper orderItemMapper = mock(OrderItemMapper.class);
+        OrderMapper orderMapper = mock(OrderMapper.class);
         ReviewService service = new ReviewService();
-        // inject mocks via reflection
         inject(service, "reviewMapper", reviewMapper);
         inject(service, "orderItemMapper", orderItemMapper);
+        inject(service, "orderMapper", orderMapper);
+
+        Order order = new Order();
+        order.setId(5L);
+        order.setUserId(100L);
 
         OrderItem item = new OrderItem();
         item.setId(1L);
+        item.setOrderId(5L);
         item.setProductId(10L);
         when(orderItemMapper.selectById(1L)).thenReturn(item);
+        when(orderMapper.selectById(5L)).thenReturn(order);
         when(reviewMapper.selectCount(any())).thenReturn(0L);
         when(reviewMapper.insert(any())).thenReturn(1);
 
@@ -41,14 +50,22 @@ class ReviewServiceTest {
     void submit_duplicate_throws() {
         ReviewMapper reviewMapper = mock(ReviewMapper.class);
         OrderItemMapper orderItemMapper = mock(OrderItemMapper.class);
+        OrderMapper orderMapper = mock(OrderMapper.class);
         ReviewService service = new ReviewService();
         inject(service, "reviewMapper", reviewMapper);
         inject(service, "orderItemMapper", orderItemMapper);
+        inject(service, "orderMapper", orderMapper);
+
+        Order order = new Order();
+        order.setId(5L);
+        order.setUserId(100L);
 
         OrderItem item = new OrderItem();
         item.setId(1L);
+        item.setOrderId(5L);
         item.setProductId(10L);
         when(orderItemMapper.selectById(1L)).thenReturn(item);
+        when(orderMapper.selectById(5L)).thenReturn(order);
         when(reviewMapper.selectCount(any())).thenReturn(1L);
 
         assertThrows(BusinessException.class, () -> service.submit(1L, 100L, 5, "good", null));

@@ -59,20 +59,15 @@ function reportPageLeave(requestFn) {
   }
 
   const payload = JSON.stringify({ stayDuration })
-
-  // sendBeacon 用于标签关闭等卸载场景，请求会异步发出，不阻塞页面关闭
   const url = `/api/behavior/page-view/${id}/leave`
-  const sent = navigator.sendBeacon && navigator.sendBeacon(url, payload)
 
-  if (!sent) {
-    // 降级：使用 fetch keepalive（部分浏览器支持）或普通 POST（页面关闭时可能被取消）
-    fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-      keepalive: true,
-    }).catch(() => {})
-  }
+  // sendBeacon 仅支持 POST，端点定义为 PUT，统一使用 fetch + keepalive
+  fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+    keepalive: true,
+  }).catch(() => {})
 
   // 清理当前页数据，为下次进入做准备
   sessionStorage.removeItem('current_page_view_id')

@@ -47,6 +47,7 @@ public class MerchantStatisticsService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
+        // 使用 SQL 聚合：统计订单数和总金额（排除赠品行在内存中处理）
         var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
                 .eq(Order::getShopId, shopId)
                 .eq(Order::getIsDeleted, 0)
@@ -55,46 +56,57 @@ public class MerchantStatisticsService {
                 .orderByAsc(Order::getCreateTime);
         List<Order> orders = orderMapper.selectList(qw);
 
-        // 过滤赠品行（is_gift=1）后计算
-        BigDecimal totalAmount = BigDecimal.ZERO;
         int totalOrders = orders.size();
         Map<String, BigDecimal> amountByBucket = new LinkedHashMap<>();
         Map<String, Integer> ordersByBucket = new LinkedHashMap<>();
 
-        for (Order order : orders) {
-            List<OrderItem> items = orderItemMapper.selectList(
+        // 批量加载所有订单的商品明细（减少 N+1 查询）
+        if (!orders.isEmpty()) {
+            List<Long> orderIds = orders.stream().map(Order::getId).collect(java.util.stream.Collectors.toList());
+            List<OrderItem> allItems = orderItemMapper.selectList(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
-                            .eq(OrderItem::getOrderId, order.getId())
+                            .in(OrderItem::getOrderId, orderIds)
             );
-            BigDecimal giftTotal = BigDecimal.ZERO;
-            BigDecimal realAmount = BigDecimal.ZERO;
-            for (OrderItem item : items) {
-                if (item.getIsGift() != null && item.getIsGift() == 1) {
-                    giftTotal = giftTotal.add(item.getPrice().multiply(new BigDecimal(item.getQuantity())));
-                } else {
+            Map<Long, List<OrderItem>> itemsByOrder = allItems.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(OrderItem::getOrderId));
+
+            BigDecimal totalAmount = BigDecimal.ZERO;
+            for (Order order : orders) {
+                List<OrderItem> items = itemsByOrder.getOrDefault(order.getId(), java.util.Collections.emptyList());
+                BigDecimal realAmount = BigDecimal.ZERO;
+                for (OrderItem item : items) {
+                    if (item.getIsGift() != null && item.getIsGift() == 1) {
+                        continue; // 排除赠品行
+                    }
                     realAmount = realAmount.add(item.getPrice().multiply(new BigDecimal(item.getQuantity())));
                 }
+                totalAmount = totalAmount.add(realAmount);
+
+                String bucket = bucketKey(order.getCreateTime(), granularity);
+                amountByBucket.merge(bucket, realAmount, BigDecimal::add);
+                ordersByBucket.merge(bucket, 1, Integer::sum);
             }
-            totalAmount = totalAmount.add(realAmount);
 
-            String bucket = bucketKey(order.getCreateTime(), granularity);
-            amountByBucket.merge(bucket, realAmount, BigDecimal::add);
-            ordersByBucket.merge(bucket, 1, Integer::sum);
-        }
+            List<Map<String, Object>> trend = new ArrayList<>();
+            for (String bucket : amountByBucket.keySet()) {
+                Map<String, Object> entry = new HashMap<>();
+                entry.put("date", bucket);
+                entry.put("amount", amountByBucket.get(bucket));
+                entry.put("orders", ordersByBucket.getOrDefault(bucket, 0));
+                trend.add(entry);
+            }
 
-        List<Map<String, Object>> trend = new ArrayList<>();
-        for (String bucket : amountByBucket.keySet()) {
-            Map<String, Object> entry = new HashMap<>();
-            entry.put("date", bucket);
-            entry.put("amount", amountByBucket.get(bucket));
-            entry.put("orders", ordersByBucket.getOrDefault(bucket, 0));
-            trend.add(entry);
+            Map<String, Object> result = new HashMap<>();
+            result.put("totalAmount", totalAmount);
+            result.put("totalOrders", totalOrders);
+            result.put("trend", trend);
+            return result;
         }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("totalAmount", totalAmount);
-        result.put("totalOrders", totalOrders);
-        result.put("trend", trend);
+        result.put("totalAmount", BigDecimal.ZERO);
+        result.put("totalOrders", 0);
+        result.put("trend", java.util.Collections.emptyList());
         return result;
     }
 
@@ -110,25 +122,28 @@ public class MerchantStatisticsService {
                 .eq(Order::getIsDeleted, 0);
         List<Order> orders = orderMapper.selectList(qw);
 
+        if (orders.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        // 批量加载所有订单的商品明细（消除 N+1 查询）
+        List<Long> orderIds = orders.stream().map(Order::getId).collect(java.util.stream.Collectors.toList());
+        List<OrderItem> allItems = orderItemMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
+                        .in(OrderItem::getOrderId, orderIds)
+        );
+
         Map<Long, BigDecimal> salesByProduct = new LinkedHashMap<>();
         Map<Long, String> nameByProduct = new HashMap<>();
         Map<Long, Integer> qtyByProduct = new HashMap<>();
 
-        for (Order order : orders) {
-            List<OrderItem> items = orderItemMapper.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
-                            .eq(OrderItem::getOrderId, order.getId())
-            );
-            for (OrderItem item : items) {
-                if (item.getIsGift() != null && item.getIsGift() == 1) continue;
-                Long pid = item.getProductId();
-                BigDecimal line = item.getPrice().multiply(new BigDecimal(item.getQuantity()));
-                salesByProduct.merge(pid, line, BigDecimal::add);
-                qtyByProduct.merge(pid, item.getQuantity(), Integer::sum);
-                if (!nameByProduct.containsKey(pid)) {
-                    nameByProduct.put(pid, item.getProductNameSnapshot());
-                }
-            }
+        for (OrderItem item : allItems) {
+            if (item.getIsGift() != null && item.getIsGift() == 1) continue;
+            Long pid = item.getProductId();
+            BigDecimal line = item.getPrice().multiply(new BigDecimal(item.getQuantity()));
+            salesByProduct.merge(pid, line, BigDecimal::add);
+            qtyByProduct.merge(pid, item.getQuantity(), Integer::sum);
+            nameByProduct.putIfAbsent(pid, item.getProductNameSnapshot());
         }
 
         return salesByProduct.entrySet().stream()

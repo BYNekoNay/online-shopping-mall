@@ -30,5 +30,9 @@ export const useCartStore = defineStore('cart', () => {
       .reduce((sum, item) => sum + item.price * item.quantity, 0)
   }
 
-  return { items, fetchList, updateItem, removeItem, getSelectedTotal }
+  function clear() {
+    items.value = []
+  }
+
+  return { items, fetchList, updateItem, removeItem, getSelectedTotal, clear }
 })

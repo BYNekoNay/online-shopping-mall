@@ -32,8 +32,10 @@ public class StartupValidator {
 
         // 校验 JWT_SECRET 非默认值
         String jwtSecret = env.getProperty("jwt.secret", "");
+        // m1 修复：仅匹配包含 "dev" 或 "change" 等明显占位关键词的弱密钥，避免误杀合法密钥
         if (jwtSecret == null || jwtSecret.isBlank()
-                || jwtSecret.contains("dev") || jwtSecret.contains("change-in-production")) {
+                || jwtSecret.contains("change-in-production")
+                || (jwtSecret.length() < 16 && jwtSecret.contains("dev"))) {
             throw new IllegalStateException(
                     "生产环境必须设置 JWT_SECRET 环境变量，禁止使用默认/开发密钥");
         }

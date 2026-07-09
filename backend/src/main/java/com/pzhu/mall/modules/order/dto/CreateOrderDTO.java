@@ -29,9 +29,9 @@ public class CreateOrderDTO {
     private List<ProductItemDTO> productItems;
 
     /**
-     * 优惠券 ID（可选）。
+     * 用户优惠券记录 ID（UserCoupon 表主键，可选）。
      */
-    private Long couponId;
+    private Long userCouponId;
 
     /**
      * 是否使用积分抵扣。
@@ -51,8 +51,8 @@ public class CreateOrderDTO {
     public void setCartItemIds(List<Long> cartItemIds) { this.cartItemIds = cartItemIds; }
     public List<ProductItemDTO> getProductItems() { return productItems; }
     public void setProductItems(List<ProductItemDTO> productItems) { this.productItems = productItems; }
-    public Long getCouponId() { return couponId; }
-    public void setCouponId(Long couponId) { this.couponId = couponId; }
+    public Long getUserCouponId() { return userCouponId; }
+    public void setUserCouponId(Long userCouponId) { this.userCouponId = userCouponId; }
     public Boolean getUsePoints() { return usePoints; }
     public void setUsePoints(Boolean usePoints) { this.usePoints = usePoints; }
     public String getRemark() { return remark; }

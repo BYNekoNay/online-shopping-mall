@@ -52,8 +52,16 @@
           <el-button v-if="order.status === 0" type="primary" @click="goPay">去支付</el-button>
           <el-button v-if="order.status === 0" @click="cancelOrder">取消订单</el-button>
           <el-button v-if="order.status === 2" type="success" @click="confirmOrder">确认收货</el-button>
+          <el-button v-if="order.status >= 2 && order.status !== 5 && order.status !== 7" @click="showLogistics">查看物流</el-button>
           <el-button @click="$router.back()">返回</el-button>
         </div>
+
+        <!-- 物流弹窗 -->
+        <el-dialog v-model="logisticsVisible" title="物流信息" width="500px">
+          <div v-if="logisticsLoading" style="text-align: center; padding: 30px;">加载中...</div>
+          <div v-else-if="logisticsError" style="text-align: center; padding: 30px; color: #999;">{{ logisticsError }}</div>
+          <pre v-else style="white-space: pre-wrap; font-size: 13px; max-height: 400px; overflow-y: auto;">{{ logisticsInfo }}</pre>
+        </el-dialog>
       </el-card>
     </template>
   </div>
@@ -64,6 +72,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/order'
+import { queryLogistics } from '@/api/logistics'
 
 const route = useRoute()
 const router = useRouter()
@@ -122,6 +131,30 @@ async function confirmOrder() {
     order.value.status = 4
   } catch {
     // ignore
+  }
+}
+// 物流查询
+const logisticsVisible = ref(false)
+const logisticsLoading = ref(false)
+const logisticsError = ref('')
+const logisticsInfo = ref('')
+async function showLogistics() {
+  logisticsVisible.value = true
+  logisticsLoading.value = true
+  logisticsError.value = ''
+  logisticsInfo.value = ''
+  try {
+    const data = await queryLogistics(order.value.id)
+    // 后端返回 JSON 字符串，尝试格式化
+    try {
+      logisticsInfo.value = JSON.stringify(JSON.parse(data), null, 2)
+    } catch {
+      logisticsInfo.value = data || '暂无物流信息'
+    }
+  } catch {
+    logisticsError.value = '物流信息暂不可用'
+  } finally {
+    logisticsLoading.value = false
   }
 }
 </script>

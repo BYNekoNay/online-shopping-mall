@@ -30,7 +30,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import request from '@/api/order'
+import request from '@/api/coupon'
 
 const points = ref(0)
 const records = ref([])
@@ -38,10 +38,9 @@ const typeMap = { 1: '下单获取', 2: '订单抵扣', 3: '兑换' }
 
 onMounted(async () => {
   try {
-    const data = await request.get('/user/points')
-    points.value = data.points
-    records.value = []
-    const recordsRes = await request.get('/user/points/records', { params: { pageNum: 1, pageSize: 50 } })
+    const data = await request.getPoints()
+    points.value = data.points || 0
+    const recordsRes = await request.getPointsRecords({ pageNum: 1, pageSize: 50 })
     records.value = recordsRes.records || []
   } catch {
     // error handled

@@ -77,10 +77,10 @@ async function submit() {
   try {
     if (editing.value && form.value.id) {
       await request.updateDict(form.value.id, form.value)
-      ElMessage.success('Updated')
+      ElMessage.success('更新成功')
     } else {
       await request.createDict(form.value)
-      ElMessage.success('Created')
+      ElMessage.success('创建成功')
     }
     dialogVisible.value = false
     load()

@@ -56,8 +56,22 @@ export function auditRefund(id, data) {
   return request.put(`/merchant/refunds/${id}/audit`, data)
 }
 
-export function getSalesStatistics(params) {
+export function getSalesStatistics(params = {}) {
+  if (!params.startDate) {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - 30)
+    params.startDate = formatDate(start)
+    params.endDate = formatDate(end)
+  }
   return request.get('/merchant/statistics/sales', { params })
+}
+
+function formatDate(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 export function getTopProducts() {
@@ -74,4 +88,14 @@ export function getProductDetail(id) {
   return request.get(`/merchant/products/${id}`)
 }
 
-export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getRefunds, auditRefund, getSalesStatistics, getTopProducts, getCategoriesTree, getProductDetail }
+/** 获取商家订单详情 */
+export function getMerchantOrderDetail(id) {
+  return request.get(`/merchant/orders/${id}`)
+}
+
+/** 运费试算 */
+export function calculateFreight(params) {
+  return request.get('/merchant/freight-templates/calculate', { params })
+}
+
+export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getRefunds, auditRefund, getSalesStatistics, getTopProducts, getCategoriesTree, getProductDetail, getMerchantOrderDetail, calculateFreight }

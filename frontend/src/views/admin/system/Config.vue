@@ -41,9 +41,9 @@ onMounted(async () => {
     if (data && typeof data === 'object') {
       form.value = {
         name: data['mall.name'] || form.value.name,
-        orderTimeout: Number(data['order.timeout']) || form.value.orderTimeout,
-        recommendRefreshHours: Number(data['recommend.refresh.hours']) || form.value.recommendRefreshHours,
-        logisticsTimeout: Number(data['logistics.timeout']) || form.value.logisticsTimeout,
+        orderTimeout: data['order.timeout'] !== undefined ? Number(data['order.timeout']) : form.value.orderTimeout,
+        recommendRefreshHours: data['recommend.refresh.hours'] !== undefined ? Number(data['recommend.refresh.hours']) : form.value.recommendRefreshHours,
+        logisticsTimeout: data['logistics.timeout'] !== undefined ? Number(data['logistics.timeout']) : form.value.logisticsTimeout,
       }
     }
   } catch {

@@ -46,7 +46,13 @@ async function handleLogin() {
     const data = await request.post('/auth/login', form.value)
     userStore.setUser(data)
     ElMessage.success('登录成功')
-    const redirect = route.query.redirect || '/'
+    // 根据角色跳转到对应页面
+    let redirect = route.query.redirect
+    if (!redirect || redirect === '/') {
+      if (data.role === 3) redirect = '/admin/dashboard'
+      else if (data.role === 2) redirect = '/merchant/products'
+      else redirect = '/'
+    }
     router.push(redirect)
   } catch {
     // error handled by interceptor

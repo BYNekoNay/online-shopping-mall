@@ -21,8 +21,8 @@ import request from '@/api/merchant'
 const form = ref({ bannerImage: '', floors: [] })
 async function saveDecoration() {
   try {
-    await request.updateShopInfo({ decorationConfig: form.value })
-    ElMessage.success('Saved')
+    await request.updateShopInfo({ decorationConfig: JSON.stringify(form.value) })
+    ElMessage.success('保存成功')
   } catch {}
 }
 </script>

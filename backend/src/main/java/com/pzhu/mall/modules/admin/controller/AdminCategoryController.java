@@ -26,7 +26,9 @@ public class AdminCategoryController {
     @Operation(summary = "分类列表")
     @GetMapping
     public Result<List<Category>> list() {
-        return Result.success(categoryMapper.selectList(null));
+        var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Category>();
+        qw.eq(Category::getIsDeleted, 0);
+        return Result.success(categoryMapper.selectList(qw));
     }
 
     @Operation(summary = "新增分类")

@@ -65,15 +65,23 @@ async function loadOrders() {
 }
 
 async function cancelOrder(id) {
-  await request.cancelOrder(id)
-  ElMessage.success('Cancelled')
-  loadOrders()
+  try {
+    await request.cancelOrder(id)
+    ElMessage.success('已取消')
+    loadOrders()
+  } catch {
+    ElMessage.error('取消订单失败')
+  }
 }
 
 async function confirmOrder(id) {
-  await request.confirmOrder(id)
-  ElMessage.success('Confirmed')
-  loadOrders()
+  try {
+    await request.confirmOrder(id)
+    ElMessage.success('已确认')
+    loadOrders()
+  } catch {
+    ElMessage.error('确认收货失败')
+  }
 }
 
 onMounted(loadOrders)

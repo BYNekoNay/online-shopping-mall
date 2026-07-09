@@ -1,11 +1,13 @@
 package com.pzhu.mall.modules.order.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 订单实体（对应 orders 表）。
+ * 订单实体（对应 order 表）。
  */
+@TableName("`orders`")
 public class Order {
 
     private Long id;

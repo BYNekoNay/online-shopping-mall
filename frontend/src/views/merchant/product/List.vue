@@ -61,7 +61,8 @@ async function loadProducts() {
     const params = {}
     if (keyword.value) params.keyword = keyword.value
     if (statusFilter.value !== '') params.status = statusFilter.value
-    products.value = await request.getMerchantProducts(params)
+    const data = await request.getMerchantProducts(params)
+    products.value = data.records || data || []
   } catch {
     products.value = []
   }

@@ -12,9 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -50,6 +52,22 @@ public class StockService {
 
     @Value("${mall.stock.alert-threshold:10}")
     private int alertThreshold;
+
+    /** Lua 脚本：原子性地懒加载库存 + 扣减 + 低库存预警 */
+    private static final DefaultRedisScript<Long> DEDUCT_STOCK_SCRIPT = new DefaultRedisScript<>(
+        "local stock = redis.call('GET', KEYS[1]); " +
+        "if stock == false then " +
+        "  redis.call('SET', KEYS[1], ARGV[2]); " +
+        "  stock = ARGV[2]; " +
+        "end; " +
+        "if tonumber(stock) < tonumber(ARGV[1]) then " +
+        "  return -1; " +
+        "end; " +
+        "local newStock = tonumber(stock) - tonumber(ARGV[1]); " +
+        "redis.call('SET', KEYS[1], newStock); " +
+        "return newStock;",
+        Long.class
+    );
 
     private String stockKey(Long skuId) {
         return RedisKeyPrefix.STOCK + ":" + skuId;
@@ -89,19 +107,21 @@ public class StockService {
         }
 
         try {
-            // 懒加载：Redis 中无此 key 时从数据库加载
+            // 懒加载 + 扣减：使用 Lua 脚本保证原子性（ARGV[1]=quantity, ARGV[2]=fallbackStock）
+            int fallbackStock = 0;
             if (!stringRedisTemplate.hasKey(stockKey)) {
-                loadFromDb(skuId);
+                Sku sku = skuMapper.selectById(skuId);
+                fallbackStock = sku != null ? sku.getStock() : 0;
             }
-            String currentStr = stringRedisTemplate.opsForValue().get(stockKey);
-            long current = currentStr != null ? Long.parseLong(currentStr) : 0;
-            if (current < quantity) {
-                // 库存不足
+            Long remaining = stringRedisTemplate.execute(
+                    DEDUCT_STOCK_SCRIPT,
+                    Collections.singletonList(stockKey),
+                    String.valueOf(quantity),
+                    String.valueOf(fallbackStock)
+            );
+            if (remaining == null || remaining < 0) {
                 return false;
             }
-            stringRedisTemplate.opsForValue().increment(stockKey, -quantity);
-            // 重新计算扣减后剩余库存
-            long remaining = current - quantity;
             // 低库存预警
             if (remaining <= alertThreshold) {
                 log.warn("Low stock alert: skuId={}, remaining={}, threshold={}", skuId, remaining, alertThreshold);

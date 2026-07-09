@@ -14,8 +14,8 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 购物车服务。
@@ -41,6 +41,29 @@ public class CartService {
         qw.eq(Cart::getUserId, userId).orderByDesc(Cart::getCreateTime);
         List<Cart> items = cartMapper.selectList(qw);
 
+        if (items.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+            // 批量加载所有商品和 SKU（消除 N+1 查询）
+            Set<Long> productIds = items.stream()
+                    .map(Cart::getProductId)
+                    .collect(Collectors.toSet());
+            List<Product> products = productMapper.selectBatchIds(productIds);
+            Map<Long, Product> productMap = products.stream()
+                    .collect(Collectors.toMap(Product::getId, p -> p));
+
+            Set<Long> skuIds = items.stream()
+                    .map(Cart::getSkuId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Map<Long, Sku> skuMap = new HashMap<>();
+            if (!skuIds.isEmpty()) {
+                List<Sku> skuList = skuMapper.selectBatchIds(skuIds);
+                skuMap = skuList.stream()
+                        .collect(Collectors.toMap(Sku::getId, s -> s));
+            }
+
         List<CartVO> voList = new ArrayList<>();
         for (Cart item : items) {
             CartVO vo = new CartVO();
@@ -50,7 +73,7 @@ public class CartService {
             vo.setQuantity(item.getQuantity());
             vo.setSelected(item.getSelected());
 
-            Product product = productMapper.selectById(item.getProductId());
+            Product product = productMap.get(item.getProductId());
             if (product == null) continue;
             vo.setProductName(product.getName());
             vo.setMainImage(product.getMainImage());
@@ -58,7 +81,7 @@ public class CartService {
             vo.setStock(product.getStock());
 
             if (item.getSkuId() != null) {
-                Sku sku = skuMapper.selectById(item.getSkuId());
+                Sku sku = skuMap.get(item.getSkuId());
                 if (sku != null) {
                     vo.setSpecText(sku.getSpecJson());
                     vo.setPrice(sku.getPrice());
@@ -72,11 +95,15 @@ public class CartService {
     }
 
     /**
-     * 添加到购物车。
+     * 添加到购物车（已存在时原子累加数量）。
      */
     public void add(Cart cart) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         cart.setUserId(userId);
+        // 校验数量必须为正数
+        if (cart.getQuantity() == null || cart.getQuantity() <= 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "商品数量必须大于0");
+        }
         // 检查是否已存在（同一用户+同一商品+同一SKU）
         LambdaQueryWrapper<Cart> qw = new LambdaQueryWrapper<>();
         qw.eq(Cart::getUserId, userId)
@@ -84,8 +111,12 @@ public class CartService {
           .eq(Cart::getSkuId, cart.getSkuId());
         Cart exist = cartMapper.selectOne(qw);
         if (exist != null) {
-            exist.setQuantity(exist.getQuantity() + (cart.getQuantity() != null ? cart.getQuantity() : 1));
-            cartMapper.updateById(exist);
+            // M8 修复：原子累加 SET quantity = quantity + ? WHERE id = ?，防止并发丢失
+            cartMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Cart>()
+                            .setSql("quantity = quantity + " + cart.getQuantity())
+                            .eq(Cart::getId, exist.getId())
+            );
         } else {
             cartMapper.insert(cart);
         }
@@ -99,6 +130,10 @@ public class CartService {
         Cart exist = cartMapper.selectById(id);
         if (exist == null || !exist.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        // 校验数量必须为正数
+        if (data.getQuantity() != null && data.getQuantity() <= 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "商品数量必须大于0");
         }
         data.setId(id);
         cartMapper.updateById(data);

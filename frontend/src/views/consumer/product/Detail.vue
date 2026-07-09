@@ -49,6 +49,28 @@
           <h3>相似商品推荐</h3>
           <RecommendList mode="similar" :product-id="productId" />
         </div>
+
+        <!-- 商品评价 -->
+        <div class="reviews-section">
+          <h3>商品评价 ({{ rating?.totalCount || 0 }})</h3>
+          <!-- 评分概况 -->
+          <div v-if="rating" class="rating-summary">
+            <div class="average-rating">
+              <span class="rating-score">{{ rating.averageRating }}</span>
+              <el-rate :model-value="Math.round(rating.averageRating)" disabled />
+            </div>
+          </div>
+          <!-- 评价列表 -->
+          <div v-if="reviews.length > 0" class="reviews-list">
+            <div v-for="review in reviews" :key="review.id" class="review-item">
+              <div class="review-user">{{ review.userNickname || '匿名用户' }}</div>
+              <el-rate :model-value="review.rating" disabled />
+              <p class="review-content">{{ review.content }}</p>
+              <span class="review-time">{{ review.createTime?.replace('T', ' ') }}</span>
+            </div>
+          </div>
+          <el-empty v-else description="暂无评价" />
+        </div>
       </template>
     </el-skeleton>
   </div>
@@ -59,6 +81,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/product'
+import { addToCart as addToCartApi } from '@/api/cart'
 import { useCartStore } from '@/store/cart'
 import RecommendList from '@/components/RecommendList.vue'
 
@@ -68,6 +91,8 @@ const productId = computed(() => Number(route.params.id))
 const loading = ref(false)
 const product = ref({})
 const selectedSkuId = ref(null)
+const reviews = ref([])
+const rating = ref(null)
 
 const selectedSku = computed(() => {
   if (!product.value.skuList || !selectedSkuId.value) return null
@@ -103,10 +128,9 @@ function onSkuChange(skuId) {
 
 async function addToCart() {
   try {
-    await cartStore.fetchList()
     const skuId = selectedSkuId.value || (product.value.skuList && product.value.skuList[0]?.id) || null
-    await request.addToCart({ productId: product.value.id, skuId, quantity: 1 })
-    ElMessage.success('Added to cart')
+    await addToCartApi({ productId: product.value.id, skuId, quantity: 1 })
+    ElMessage.success('已加入购物车')
     cartStore.fetchList()
   } catch {
     // error handled by interceptor
@@ -117,8 +141,15 @@ onMounted(async () => {
   loading.value = true
   try {
     product.value = await request.getProduct(productId.value)
+    // 加载评价和评分
+    const [reviewsRes, ratingRes] = await Promise.all([
+      request.getProductReviews(productId.value).catch(() => []),
+      request.getProductRating(productId.value).catch(() => null)
+    ])
+    reviews.value = reviewsRes || []
+    rating.value = ratingRes || null
   } catch {
-    ElMessage.error('Failed to load product')
+    ElMessage.error('加载商品信息失败')
   } finally {
     loading.value = false
   }
@@ -197,5 +228,63 @@ onMounted(async () => {
 }
 .similar-section h3 {
   margin-bottom: 15px;
+}
+/* 评价区域 */
+.reviews-section {
+  margin-top: 40px;
+  padding-top: 30px;
+  border-top: 1px solid #e4e7ed;
+}
+.reviews-section h3 {
+  font-size: 20px;
+  margin-bottom: 20px;
+  color: #0F172A;
+}
+.rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: #F8FAFC;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+.average-rating {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rating-score {
+  font-size: 36px;
+  font-weight: 700;
+  color: #f56c6c;
+}
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.review-item {
+  padding: 16px 20px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.review-item:hover {
+  border-color: #409eff;
+}
+.review-user {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+.review-content {
+  color: #555;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.review-time {
+  font-size: 12px;
+  color: #999;
 }
 </style>

@@ -21,6 +21,9 @@ public class RedissonConfig {
     @Value("${spring.redis.port:6379}")
     private int port;
 
+    @Value("${spring.redis.password:}")
+    private String password;
+
     @Bean
     @Primary
     public RedissonClient redissonClient() {
@@ -34,6 +37,10 @@ public class RedissonConfig {
                 .setTimeout(3000)
                 .setRetryAttempts(3)
                 .setRetryInterval(1500);
+        // M3 修复：支持 Redis 密码
+        if (password != null && !password.isBlank()) {
+            server.setPassword(password);
+        }
         return Redisson.create(config);
     }
 }

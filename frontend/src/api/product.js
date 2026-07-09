@@ -9,15 +9,21 @@ export function getProduct(id) {
 }
 
 export function searchProducts(params) {
-  return request.get('/products/search', { params })
+  // 统一使用 getProducts，后端 /api/products/search 已标记 @deprecated
+  return request.get('/products', { params: { ...params, keyword: params?.keyword } })
 }
 
 export function getCategories() {
   return request.get('/products/categories/tree')
 }
 
-export function addToCart(data) {
-  return request.post('/cart', data)
+export function getProductReviews(id) {
+  return request.get(`/products/${id}/reviews`)
 }
 
-export default { getProducts, getProduct, searchProducts, getCategories, addToCart }
+/** 获取商品评分概况 */
+export function getProductRating(id) {
+  return request.get(`/products/${id}/rating`)
+}
+
+export default { getProducts, getProduct, searchProducts, getCategories, getProductReviews, getProductRating }

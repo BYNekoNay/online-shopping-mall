@@ -22,8 +22,13 @@ public class OrderNoGenerator {
         long millis = Instant.now().toEpochMilli();
         int seq = SEQUENCE.getAndIncrement();
         if (seq >= MAX_SEQUENCE) {
-            SEQUENCE.set(0);
-            seq = 0;
+            // 使用 CAS 重置，避免多线程同时调用 set(0) 导致序列号回退
+            synchronized (OrderNoGenerator.class) {
+                if (SEQUENCE.get() >= MAX_SEQUENCE) {
+                    SEQUENCE.set(0);
+                }
+            }
+            seq = SEQUENCE.getAndIncrement();
         }
         return toBase36(millis, 8) + toBase36(seq, 4);
     }

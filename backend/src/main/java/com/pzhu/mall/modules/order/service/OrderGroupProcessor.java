@@ -15,7 +15,10 @@ import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.entity.Sku;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.product.mapper.SkuMapper;
+import com.pzhu.mall.modules.cart.mapper.CartMapper;
 import com.pzhu.mall.modules.logistics.service.FreightService;
+import com.pzhu.mall.common.exception.BusinessException;
+import com.pzhu.mall.common.enums.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,13 +65,17 @@ public class OrderGroupProcessor {
     @Resource
     private BehaviorService behaviorService;
 
+    @Resource
+    private CartMapper cartMapper;
+
     /**
      * 处理单个店铺分组（独立事务）。
      * <p>
-     * 内部保证：创建 Order → 批量插入 OrderItem → 积分抵扣结算 → 标记优惠券已使用，
+     * 内部保证：创建 Order → 批量插入 OrderItem → 积分抵扣结算 → 标记优惠券已使用 → 清理购物车，
      * 任一环节失败时整个分组回滚，调用方负责 Redis 库存归还。
      *
      * @param applyPoints 是否应用积分抵扣（仅第一个成功分组传 true）
+     * @param deleteCartItemIds 需要在事务内删除的购物车项 ID（仅第一个成功分组传入）
      */
     @Transactional(rollbackFor = Exception.class)
     public List<OrderVO> processGroup(Long userId, Long shopId,
@@ -76,13 +83,17 @@ public class OrderGroupProcessor {
                                       String addressSnapshot,
                                       String province,
                                       CreateOrderDTO dto,
-                                      boolean applyPoints) {
+                                      boolean applyPoints,
+                                      List<Long> deleteCartItemIds) {
         List<OrderVO> result = new ArrayList<>();
 
         // 计算商品金额
         BigDecimal goodsAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
         for (ProductItemDTO item : groupItems) {
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "商品数量必须大于0");
+            }
             Product product = productMapper.selectById(item.getProductId());
             Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
             BigDecimal unitPrice = sku != null ? sku.getPrice() : product.getPrice();
@@ -106,10 +117,10 @@ public class OrderGroupProcessor {
         // 促销优惠
         BigDecimal promotionDiscount = promotionService.calculateDiscount(shopId, goodsAmount);
 
-        // 优惠券抵扣
+        // 优惠券抵扣（通过 userCouponId 查找关联的 Coupon 模板）
         BigDecimal couponDiscount = BigDecimal.ZERO;
-        if (dto.getCouponId() != null) {
-            couponDiscount = couponService.calculateDiscount(dto.getCouponId(), goodsAmount);
+        if (dto.getUserCouponId() != null) {
+            couponDiscount = couponService.calculateDiscountByUserCoupon(dto.getUserCouponId(), goodsAmount);
         }
 
         // 积分抵扣
@@ -126,6 +137,9 @@ public class OrderGroupProcessor {
                 .subtract(promotionDiscount)
                 .subtract(couponDiscount)
                 .subtract(pointsDeduct);
+        if (payAmount.compareTo(BigDecimal.ZERO) < 0) {
+            payAmount = BigDecimal.ZERO;
+        }
 
         // 创建订单
         Order order = new Order();
@@ -157,13 +171,18 @@ public class OrderGroupProcessor {
         }
 
         // 标记优惠券已使用
-        if (dto.getCouponId() != null) {
-            couponService.markUsed(dto.getCouponId(), order.getId());
+        if (dto.getUserCouponId() != null) {
+            couponService.markUsed(dto.getUserCouponId(), order.getId(), userId);
         }
 
         // 记录购买行为
         for (OrderItem oi : orderItems) {
             behaviorService.record(userId, oi.getProductId(), 3);
+        }
+
+        // 在事务内删除已提交的购物车项
+        if (deleteCartItemIds != null && !deleteCartItemIds.isEmpty()) {
+            cartMapper.deleteBatchIds(deleteCartItemIds);
         }
 
         result.add(buildOrderVO(order));

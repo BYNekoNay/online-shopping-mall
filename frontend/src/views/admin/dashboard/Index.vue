@@ -30,7 +30,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import request from '@/api/admin'
 
@@ -79,8 +79,13 @@ function renderFunnel() {
 onMounted(() => {
   loadDashboard()
   loadDetail()
-  window.addEventListener('resize', () => chartInstance && chartInstance.resize())
+  window.addEventListener('resize', handleResize)
 })
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  if (chartInstance) chartInstance.dispose()
+})
+function handleResize() { if (chartInstance) chartInstance.resize() }
 </script>
 
 <style scoped>

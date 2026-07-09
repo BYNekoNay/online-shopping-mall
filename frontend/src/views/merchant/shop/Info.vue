@@ -19,12 +19,15 @@ import request from '@/api/merchant'
 
 const form = ref({ name: '', logo: '', description: '' })
 onMounted(async () => {
-  try { form.value = await request.getShopInfo() } catch {}
+  try {
+    const data = await request.getShopInfo()
+    form.value = { name: data.name || '', logo: data.logo || '', description: data.description || '' }
+  } catch {}
 })
 async function saveInfo() {
   try {
     await request.updateShopInfo(form.value)
-    ElMessage.success('Saved')
+    ElMessage.success('保存成功')
   } catch {}
 }
 </script>

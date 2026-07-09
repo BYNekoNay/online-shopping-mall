@@ -7,6 +7,7 @@ import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
 import com.pzhu.mall.security.JwtUtil;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,10 @@ public class UserService {
      */
     @Transactional
     public Long register(String username, String rawPassword, String nickname, String phone, String email) {
+        // M12 修复：密码强度校验（至少 8 位）
+        if (rawPassword == null || rawPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "密码长度至少 8 位");
+        }
         LambdaQueryWrapper<User> qw = new LambdaQueryWrapper<>();
         qw.eq(User::getUsername, username).eq(User::getIsDeleted, 0);
         if (userMapper.selectCount(qw) > 0) {
@@ -42,14 +47,14 @@ public class UserService {
             LambdaQueryWrapper<User> pw = new LambdaQueryWrapper<>();
             pw.eq(User::getPhone, phone).eq(User::getIsDeleted, 0);
             if (userMapper.selectCount(pw) > 0) {
-                throw new BusinessException(ErrorCode.PARAM_ERROR, "Phone already registered");
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "该手机号已被注册");
             }
         }
         if (email != null && !email.isBlank()) {
             LambdaQueryWrapper<User> ew = new LambdaQueryWrapper<>();
             ew.eq(User::getEmail, email).eq(User::getIsDeleted, 0);
             if (userMapper.selectCount(ew) > 0) {
-                throw new BusinessException(ErrorCode.PARAM_ERROR, "Email already registered");
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "该邮箱已被注册");
             }
         }
 
@@ -63,7 +68,19 @@ public class UserService {
         user.setStatus(1);
         user.setPoints(0);
         user.setIsDeleted(0);
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("username") || msg.contains("uk_username")) {
+                throw new BusinessException(ErrorCode.USERNAME_EXISTS);
+            } else if (msg.contains("phone") || msg.contains("uk_phone")) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "该手机号已被注册");
+            } else if (msg.contains("email") || msg.contains("uk_email")) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "该邮箱已被注册");
+            }
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "注册信息冲突，请检查输入");
+        }
         return user.getId();
     }
 
