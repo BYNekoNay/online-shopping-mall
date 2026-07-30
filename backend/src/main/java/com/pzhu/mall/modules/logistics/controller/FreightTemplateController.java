@@ -47,9 +47,23 @@ public class FreightTemplateController {
     @Operation(summary = "保存运费模板（商家）")
     @RequireRole(2)
     @PostMapping("/merchant/freight-templates")
-    public Result<Void> merchantSave(@RequestBody FreightTemplate template) {
+    public Result<Void> merchantSave(@RequestBody FreightTemplateDTO dto) {
         Long shopId = getShopId();
+        // H-05 修复：使用 DTO 接收并强制绑定当前店铺，防止传入他人模板 ID 覆盖其运费模板（IDOR）
+        FreightTemplate template = new FreightTemplate();
+        template.setName(dto.getName());
+        template.setRegionRuleJson(dto.getRegionRuleJson());
+        template.setFreeShippingThreshold(dto.getFreeShippingThreshold());
+        template.setDefaultFee(dto.getDefaultFee());
         template.setShopId(shopId);
+        template.setIsDeleted(0);
+        if (dto.getId() != null) {
+            FreightTemplate existing = freightService.getById(dto.getId());
+            if (existing == null || !shopId.equals(existing.getShopId())) {
+                throw new BusinessException(ErrorCode.NOT_FOUND);
+            }
+            template.setId(dto.getId());
+        }
         freightService.save(template);
         return Result.success();
     }
@@ -81,5 +95,25 @@ public class FreightTemplateController {
     private Long getShopId() {
         Long userId = LoginUserContext.getCurrentUserId();
         return shopService.getMerchantShopIdOrThrow(userId);
+    }
+
+    /** 运费模板编辑 DTO（仅包含允许客户端控制的字段）。 */
+    public static class FreightTemplateDTO {
+        private Long id;
+        private String name;
+        private String regionRuleJson;
+        private java.math.BigDecimal freeShippingThreshold;
+        private java.math.BigDecimal defaultFee;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getRegionRuleJson() { return regionRuleJson; }
+        public void setRegionRuleJson(String regionRuleJson) { this.regionRuleJson = regionRuleJson; }
+        public java.math.BigDecimal getFreeShippingThreshold() { return freeShippingThreshold; }
+        public void setFreeShippingThreshold(java.math.BigDecimal freeShippingThreshold) { this.freeShippingThreshold = freeShippingThreshold; }
+        public java.math.BigDecimal getDefaultFee() { return defaultFee; }
+        public void setDefaultFee(java.math.BigDecimal defaultFee) { this.defaultFee = defaultFee; }
     }
 }

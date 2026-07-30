@@ -38,7 +38,7 @@ public class SecurityHeadersFilter {
             httpResp.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
             httpResp.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
             httpResp.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-            httpResp.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;");
+            httpResp.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;");
             chain.doFilter(request, response);
         }
     }

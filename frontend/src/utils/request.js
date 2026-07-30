@@ -9,9 +9,16 @@ const service = axios.create({
 })
 
 service.interceptors.request.use((config) => {
-  const userStore = JSON.parse(localStorage.getItem('user') || '{}')
-  if (userStore.token) {
-    config.headers.Authorization = `Bearer ${userStore.token}`
+  // M-24 修复：user 数据损坏时 JSON.parse 会抛异常导致所有请求失败，加容错
+  let token = null
+  try {
+    const userStore = JSON.parse(localStorage.getItem('user') || '{}')
+    token = userStore && userStore.token
+  } catch {
+    // 忽略损坏的本地数据，按未登录处理
+  }
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
@@ -29,6 +36,8 @@ service.interceptors.response.use(
       if (code === 10002) {
         const userStore = useUserStore()
         userStore.logout()
+        // M-25 修复：原实现只清状态不跳转，用户停留在当前页持续报错
+        router.push('/login')
         return Promise.reject(new Error(message))
       }
       // 其他业务错误 → toast 提示
@@ -41,6 +50,8 @@ service.interceptors.response.use(
     if (error.response?.status === 401) {
       const userStore = useUserStore()
       userStore.logout()
+      // M-25 修复：登出后跳转登录页
+      router.push('/login')
     } else if (error.response?.status === 403) {
       router.push('/403')
     } else if (error.code === 'ECONNABORTED' || !error.response) {

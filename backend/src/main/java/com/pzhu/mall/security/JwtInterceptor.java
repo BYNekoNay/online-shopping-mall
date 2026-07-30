@@ -10,6 +10,7 @@ import javax.servlet.http.HttpServletResponse;
 public class JwtInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
+    private final AccountStatusService accountStatusService;
 
     private static final String[] WHITE_LIST = {
             "/api/auth/register",
@@ -20,12 +21,12 @@ public class JwtInterceptor implements HandlerInterceptor {
             "/api/recommend/guess-you-like",
             "/api/recommend/similar/",
             "/api/promotions/active",
-            "/api/upload/image",
             "/api/behavior/page-view"
     };
 
-    public JwtInterceptor(JwtUtil jwtUtil) {
+    public JwtInterceptor(JwtUtil jwtUtil, AccountStatusService accountStatusService) {
         this.jwtUtil = jwtUtil;
+        this.accountStatusService = accountStatusService;
     }
 
     @Override
@@ -42,7 +43,10 @@ public class JwtInterceptor implements HandlerInterceptor {
                             var claims = jwtUtil.parseToken(token);
                             Long userId = Long.parseLong(claims.getSubject());
                             Integer role = claims.get("role", Integer.class);
-                            LoginUserContext.set(userId, role);
+                            // H-2 修复：白名单路径为可选登录，账号已禁用/注销时按匿名处理（不写入上下文）
+                            if (accountStatusService.isActive(userId)) {
+                                LoginUserContext.set(userId, role);
+                            }
                         }
                     } catch (Exception e) {
                         // optional login failed, continue as anonymous
@@ -70,7 +74,13 @@ public class JwtInterceptor implements HandlerInterceptor {
                 var claims = jwtUtil.parseToken(token);
                 Long userId = Long.parseLong(claims.getSubject());
                 Integer role = claims.get("role", Integer.class);
+                // H-2 修复：受保护路径校验账号状态，禁用账号的旧 token 立即失效（不再等到 7 天过期）
+                if (!accountStatusService.isActive(userId)) {
+                    throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.ACCOUNT_DISABLED);
+                }
                 LoginUserContext.set(userId, role);
+            } catch (com.pzhu.mall.common.exception.BusinessException e) {
+                throw e;
             } catch (Exception e) {
                 throw new com.pzhu.mall.common.exception.BusinessException(com.pzhu.mall.common.enums.ErrorCode.UNAUTHORIZED);
             }

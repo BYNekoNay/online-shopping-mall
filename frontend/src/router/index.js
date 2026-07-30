@@ -46,8 +46,9 @@ const routes = [
     meta: { requiresAuth: true, roles: [2] },
     children: [
       { path: '', redirect: '/merchant/products' },
-      { path: 'apply', name: 'MerchantApply', component: () => import('@/views/merchant/apply/Apply.vue') },
-      { path: 'apply-pending', name: 'MerchantApplyPending', component: () => import('@/views/merchant/apply/Pending.vue') },
+      // H-17 修复：入驻申请页面向消费者(role=1)，不能被父路由的 roles:[2] 拦截
+      { path: 'apply', name: 'MerchantApply', component: () => import('@/views/merchant/apply/Apply.vue'), meta: { roles: [1, 2] } },
+      { path: 'apply-pending', name: 'MerchantApplyPending', component: () => import('@/views/merchant/apply/Pending.vue'), meta: { roles: [1, 2] } },
       { path: 'shop/info', name: 'MerchantShopInfo', component: () => import('@/views/merchant/shop/Info.vue') },
       { path: 'shop/decoration', name: 'MerchantDecoration', component: () => import('@/views/merchant/shop/Decoration.vue') },
       { path: 'shop/freight', name: 'MerchantFreight', component: () => import('@/views/merchant/shop/Freight.vue') },
@@ -88,7 +89,8 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const userStore = useUserStore()
   const requiresAuth = to.matched.some(r => r.meta.requiresAuth)
-  const allowedRoles = to.matched.map(r => r.meta.roles).find(Boolean)
+  // H-17 修复：roles 取 matched 链中最深层的声明（子路由可覆盖父路由），未声明则不限制角色
+  const allowedRoles = to.matched.map(r => r.meta.roles).filter(Boolean).pop()
 
   if (requiresAuth && !userStore.token) {
     next({ path: '/login', query: { redirect: to.fullPath } })

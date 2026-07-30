@@ -31,6 +31,8 @@ class ReviewServiceTest {
         Order order = new Order();
         order.setId(5L);
         order.setUserId(100L);
+        // M-16 配套：订单须为已完成状态才允许评价
+        order.setStatus(4);
 
         OrderItem item = new OrderItem();
         item.setId(1L);
@@ -59,6 +61,8 @@ class ReviewServiceTest {
         Order order = new Order();
         order.setId(5L);
         order.setUserId(100L);
+        // M-16 配套：订单须为已完成状态，确保走到"重复评价"分支
+        order.setStatus(4);
 
         OrderItem item = new OrderItem();
         item.setId(1L);
@@ -69,6 +73,35 @@ class ReviewServiceTest {
         when(reviewMapper.selectCount(any())).thenReturn(1L);
 
         assertThrows(BusinessException.class, () -> service.submit(1L, 100L, 5, "good", null));
+    }
+
+    @Test
+    void submit_orderNotCompleted_throws() {
+        // M-16 配套：未完成订单（待发货 status=1）不允许评价
+        ReviewMapper reviewMapper = mock(ReviewMapper.class);
+        OrderItemMapper orderItemMapper = mock(OrderItemMapper.class);
+        OrderMapper orderMapper = mock(OrderMapper.class);
+        ReviewService service = new ReviewService();
+        inject(service, "reviewMapper", reviewMapper);
+        inject(service, "orderItemMapper", orderItemMapper);
+        inject(service, "orderMapper", orderMapper);
+
+        Order order = new Order();
+        order.setId(5L);
+        order.setUserId(100L);
+        order.setStatus(1);
+
+        OrderItem item = new OrderItem();
+        item.setId(1L);
+        item.setOrderId(5L);
+        item.setProductId(10L);
+        when(orderItemMapper.selectById(1L)).thenReturn(item);
+        when(orderMapper.selectById(5L)).thenReturn(order);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.submit(1L, 100L, 5, "good", null));
+        assertEquals(ErrorCode.ORDER_STATUS_INVALID.getCode(), ex.getCode());
+        verify(reviewMapper, never()).insert(any(Review.class));
     }
 
     @Test

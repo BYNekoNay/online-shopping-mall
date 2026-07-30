@@ -38,6 +38,8 @@ public class ProductController {
     @Operation(summary = "商品列表/搜索（search 参数由 ProductQueryDTO.keyword 传递）")
     @GetMapping
     public Result<PageResult<ProductVO>> list(ProductQueryDTO query) {
+        // M-15 修复：消费者端列表仅展示上架商品，避免待审核/下架商品出现在搜索结果（商家端走 /api/merchant/products）
+        query.setStatus(com.pzhu.mall.common.enums.ProductStatus.ONLINE.getCode());
         return Result.success(productService.listPage(query));
     }
 
@@ -60,10 +62,19 @@ public class ProductController {
         return Result.success(categoryService.listTree());
     }
 
-    @Operation(summary = "商品评价列表")
+    @Operation(summary = "商品评价列表（分页）")
     @GetMapping("/{id}/reviews")
-    public Result<List<Review>> reviews(@PathVariable Long id) {
-        return Result.success(reviewService.listByProduct(id));
+    public Result<PageResult<Review>> reviews(@PathVariable Long id,
+                                              @RequestParam(defaultValue = "1") long pageNum,
+                                              @RequestParam(defaultValue = "20") long pageSize) {
+        // H-22 修复：分页返回，pageSize 上限 100，防止热门商品评价全量加载
+        if (pageSize > 100) {
+            pageSize = 100;
+        }
+        if (pageNum < 1) {
+            pageNum = 1;
+        }
+        return Result.success(reviewService.listByProduct(id, pageNum, pageSize));
     }
 
     @Operation(summary = "商品评分统计（平均分+评价数）")

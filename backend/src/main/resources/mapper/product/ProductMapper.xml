@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pzhu.mall.modules.product.mapper.ProductMapper">
+
+  <!-- H-4 修复：无 SKU 商品的原子库存扣减，与 SkuMapper.deductStock 同构 -->
+  <update id="deductStock">
+    UPDATE product
+    SET stock = stock - #{quantity},
+        update_time = NOW()
+    WHERE id = #{productId}
+      AND stock >= #{quantity}
+      AND is_deleted = 0
+  </update>
+
+</mapper>

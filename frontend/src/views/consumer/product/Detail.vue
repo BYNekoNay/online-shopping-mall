@@ -146,7 +146,7 @@ onMounted(async () => {
       request.getProductReviews(productId.value).catch(() => []),
       request.getProductRating(productId.value).catch(() => null)
     ])
-    reviews.value = reviewsRes || []
+    reviews.value = reviewsRes?.records || []
     rating.value = ratingRes || null
   } catch {
     ElMessage.error('加载商品信息失败')

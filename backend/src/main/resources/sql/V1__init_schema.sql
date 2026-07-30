@@ -4,8 +4,14 @@
 -- MySQL 8.0+, utf8mb4, InnoDB
 -- ============================================================
 
-DROP DATABASE IF EXISTS mall;
-CREATE DATABASE mall CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+-- M-37 设计决策（非疏漏）：全库 26 张表均不建物理外键（FOREIGN KEY）。
+-- 取舍说明：互联网电商架构惯例——引用完整性由应用层（Service 校验 + 事务）保证，
+-- 避免外键带来的级联锁、写入性能损耗与分库分表/结构演进阻力；
+-- 跨表一致性已在代码中对齐（如下单校验商品/SKU/地址归属、退款校验订单归属）。
+
+-- M-35 修复：移除 DROP DATABASE（误执行即删库）；CREATE 改为 IF NOT EXISTS 保证幂等
+-- （docker-entrypoint 场景下 mall 库已由 MYSQL_DATABASE 环境变量创建）
+CREATE DATABASE IF NOT EXISTS mall CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE mall;
 
 -- ============================================================
@@ -126,6 +132,13 @@ CREATE TABLE `freight_template` (
 -- 2.3 购物车与订单
 -- ============================================================
 
+-- M-34 设计决策（非疏漏）：uk_user_product_sku 含可空列 sku_id。
+-- MySQL 唯一键语义：NULL 不参与唯一约束（NULL != NULL），即同一用户对同一无 SKU 商品
+-- 理论上可插入多条 sku_id=NULL 的行。此为有意保留——无 SKU 商品与多 SKU 商品共用本表，
+-- sku_id 必须可空。应用层已做双重规避（见 CartService）：
+--   1) 加购前按 user_id + product_id + sku_id IS NULL 匹配已有行并合并数量；
+--   2) 并发加购命中唯一键时捕获 DuplicateKeyException 回退为合并更新。
+-- 故不改表结构（将 sku_id 改为非空或函数索引会破坏无 SKU 商品的加购语义）。
 CREATE TABLE `cart` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NOT NULL,
@@ -283,7 +296,7 @@ CREATE TABLE `points_record` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `change_amount` INT NOT NULL COMMENT '变动数量，正数为获取，负数为消耗',
-  `type` TINYINT NOT NULL COMMENT '1-下单获取，2-订单抵扣，3-兑换',
+  `type` TINYINT NOT NULL COMMENT '1-下单获取，2-订单抵扣，3-兑换，4-取消/退款返还',
   `related_order_id` BIGINT UNSIGNED DEFAULT NULL,
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -422,9 +435,9 @@ CREATE TABLE `system_config` (
 -- 初始化数据
 -- ============================================================
 
--- 默认管理员账号（密码: admin123，BCrypt加密后存入，此处先用明文占位，后续用INSERT INTO ... VALUES (..., '$2a$10$...', ...)）
+-- 默认管理员账号（H-11 修复：密码由 admin123 轮换为 Admin@2026，原哈希已随调试文件泄露作废）
 INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `status`) VALUES
-('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '管理员', 3, 1);
+('admin', '$2a$10$UBi4W0ASv2kytcew8cYuqO.mCtIYMetRi3xlRwYItvSzDcEn8pYf6', '管理员', 3, 1);
 
 -- 商品分类初始数据
 INSERT INTO `category` (`parent_id`, `name`, `sort`) VALUES

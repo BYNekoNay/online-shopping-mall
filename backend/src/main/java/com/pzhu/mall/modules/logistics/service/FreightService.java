@@ -95,6 +95,13 @@ public class FreightService {
     }
 
     /**
+     * 按 ID 获取运费模板（用于归属校验）。
+     */
+    public FreightTemplate getById(Long id) {
+        return freightTemplateMapper.selectById(id);
+    }
+
+    /**
      * 保存运费模板。
      */
     public void save(FreightTemplate template) {

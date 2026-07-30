@@ -163,7 +163,8 @@ public class MerchantStatisticsService {
     private String bucketKey(LocalDateTime time, String granularity) {
         LocalDate d = time.toLocalDate();
         return switch (granularity) {
-            case "week" -> d.toString();
+            // M-12 修复：周粒度取所在 ISO 周的周一作为桶键（原实现与 day 相同，按周聚合失效）
+            case "week" -> d.with(java.time.DayOfWeek.MONDAY).toString();
             case "month" -> d.getYear() + "-" + String.format("%02d", d.getMonthValue());
             default -> d.toString();
         };

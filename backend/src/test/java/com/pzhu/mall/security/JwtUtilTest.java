@@ -51,7 +51,8 @@ class JwtUtilTest {
     }
 
     @Test
-    void parseToken_invalidToken_returnsTrue() {
-        assertTrue(jwtUtil.isExpired("not-a-valid-token"));
+    void isExpired_malformedToken_throwsIllegalArgument() {
+        // M2 修复后：格式错误/签名无效的 token 不再视为"过期"，而是抛出异常让调用方区分
+        assertThrows(IllegalArgumentException.class, () -> jwtUtil.isExpired("not-a-valid-token"));
     }
 }

@@ -150,6 +150,8 @@ public class OrderService {
                 p.setProductId(c.getProductId());
                 p.setSkuId(c.getSkuId());
                 p.setQuantity(c.getQuantity());
+                // H-3/M-8 修复：记录来源购物车项 ID，便于按成功分组精确清理
+                p.setCartId(c.getId());
                 return p;
             }).collect(Collectors.toList());
         }
@@ -168,6 +170,17 @@ public class OrderService {
             if (com.pzhu.mall.common.enums.ProductStatus.of(product.getStatus()) != com.pzhu.mall.common.enums.ProductStatus.ONLINE) {
                 throw new BusinessException(ErrorCode.PRODUCT_OFFLINE_ORDER);
             }
+            // C-1 修复：校验 SKU 与商品的绑定关系，防止用其他商品的低价 SKU 下单（价格篡改）；
+            // 在库存预扣减之前快速失败，避免非法组合被库存扣减的 try-catch 吞成"库存不足"
+            if (item.getSkuId() != null) {
+                Sku sku = skuMapper.selectById(item.getSkuId());
+                if (sku == null) {
+                    throw new BusinessException(ErrorCode.SKU_NOT_FOUND);
+                }
+                if (!item.getProductId().equals(sku.getProductId())) {
+                    throw new BusinessException(ErrorCode.SKU_PRODUCT_MISMATCH);
+                }
+            }
             byShop.computeIfAbsent(product.getShopId(), k -> new ArrayList<>()).add(item);
         }
 
@@ -176,12 +189,18 @@ public class OrderService {
         if (address == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
+        // M-01 修复：校验收货地址归属，防止越权使用他人地址下单；
+        // 不满足时统一按"不存在"返回，避免暴露他人地址 ID 是否存在
+        if (address.getUserId() == null || !address.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
         String addressSnapshot = String.format("{\"receiver\":\"%s\",\"phone\":\"%s\",\"province\":\"%s\",\"city\":\"%s\",\"district\":\"%s\",\"detail\":\"%s\"}",
                 address.getReceiver(), address.getPhone(), address.getProvince(), address.getCity(), address.getDistrict(), address.getDetail());
 
         List<OrderVO> allOrders = new ArrayList<>();
         boolean pointsProcessed = false;
-        boolean cartDeleted = false;
+        // H-6 修复：优惠券为单一资源，跨分组仅核销一次（与积分同模式）
+        boolean couponProcessed = false;
         List<String> failedShops = new ArrayList<>();
 
         // 4. 按分组创建订单（每组独立事务，单组失败跳过并记录，其余组继续）
@@ -191,9 +210,13 @@ public class OrderService {
 
             List<Long> deductedSkus = new ArrayList<>();
             List<Integer> deductedQtys = new ArrayList<>();
+            // H-4 修复：无 SKU 商品（单规格，直接用 product.stock）走商品级库存命名空间，
+            // 与 SKU 级扣减分开跟踪，回滚时各自归还
+            List<Long> deductedProducts = new ArrayList<>();
+            List<Integer> deductedProductQtys = new ArrayList<>();
             boolean stockFailed = false;
             try {
-                // 4.7 库存预扣减（该分组内全部 SKU，失败则回滚该分组已扣减的库存）
+                // 4.7 库存预扣减（该分组内全部商品，失败则回滚该分组已扣减的库存）
                 for (ProductItemDTO item : groupItems) {
                     Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
                     if (sku != null) {
@@ -204,6 +227,15 @@ public class OrderService {
                         }
                         deductedSkus.add(sku.getId());
                         deductedQtys.add(item.getQuantity());
+                    } else {
+                        // H-4 修复：单规格商品扣减商品级库存
+                        boolean ok = stockService.deductProduct(item.getProductId(), item.getQuantity());
+                        if (!ok) {
+                            stockFailed = true;
+                            break;
+                        }
+                        deductedProducts.add(item.getProductId());
+                        deductedProductQtys.add(item.getQuantity());
                     }
                 }
             } catch (Exception e) {
@@ -213,21 +245,35 @@ public class OrderService {
                 for (int i = 0; i < deductedSkus.size(); i++) {
                     stockService.rollback(deductedSkus.get(i), deductedQtys.get(i));
                 }
+                for (int i = 0; i < deductedProducts.size(); i++) {
+                    stockService.rollbackProduct(deductedProducts.get(i), deductedProductQtys.get(i));
+                }
                 failedShops.add("店铺" + shopId + "库存不足");
                 continue;
             }
 
             // 4.8 调用独立事务方法处理该分组（insert order + orderItems + 积分/优惠券 + 购物车清理）
             boolean applyPoints = !pointsProcessed && Boolean.TRUE.equals(dto.getUsePoints());
-            boolean shouldDeleteCart = !cartDeleted && dto.getCartItemIds() != null;
+            // H-6 修复：优惠券仅在首个成功分组计价并核销，后续分组不再触碰券状态
+            boolean applyCoupon = !couponProcessed && dto.getUserCouponId() != null;
+            // M-8 修复：仅清理本成功分组来源的购物车项（按 cartId 精确匹配），
+            // 失败分组的商品保留在购物车，不再"部分失败删全部"
+            List<Long> groupCartIds = groupItems.stream()
+                    .map(ProductItemDTO::getCartId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toList());
             List<OrderVO> groupOrders;
             try {
                 groupOrders = orderGroupProcessor.processGroup(userId, shopId, groupItems, addressSnapshot, address.getProvince(), dto, applyPoints,
-                        shouldDeleteCart ? dto.getCartItemIds() : null);
+                        applyCoupon, groupCartIds.isEmpty() ? null : groupCartIds);
             } catch (Exception e) {
                 // 事务回滚后，归还 Redis 预扣减的库存
                 for (int i = 0; i < deductedSkus.size(); i++) {
                     stockService.rollback(deductedSkus.get(i), deductedQtys.get(i));
+                }
+                // H-4 修复：同步归还商品级预扣库存
+                for (int i = 0; i < deductedProducts.size(); i++) {
+                    stockService.rollbackProduct(deductedProducts.get(i), deductedProductQtys.get(i));
                 }
                 failedShops.add("店铺" + shopId + "下单失败");
                 continue;
@@ -238,8 +284,9 @@ public class OrderService {
             if (applyPoints) {
                 pointsProcessed = true;
             }
-            if (shouldDeleteCart) {
-                cartDeleted = true;
+            // H-6 修复：标记优惠券已核销（仅第一个成功分组核销一次）
+            if (applyCoupon) {
+                couponProcessed = true;
             }
         }
 
@@ -339,7 +386,7 @@ public class OrderService {
     }
 
     /**
-     * 取消订单。
+     * 取消订单（用户主动取消）。
      * <p>使用原子 UPDATE（WHERE status=0）防止 TOCTOU 竞态条件，确保并发安全。</p>
      */
     @Transactional
@@ -352,6 +399,35 @@ public class OrderService {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
 
+        boolean updated = doCancel(order);
+        if (!updated) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+    }
+
+    /**
+     * H-16 修复：系统级取消订单（供超时定时任务调用）。
+     * <p>定时任务线程没有登录上下文（LoginUserContext 为 null），不能复用 cancelOrder 的
+     * 用户归属校验（equals(null) 恒为 false 会导致超时取消永远失败）。
+     * 幂等设计：订单不存在或已不处于"待付款"状态时静默跳过，不抛异常。</p>
+     */
+    @Transactional
+    public void cancelOrderBySystem(Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            return;
+        }
+        doCancel(order);
+    }
+
+    /**
+     * 取消订单公共逻辑：原子状态更新 + 库存归还 + 优惠券释放 + 积分扣回。
+     *
+     * @return true 取消成功；false 订单已不处于待付款状态（被并发处理），调用方自行决定语义
+     */
+    private boolean doCancel(Order order) {
+        Long orderId = order.getId();
+
         // 原子更新：只在 status=0（待付款）时更新为 status=5（已取消）
         boolean updated = orderMapper.update(null,
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
@@ -361,7 +437,7 @@ public class OrderService {
         ) > 0;
 
         if (!updated) {
-            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+            return false;
         }
 
         // 库存归还
@@ -371,6 +447,9 @@ public class OrderService {
         for (com.pzhu.mall.modules.order.entity.OrderItem item : items) {
             if (item.getSkuId() != null) {
                 stockService.rollback(item.getSkuId(), item.getQuantity());
+            } else {
+                // H-4 修复：单规格商品归还商品级库存
+                stockService.rollbackProduct(item.getProductId(), item.getQuantity());
             }
         }
 
@@ -379,10 +458,12 @@ public class OrderService {
             couponService.releaseByOrderId(orderId);
         }
 
-        // 扣回积分（若订单使用了积分抵扣）
+        // H-5 修复：未支付订单取消时返还下单抵扣的积分（type=2）。
+        // 原实现调用 clawback（仅处理 type=1 获取记录），未支付订单无获取记录，抵扣积分永久丢失
         if (order.getPointsDeductAmount() != null && order.getPointsDeductAmount().compareTo(BigDecimal.ZERO) > 0) {
-            pointsService.clawback(orderId);
+            pointsService.refundDeduct(orderId);
         }
+        return true;
     }
 
     /**
@@ -416,8 +497,10 @@ public class OrderService {
      */
     @Transactional
     public void pay(Long orderId, Integer payType) {
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         Order order = orderMapper.selectById(orderId);
-        if (order == null) {
+        // M-15 修复：校验订单归属，防止越权支付他人订单
+        if (order == null || !order.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
         if (order.getStatus() != 0) {
@@ -478,6 +561,13 @@ public class OrderService {
                     int newStock = Math.max(0, product.getStock() - item.getQuantity());
                     product.setStock(newStock);
                     productMapper.updateById(product);
+                }
+            } else {
+                // H-4 修复：单规格商品走商品级原子扣减（UPDATE ... WHERE stock >= ?），
+                // 原实现此分支无任何数据库扣减，Redis 预扣减丢失后即可无限超卖
+                boolean ok = productMapper.deductStock(item.getProductId(), item.getQuantity());
+                if (!ok) {
+                    throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH, "商品库存不足");
                 }
             }
         }

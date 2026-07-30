@@ -1,8 +1,10 @@
 package com.pzhu.mall.modules.cart.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.common.enums.ProductStatus;
 import com.pzhu.mall.modules.cart.entity.Cart;
 import com.pzhu.mall.modules.cart.mapper.CartMapper;
 import com.pzhu.mall.modules.cart.vo.CartVO;
@@ -10,10 +12,12 @@ import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.entity.Sku;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.product.mapper.SkuMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,6 +35,9 @@ public class CartService {
 
     @Resource
     private SkuMapper skuMapper;
+
+    /** M-02：单条购物车项的最大购买数量上限 */
+    private static final int MAX_CART_QUANTITY = 99;
 
     /**
      * 获取当前用户的购物车列表（含商品信息）。
@@ -100,26 +107,70 @@ public class CartService {
     public void add(Cart cart) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         cart.setUserId(userId);
+        cart.setId(null); // 防止请求体携带主键造成误更新
         // 校验数量必须为正数
         if (cart.getQuantity() == null || cart.getQuantity() <= 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "商品数量必须大于0");
         }
-        // 检查是否已存在（同一用户+同一商品+同一SKU）
-        LambdaQueryWrapper<Cart> qw = new LambdaQueryWrapper<>();
-        qw.eq(Cart::getUserId, userId)
-          .eq(Cart::getProductId, cart.getProductId())
-          .eq(Cart::getSkuId, cart.getSkuId());
-        Cart exist = cartMapper.selectOne(qw);
-        if (exist != null) {
-            // M8 修复：原子累加 SET quantity = quantity + ? WHERE id = ?，防止并发丢失
-            cartMapper.update(null,
-                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Cart>()
-                            .setSql("quantity = quantity + " + cart.getQuantity())
-                            .eq(Cart::getId, exist.getId())
-            );
-        } else {
-            cartMapper.insert(cart);
+
+        // M-02 修复：加购时校验商品状态、规格与库存
+        Product product = productMapper.selectById(cart.getProductId());
+        if (product == null || (product.getIsDeleted() != null && product.getIsDeleted() == 1)) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
+        if (ProductStatus.of(product.getStatus()) != ProductStatus.ONLINE) {
+            throw new BusinessException(ErrorCode.PRODUCT_OFFLINE_ORDER);
+        }
+        int stock;
+        if (cart.getSkuId() != null) {
+            Sku sku = skuMapper.selectById(cart.getSkuId());
+            if (sku == null) {
+                throw new BusinessException(ErrorCode.SKU_NOT_FOUND);
+            }
+            // C-1 修复：校验 SKU 与商品的绑定关系，防止用其他商品的低价 SKU 加购本商品（价格篡改）
+            if (!cart.getProductId().equals(sku.getProductId())) {
+                throw new BusinessException(ErrorCode.SKU_PRODUCT_MISMATCH);
+            }
+            stock = sku.getStock() != null ? sku.getStock() : 0;
+        } else {
+            stock = product.getStock() != null ? product.getStock() : 0;
+        }
+        if (cart.getQuantity() > MAX_CART_QUANTITY) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "单件商品加购数量不能超过 " + MAX_CART_QUANTITY);
+        }
+        if (cart.getQuantity() > stock) {
+            throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+        }
+
+        // M-05 修复：原子 upsert，替代"先查后写"的 check-then-act，防止并发加购产生重复行。
+        // 先尝试对已有行原子累加；无匹配行则 INSERT；若并发下唯一键冲突，回退为再次累加。
+        int updated = incrementQuantity(userId, cart.getProductId(), cart.getSkuId(), cart.getQuantity());
+        if (updated == 0) {
+            cart.setSelected(1);
+            cart.setCreateTime(LocalDateTime.now());
+            try {
+                cartMapper.insert(cart);
+            } catch (DuplicateKeyException e) {
+                incrementQuantity(userId, cart.getProductId(), cart.getSkuId(), cart.getQuantity());
+            }
+        }
+    }
+
+    /**
+     * 对指定（用户+商品+SKU）的购物车行原子累加数量。
+     * <p>skuId 可为空，为空时使用 IS NULL 匹配，避免生成 {@code sku_id = NULL} 恒假条件。</p>
+     */
+    private int incrementQuantity(Long userId, Long productId, Long skuId, int quantity) {
+        LambdaUpdateWrapper<Cart> uw = new LambdaUpdateWrapper<Cart>()
+                .setSql("quantity = quantity + " + quantity)
+                .eq(Cart::getUserId, userId)
+                .eq(Cart::getProductId, productId);
+        if (skuId == null) {
+            uw.isNull(Cart::getSkuId);
+        } else {
+            uw.eq(Cart::getSkuId, skuId);
+        }
+        return cartMapper.update(null, uw);
     }
 
     /**
@@ -135,8 +186,13 @@ public class CartService {
         if (data.getQuantity() != null && data.getQuantity() <= 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "商品数量必须大于0");
         }
-        data.setId(id);
-        cartMapper.updateById(data);
+        // M-03 修复：仅允许更新 quantity/selected，禁止覆写 userId/productId/skuId（Mass Assignment）。
+        // updateById 忽略 null 字段，因此新建实体只会写入这两个可变字段。
+        Cart update = new Cart();
+        update.setId(id);
+        update.setQuantity(data.getQuantity());
+        update.setSelected(data.getSelected());
+        cartMapper.updateById(update);
     }
 
     /**

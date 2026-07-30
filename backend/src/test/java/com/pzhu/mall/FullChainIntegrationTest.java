@@ -6,18 +6,31 @@ import com.pzhu.mall.modules.cart.controller.CartController;
 import com.pzhu.mall.modules.order.controller.OrderController;
 import com.pzhu.mall.modules.recommend.controller.RecommendController;
 import com.pzhu.mall.modules.statistics.controller.MerchantStatisticsController;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
- * 全链路集成测试用例汇总。
+ * 全链路集成测试用例汇总（HTTP 级端到端用例目录）。
  *
  * <p>覆盖三端角色完整业务闭环：
  * 注册登录 → 浏览 → 加购 → 下单 → 支付 → 查看推荐 → 查看统计 → 售后
  *
+ * <p><b>注意：以下测试方法目前均为用例设计骨架，尚未实现具体断言。</b>
+ * 整体标记 {@code @Disabled} 以避免空方法被误计为"通过"。
+ * 实现时请补充 MockMvc/HTTP 调用与断言，并移除 {@code @Disabled}。
+ *
+ * <p>6.6 补齐说明：服务编排级主链路（注册 → 登录 → 加购 → 下单 → 支付 →
+ * 发货 → 确认收货 → 评价）已在 {@link MainChainIntegrationTest} 中实现，
+ * 用真实 Service + Mock 持久层验证跨服务契约与订单状态机流转，随
+ * {@code mvn test} 常规执行、不依赖基础设施。本类保留为 HTTP 级用例目录，
+ * 供具备本地 MySQL + Redis 环境时手动实现与执行。
+ *
  * <p>运行方式：mvn test -Dtest=FullChainIntegrationTest
  * 需要本地 MySQL + Redis 运行中。
  */
+@Disabled("HTTP 级用例骨架，需本地 MySQL+Redis 环境实现后移除本注解；" +
+        "服务级主链路已由 MainChainIntegrationTest 覆盖。详见 docs/06-测试计划.md")
 @SpringBootTest(classes = MallApplication.class)
 class FullChainIntegrationTest {
 

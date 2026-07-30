@@ -294,14 +294,18 @@ public class RecommendCalculateService {
             userNorm.put(entry.getKey(), norm > 0 ? norm : 1.0);
         }
 
-        // 仅对有共同商品的用户对累加内积
+        // 仅对有共同商品的用户对累加内积（逐商品累加 r[u][item] * r[v][item]）
         Map<Long, Map<Long, Double>> coRate = new HashMap<>();
-        for (List<Long> users : itemUsers.values()) {
+        for (Map.Entry<Long, List<Long>> itemEntry : itemUsers.entrySet()) {
+            Long itemId = itemEntry.getKey();
+            List<Long> users = itemEntry.getValue();
             for (int i = 0; i < users.size(); i++) {
                 for (int j = i + 1; j < users.size(); j++) {
                     Long u = users.get(i);
                     Long v = users.get(j);
-                    double productScore = computeCoRateProduct(ratingMatrix, u, v);
+                    double ri = ratingMatrix.get(u).getOrDefault(itemId, 0.0);
+                    double rj = ratingMatrix.get(v).getOrDefault(itemId, 0.0);
+                    double productScore = ri * rj;
                     if (productScore > 0) {
                         coRate.computeIfAbsent(u, k -> new HashMap<>()).merge(v, productScore, Double::sum);
                         coRate.computeIfAbsent(v, k -> new HashMap<>()).merge(u, productScore, Double::sum);
@@ -324,24 +328,6 @@ public class RecommendCalculateService {
         }
 
         return similarity;
-    }
-
-    /**
-     * 计算两个用户共同交互商品的评分乘积之和（余弦内积分子）。
-     */
-    private double computeCoRateProduct(Map<Long, Map<Long, Double>> ratingMatrix, Long u, Long v) {
-        Map<Long, Double> ru = ratingMatrix.get(u);
-        Map<Long, Double> rv = ratingMatrix.get(v);
-        if (ru == null || rv == null) {
-            return 0.0;
-        }
-        double sum = 0.0;
-        for (Map.Entry<Long, Double> e : ru.entrySet()) {
-            if (rv.containsKey(e.getKey())) {
-                sum += e.getValue() * rv.get(e.getKey());
-            }
-        }
-        return sum;
     }
 
     // ==================== ItemCF ====================
@@ -759,5 +745,75 @@ public class RecommendCalculateService {
         } else {
             log.info("[推荐-单用户计算] 用户={} 无推荐结果", userId);
         }
+    }
+
+    /**
+     * 计算指定商品的 Top-N 相似商品（ItemCF 余弦相似度，实时计算）。
+     *
+     * <p>用于"相似商品推荐"查询接口。构建商品评分向量（用户维度），
+     * 计算目标商品与其他商品的余弦相似度，按相似度降序返回 Top-N。
+     *
+     * @param productId 目标商品 ID
+     * @param topN      返回数量上限
+     * @return 有序映射：商品ID → 相似度（0~1），按相似度降序；目标商品无行为数据时返回空
+     */
+    public Map<Long, Double> computeSimilarProducts(Long productId, int topN) {
+        // 1. 加载全量行为，构建用户-商品评分矩阵
+        List<UserBehavior> allBehaviors = userBehaviorMapper.selectList(
+                new LambdaQueryWrapper<UserBehavior>()
+                        .in(UserBehavior::getBehaviorType, 1, 2, 3, 4)
+        );
+        Map<Long, Map<Long, Double>> ratingMatrix = buildRatingMatrix(allBehaviors);
+
+        // 2. 转置为商品向量：productId -> (userId -> score)
+        Map<Long, Map<Long, Double>> itemVectors = new HashMap<>();
+        for (Map.Entry<Long, Map<Long, Double>> userEntry : ratingMatrix.entrySet()) {
+            Long userId = userEntry.getKey();
+            for (Map.Entry<Long, Double> e : userEntry.getValue().entrySet()) {
+                itemVectors.computeIfAbsent(e.getKey(), k -> new HashMap<>()).put(userId, e.getValue());
+            }
+        }
+
+        Map<Long, Double> targetVector = itemVectors.get(productId);
+        if (targetVector == null || targetVector.isEmpty()) {
+            log.info("[推荐-相似商品] 商品={} 无行为数据，无法计算相似度", productId);
+            return Collections.emptyMap();
+        }
+        double targetNorm = Math.sqrt(targetVector.values().stream().mapToDouble(v -> v * v).sum());
+        if (targetNorm <= 0) {
+            return Collections.emptyMap();
+        }
+
+        // 3. 逐一计算余弦相似度（仅统计与目标商品有共同用户的商品）
+        Map<Long, Double> scores = new HashMap<>();
+        for (Map.Entry<Long, Map<Long, Double>> itemEntry : itemVectors.entrySet()) {
+            Long otherId = itemEntry.getKey();
+            if (otherId.equals(productId)) {
+                continue;
+            }
+            Map<Long, Double> otherVector = itemEntry.getValue();
+            double dot = 0.0;
+            for (Map.Entry<Long, Double> e : targetVector.entrySet()) {
+                Double otherRating = otherVector.get(e.getKey());
+                if (otherRating != null) {
+                    dot += e.getValue() * otherRating;
+                }
+            }
+            if (dot > 0) {
+                double otherNorm = Math.sqrt(otherVector.values().stream().mapToDouble(v -> v * v).sum());
+                if (otherNorm > 0) {
+                    scores.put(otherId, dot / (targetNorm * otherNorm));
+                }
+            }
+        }
+
+        // 4. 取 Top-N，按相似度降序
+        Map<Long, Double> topResults = new LinkedHashMap<>();
+        scores.entrySet().stream()
+                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                .limit(topN)
+                .forEach(e -> topResults.put(e.getKey(), e.getValue()));
+        log.info("[推荐-相似商品] 商品={} 计算出{}个相似商品", productId, topResults.size());
+        return topResults;
     }
 }

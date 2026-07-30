@@ -1,5 +1,7 @@
 package com.pzhu.mall.modules.behavior.service;
 
+import com.pzhu.mall.common.exception.BusinessException;
+import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.behavior.dto.PageViewDTO;
 import com.pzhu.mall.modules.behavior.dto.PageLeaveDTO;
 import com.pzhu.mall.modules.behavior.dto.RecommendClickDTO;
@@ -8,6 +10,7 @@ import com.pzhu.mall.modules.behavior.entity.UserBehavior;
 import com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper;
 import com.pzhu.mall.modules.behavior.entity.PageViewLog;
 import com.pzhu.mall.modules.behavior.mapper.PageViewLogMapper;
+import com.pzhu.mall.security.LoginUserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -45,11 +48,13 @@ public class BehaviorService {
         ub.setUserId(userId);
         ub.setProductId(productId);
         ub.setBehaviorType(behaviorType);
+        // M-10 修复：存储权重与推荐算法 RecommendCalculateService.getWeight() 口径对齐
+        // （浏览=1.0 / 收藏=3.0 / 购买=5.0 / 评价=4.0），避免 DB 存储值与算法实际权重不一致
         BigDecimal weight = switch (behaviorType) {
-            case 2 -> new BigDecimal("2.00");
-            case 3 -> new BigDecimal("3.00");
-            case 4 -> new BigDecimal("4.00");
-            default -> new BigDecimal("1.00");
+            case 2 -> new BigDecimal("3.00");  // 收藏
+            case 3 -> new BigDecimal("5.00");  // 购买
+            case 4 -> new BigDecimal("4.00");  // 评价
+            default -> new BigDecimal("1.00"); // 浏览
         };
         ub.setBehaviorWeight(weight);
         userBehaviorMapper.insert(ub);
@@ -82,7 +87,8 @@ public class BehaviorService {
      */
     public Long recordPageEnter(PageViewDTO dto) {
         PageViewLog log = new PageViewLog();
-        log.setUserId(dto.getUserId());
+        // M-26 修复：userId 只取登录态，不信任前端传入值，防止伪造他人页面访问日志（与 M-11 口径一致）
+        log.setUserId(LoginUserContext.getCurrentUserId());
         log.setSessionId(dto.getSessionId());
         log.setPagePath(dto.getPagePath());
         log.setReferrerPage(dto.getReferrerPage());
@@ -96,10 +102,21 @@ public class BehaviorService {
      */
     public void recordPageLeave(Long id, Integer stayDuration) {
         PageViewLog log = pageViewLogMapper.selectById(id);
-        if (log != null) {
-            log.setLeaveTime(LocalDateTime.now());
-            log.setStayDuration(stayDuration);
-            pageViewLogMapper.updateById(log);
+        if (log == null) {
+            return;
         }
+        // M-27 修复：校验日志归属，防止越权回填他人页面停留数据
+        Long currentUserId = LoginUserContext.getCurrentUserId();
+        boolean owned = currentUserId != null
+                ? currentUserId.equals(log.getUserId())
+                : log.getUserId() == null;
+        if (!owned) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        // M-27 修复：停留时长封顶（负数归零，上限 24h=86400 秒），防止脏数据/整型溢出
+        int capped = stayDuration == null ? 0 : Math.min(Math.max(stayDuration, 0), 86400);
+        log.setLeaveTime(LocalDateTime.now());
+        log.setStayDuration(capped);
+        pageViewLogMapper.updateById(log);
     }
 }

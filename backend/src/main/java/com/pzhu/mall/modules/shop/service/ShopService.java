@@ -97,14 +97,25 @@ public class ShopService {
 
     /**
      * 更新店铺信息（仅允许更新 name/logo/description/decorationConfig）。
+     *
+     * <p>M-18 修复：逐字段 null 守卫，仅更新前端实际提交的字段，
+     * 避免部分更新时 null 值污染实体（配合 updateById 的 NOT_NULL 策略形成双重保护）。
      */
     @Transactional
     public void updateInfo(Long merchantUserId, ShopUpdateDTO dto) {
         Shop shop = getMerchantShop(merchantUserId); // 校验 status=1
-        shop.setName(dto.getName());
-        shop.setLogo(dto.getLogo());
-        shop.setDescription(dto.getDescription());
-        shop.setDecorationConfig(dto.getDecorationConfig());
+        if (dto.getName() != null) {
+            shop.setName(dto.getName());
+        }
+        if (dto.getLogo() != null) {
+            shop.setLogo(dto.getLogo());
+        }
+        if (dto.getDescription() != null) {
+            shop.setDescription(dto.getDescription());
+        }
+        if (dto.getDecorationConfig() != null) {
+            shop.setDecorationConfig(dto.getDecorationConfig());
+        }
         shop.setUpdateTime(LocalDateTime.now());
         shopMapper.updateById(shop);
     }
@@ -118,10 +129,19 @@ public class ShopService {
         if (shop == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        shop.setStatus(approved ? 1 : 2);
-        shop.setRejectReason(approved ? null : reason);
-        shop.setUpdateTime(LocalDateTime.now());
-        shopMapper.updateById(shop);
+        // H-09 + M-17 修复：仅允许审核"待审核"(status=0) 状态的店铺，
+        // 使用 WHERE status=0 的原子更新，防止两个管理员并发审核时后写覆盖前写
+        int updated = shopMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Shop>()
+                        .set(Shop::getStatus, approved ? 1 : 2)
+                        .set(Shop::getRejectReason, approved ? null : reason)
+                        .set(Shop::getUpdateTime, LocalDateTime.now())
+                        .eq(Shop::getId, shopId)
+                        .eq(Shop::getStatus, 0)
+        );
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "店铺不处于待审核状态，无法审核");
+        }
     }
 
     /**

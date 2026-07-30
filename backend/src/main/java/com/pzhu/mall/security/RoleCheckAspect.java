@@ -33,7 +33,8 @@ public class RoleCheckAspect {
         }
 
         for (int allowedRole : requireRole.value()) {
-            if (currentRole == allowedRole) return;
+            // M-23 修复：显式拆箱比较，避免 Integer == int 隐式拆箱的阅读歧义
+            if (currentRole.intValue() == allowedRole) return;
         }
 
         throw new BusinessException(ErrorCode.FORBIDDEN);

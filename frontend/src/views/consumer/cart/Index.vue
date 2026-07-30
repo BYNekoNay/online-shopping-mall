@@ -14,7 +14,7 @@
           </div>
         </template>
         <div v-for="item in items" :key="item.id" class="cart-item">
-          <el-checkbox :model-value="item.selected" @change="toggleSelect(item)" />
+          <el-checkbox :model-value="item.selected" @change="(val) => toggleSelect(item, val)" />
           <img :src="item.productImage" class="cart-item-image" />
           <div class="cart-item-info">
             <div>{{ item.productName }}</div>
@@ -54,8 +54,11 @@ const items = computed(() => cartStore.items)
 const selectedCount = computed(() => items.value.filter(i => i.selected).length)
 const selectedTotal = computed(() => cartStore.getSelectedTotal())
 
-async function toggleSelect(item) {
-  await request.updateCartItem(item.id, { selected: item.selected ? 1 : 0 })
+async function toggleSelect(item, val) {
+  // H-18 修复：val 为变更后的值；原实现读 item.selected 旧值，导致提交状态恒反转
+  const selected = val ? 1 : 0
+  await request.updateCartItem(item.id, { selected })
+  cartStore.updateItem(item.id, { selected })
 }
 
 async function updateQuantity(item) {

@@ -92,6 +92,18 @@ public class OrderEstimateController {
             for (ProductItemDTO item : groupItems) {
                 Product product = productMapper.selectById(item.getProductId());
                 Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
+                // C-1 修复：估价与下单同口径——校验 SKU 与商品的绑定关系，
+                // 防止伪造"商品A+商品B的SKU"组合得到被篡改的估价金额
+                if (item.getSkuId() != null) {
+                    if (sku == null) {
+                        throw new com.pzhu.mall.common.exception.BusinessException(
+                                com.pzhu.mall.common.enums.ErrorCode.SKU_NOT_FOUND);
+                    }
+                    if (!item.getProductId().equals(sku.getProductId())) {
+                        throw new com.pzhu.mall.common.exception.BusinessException(
+                                com.pzhu.mall.common.enums.ErrorCode.SKU_PRODUCT_MISMATCH);
+                    }
+                }
                 BigDecimal unitPrice = sku != null ? sku.getPrice() : product.getPrice();
                 BigDecimal itemAmount = unitPrice.multiply(new BigDecimal(item.getQuantity()));
                 goodsAmount = goodsAmount.add(itemAmount);

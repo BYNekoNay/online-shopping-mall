@@ -1,8 +1,10 @@
 package com.pzhu.mall.modules.product.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
+import com.pzhu.mall.common.result.PageResult;
 import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.entity.OrderItem;
 import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
@@ -55,6 +57,12 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权评价该订单项");
         }
 
+        // M-16 修复：仅"已收货"(3)或"已完成"(4)的订单允许评价，防止未付款/未收货即评价
+        Integer orderStatus = order.getStatus();
+        if (orderStatus == null || (orderStatus != 3 && orderStatus != 4)) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "订单未完成，无法评价");
+        }
+
         // 幂等：同一 orderItemId 只能评价一次（数据库 UNIQUE 约束兜底）
         Long existing = reviewMapper.selectCount(
                 new LambdaQueryWrapper<Review>().eq(Review::getOrderItemId, orderItemId)
@@ -81,14 +89,17 @@ public class ReviewService {
     }
 
     /**
-     * 查询商品评价列表。
+     * 查询商品评价列表（分页）。
+     * <p>H-22 修复：原实现 selectList 全量返回，热门商品评价量大时响应膨胀；改为分页查询。</p>
      */
-    public List<Review> listByProduct(Long productId) {
-        return reviewMapper.selectList(
+    public PageResult<Review> listByProduct(Long productId, long pageNum, long pageSize) {
+        Page<Review> page = new Page<>(pageNum, pageSize);
+        Page<Review> result = reviewMapper.selectPage(page,
                 new LambdaQueryWrapper<Review>()
                         .eq(Review::getProductId, productId)
                         .orderByDesc(Review::getCreateTime)
         );
+        return new PageResult<>(result.getTotal(), pageNum, pageSize, result.getPages(), result.getRecords());
     }
 
     /**

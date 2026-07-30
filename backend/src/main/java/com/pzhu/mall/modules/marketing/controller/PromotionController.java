@@ -36,10 +36,13 @@ public class PromotionController {
             promotions = promotionMapper.selectList(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
                             .eq(Promotion::getStatus, 1)
+                            .eq(Promotion::getIsDeleted, 0)
                             .eq(Promotion::getScope, scope)
                             .eq(Promotion::getScopeId, scopeId)
-                            .ge(Promotion::getStartTime, LocalDateTime.now().minusDays(1))
-                            .le(Promotion::getEndTime, LocalDateTime.now().plusDays(1))
+                            // H-13 修复：时间条件写反导致长期促销对消费者不可见，
+                            // 正确语义为"当前生效"：开始时间 <= now <= 结束时间
+                            .le(Promotion::getStartTime, LocalDateTime.now())
+                            .ge(Promotion::getEndTime, LocalDateTime.now())
             );
         } else {
             promotions = promotionService.listActive();

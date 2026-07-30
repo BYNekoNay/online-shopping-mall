@@ -4,12 +4,16 @@
 -- 依赖：V1__init_schema.sql 已执行
 -- 支持重复执行：先清理再插入
 -- 用户 ID 约定：
---   user1~user8 = ID 2~9（由 V1__init_schema.sql 插入）
---   merchant1=20, merchant2=21（由其他 seed 脚本插入）
+--   user1~user8 = ID 2~9（M-36 修复：由本脚本第 1.5 节创建，
+--     原注释称由 V1__init_schema.sql 插入，但 V1 实际只创建 admin，导致孤儿数据）
+--   user9~user18 = ID 10~19（R__seed_recommend_data.sql 引用的补充用户）
+--   merchant1=20, merchant2=21（本脚本第 1.5 节创建）
 -- ============================================================
 
 -- ============================================================
 -- 1. 清理已有模拟数据（按实际存在的用户 ID）
+-- 注意：M-36 修复——不再 DELETE user 表记录（演示用户为常驻引用数据，
+-- 原实现删除 10/11 后从不重建，重复执行会使行为数据失去归属）
 -- ============================================================
 
 DELETE FROM user_behavior
@@ -24,7 +28,35 @@ DELETE FROM cart WHERE user_id BETWEEN 2 AND 11;
 DELETE FROM sku WHERE product_id BETWEEN 100 AND 112;
 DELETE FROM product WHERE id BETWEEN 100 AND 112;
 DELETE FROM shop WHERE id BETWEEN 1 AND 10;
-DELETE FROM user WHERE id IN (10, 11);
+
+-- ============================================================
+-- 1.5 M-36 修复：创建脚本引用的演示用户（原缺失导致行为/店铺数据全部孤儿）
+-- H-11 修复：密码由 user123 轮换为 Mall@2026（原哈希已随调试文件泄露作废）
+-- INSERT IGNORE 保证重复执行幂等；显式 ID 使 AUTO_INCREMENT 顺延，
+-- 不影响后续脚本（如 init-data.sql）按自增插入的账号
+-- ============================================================
+
+INSERT IGNORE INTO `user` (`id`, `username`, `password`, `nickname`, `role`, `status`) VALUES
+(2,  'user1',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户1', 1, 1),
+(3,  'user2',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户2', 1, 1),
+(4,  'user3',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户3', 1, 1),
+(5,  'user4',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户4', 1, 1),
+(6,  'user5',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户5', 1, 1),
+(7,  'user6',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户6', 1, 1),
+(8,  'user7',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户7', 1, 1),
+(9,  'user8',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户8', 1, 1),
+(10, 'user9',     '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户9', 1, 1),
+(11, 'user10',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户10', 1, 1),
+(12, 'user11',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户11', 1, 1),
+(13, 'user12',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户12', 1, 1),
+(14, 'user13',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户13', 1, 1),
+(15, 'user14',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户14', 1, 1),
+(16, 'user15',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户15', 1, 1),
+(17, 'user16',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户16', 1, 1),
+(18, 'user17',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户17', 1, 1),
+(19, 'user18',    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示用户18', 1, 1),
+(20, 'merchant1', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示商家1', 2, 1),
+(21, 'merchant2', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '演示商家2', 2, 1);
 
 -- ============================================================
 -- 2. 插入商家店铺（使用实际 merchant_user_id=20, 21）

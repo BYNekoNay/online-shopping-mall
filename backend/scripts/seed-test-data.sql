@@ -37,10 +37,9 @@ DELETE FROM operation_log;
 DELETE FROM user;
 
 -- ============================================================
--- 1. BCrypt 密码常量
---    admin123 -> $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
---    user123  -> $2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS
---    merchant123 -> $2a$10$G.bsriBSWsE1wF1oCxFSE.46m8dzGToHPHoJ5Xi1l.WPE08icpMEa
+-- 1. BCrypt 密码常量（H-11 修复：轮换弱口令）
+--    admin    -> Admin@2026 -> $2a$10$UBi4W0ASv2kytcew8cYuqO.mCtIYMetRi3xlRwYItvSzDcEn8pYf6
+--    user/merchant 演示账号 -> Mall@2026 -> $2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u
 -- ============================================================
 
 -- ============================================================
@@ -48,32 +47,32 @@ DELETE FROM user;
 -- ============================================================
 -- 管理员
 INSERT INTO `user` (`id`, `username`, `password`, `nickname`, `role`, `status`, `points`) VALUES
-(1, 'admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '管理员', 3, 1, 0);
+(1, 'admin', '$2a$10$UBi4W0ASv2kytcew8cYuqO.mCtIYMetRi3xlRwYItvSzDcEn8pYf6', '管理员', 3, 1, 0);
 
 -- 消费者 user1~user8 (ID=2~9)
 INSERT INTO `user` (`id`, `username`, `password`, `nickname`, `phone`, `email`, `role`, `status`, `points`) VALUES
-(2, 'user1', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小明', '13800000001', 'user1@test.com', 1, 1, 500),
-(3, 'user2', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小红', '13800000002', 'user2@test.com', 1, 1, 300),
-(4, 'user3', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小刚', '13800000003', 'user3@test.com', 1, 1, 200),
-(5, 'user4', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小丽', '13800000004', 'user4@test.com', 1, 1, 100),
-(6, 'user5', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小华', '13800000005', 'user5@test.com', 1, 1, 50),
-(7, 'user6', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小强', '13800000006', 'user6@test.com', 1, 1, 0),
-(8, 'user7', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小芳', '13800000007', 'user7@test.com', 1, 1, 0),
-(9, 'user8', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小军', '13800000008', 'user8@test.com', 1, 1, 0);
+(2, 'user1', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小明', '13800000001', 'user1@test.com', 1, 1, 500),
+(3, 'user2', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小红', '13800000002', 'user2@test.com', 1, 1, 300),
+(4, 'user3', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小刚', '13800000003', 'user3@test.com', 1, 1, 200),
+(5, 'user4', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小丽', '13800000004', 'user4@test.com', 1, 1, 100),
+(6, 'user5', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小华', '13800000005', 'user5@test.com', 1, 1, 50),
+(7, 'user6', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小强', '13800000006', 'user6@test.com', 1, 1, 0),
+(8, 'user7', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小芳', '13800000007', 'user7@test.com', 1, 1, 0),
+(9, 'user8', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小军', '13800000008', 'user8@test.com', 1, 1, 0);
 
 -- 补充用户 user9~user14 (ID=10~15)
 INSERT INTO `user` (`id`, `username`, `password`, `nickname`, `phone`, `email`, `role`, `status`, `points`) VALUES
-(10, 'user9',  '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小张', '13800000009', 'user9@test.com',  1, 1, 0),
-(11, 'user10', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小李', '13800000010', 'user10@test.com', 1, 1, 0),
-(12, 'user11', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小王', '13800000011', 'user11@test.com', 1, 1, 0),
-(13, 'user12', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小赵', '13800000012', 'user12@test.com', 1, 1, 0),
-(14, 'user13', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小孙', '13800000013', 'user13@test.com', 1, 1, 0),
-(15, 'user14', '$2a$10$XkhL2aUDeA.bvhwFj21MPuYGw1heDv6AYnZIs4dFA3qAvdjwohkhS', '小周', '13800000014', 'user14@test.com', 1, 1, 0);
+(10, 'user9',  '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小张', '13800000009', 'user9@test.com',  1, 1, 0),
+(11, 'user10', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小李', '13800000010', 'user10@test.com', 1, 1, 0),
+(12, 'user11', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小王', '13800000011', 'user11@test.com', 1, 1, 0),
+(13, 'user12', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小赵', '13800000012', 'user12@test.com', 1, 1, 0),
+(14, 'user13', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小孙', '13800000013', 'user13@test.com', 1, 1, 0),
+(15, 'user14', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '小周', '13800000014', 'user14@test.com', 1, 1, 0);
 
 -- 商家（角色=2）
 INSERT INTO `user` (`id`, `username`, `password`, `nickname`, `phone`, `email`, `role`, `status`, `points`) VALUES
-(20, 'merchant1', '$2a$10$G.bsriBSWsE1wF1oCxFSE.46m8dzGToHPHoJ5Xi1l.WPE08icpMEa', '数码商家', '13900000001', 'merchant1@shop.com', 2, 1, 0),
-(21, 'merchant2', '$2a$10$G.bsriBSWsE1wF1oCxFSE.46m8dzGToHPHoJ5Xi1l.WPE08icpMEa', '时尚商家', '13900000002', 'merchant2@shop.com', 2, 1, 0);
+(20, 'merchant1', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '数码商家', '13900000001', 'merchant1@shop.com', 2, 1, 0),
+(21, 'merchant2', '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u', '时尚商家', '13900000002', 'merchant2@shop.com', 2, 1, 0);
 
 -- ============================================================
 -- 3. 店铺

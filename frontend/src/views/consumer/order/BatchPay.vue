@@ -37,29 +37,29 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/order'
 
-const route = useRoute()
 const router = useRouter()
 const orders = ref([])
 const payingId = ref(null)
 
-onMounted(async () => {
-  // 从路由 state 或 localStorage 恢复订单列表
+onMounted(() => {
+  // 从路由 state 或 sessionStorage 恢复订单列表
+  // H-20 修复：本路由无 :id 参数，原兜底 getOrderDetail(route.params.id) 的 id 恒为 undefined；
+  // 订单列表仅从 sessionStorage 恢复，缺失时跳回订单列表
   try {
     const stored = sessionStorage.getItem('pendingOrders')
     if (stored) {
       orders.value = JSON.parse(stored)
-    } else {
-      // fallback: 通过 orderId 获取详情
-      const detail = await request.getOrderDetail(route.params.id)
-      orders.value = [detail]
+      return
     }
   } catch {
-    ElMessage.error('加载订单失败')
+    // 存储数据损坏，按无数据处理
   }
+  ElMessage.warning('未找到待支付订单，请从订单列表进入')
+  router.replace('/orders')
 })
 
 async function handlePay(order) {

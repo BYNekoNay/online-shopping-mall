@@ -13,6 +13,8 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(30001, "商品不存在或已下架"),
     PRODUCT_OFFLINE(30002, "商品已下架"),
     SKU_NOT_FOUND(30003, "商品规格不存在"),
+    // C-1 修复：SKU 与商品绑定关系校验失败（防止用低价商品的 SKU 购买高价商品）
+    SKU_PRODUCT_MISMATCH(30004, "商品规格与商品不匹配"),
     STOCK_NOT_ENOUGH(40001, "库存不足"),
     PRODUCT_OFFLINE_ORDER(40002, "商品已下架，无法下单"),
     COUPON_UNAVAILABLE(40003, "优惠券暂不可用"),
@@ -24,6 +26,8 @@ public enum ErrorCode {
     COUPON_SOLD_OUT(60001, "优惠券已领完"),
     COUPON_EXPIRED(60002, "优惠券已过期"),
     PROMOTION_NOT_ACTIVE(60003, "促销活动已结束"),
+    // M-08 修复：新增"领取尚未开始"错误码，配合 receive() 的 validFrom 校验
+    COUPON_NOT_STARTED(60004, "优惠券领取尚未开始"),
     FREIGHT_TEMPLATE_NOT_FOUND(70001, "运费模板不存在"),
     LOGISTICS_QUERY_FAILED(70002, "物流信息查询失败"),
     RECOMMEND_GENERATING(80001, "推荐内容正在生成中，请稍后再看"),

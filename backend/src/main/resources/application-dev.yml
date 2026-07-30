@@ -5,7 +5,14 @@ spring:
     password: ${REDIS_PASSWORD:}
 
 jwt:
-  secret: ${JWT_SECRET:pzhu-mall-dev-secret-key-please-change-in-production}
+  # H-11 修复：dev 默认密钥已轮换（原默认值随仓库/调试文件泄露，可被用于伪造 token）。
+  # 新值为随机生成的开发专用密钥；生产环境仍必须通过 JWT_SECRET 环境变量显式注入。
+  secret: ${JWT_SECRET:pzhu-mall-dev-0aa08406fe73966ebf7e24b35ed2c333a130617c0ce9a1e0}
+
+# H-06：SQL 日志仅在 dev 环境开启（从 base 配置迁移至此）
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 logging:
   level:

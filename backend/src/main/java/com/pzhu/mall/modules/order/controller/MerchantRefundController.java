@@ -46,12 +46,22 @@ public class MerchantRefundController {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         Long shopId = shopService.getMerchantShopIdOrThrow(userId);
 
-        // 使用子查询在数据库中过滤该店铺的退款记录，避免内存分页问题
+        // 先查出该店铺的订单 ID 列表（仅取 id 列），再据此过滤退款记录
+        List<Long> orderIds = orderMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.Order>()
+                        .select(com.pzhu.mall.modules.order.entity.Order::getId)
+                        .eq(com.pzhu.mall.modules.order.entity.Order::getShopId, shopId)
+        ).stream().map(com.pzhu.mall.modules.order.entity.Order::getId).collect(Collectors.toList());
+
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<Refund> page =
             new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
+        if (orderIds.isEmpty()) {
+            // 店铺无订单，直接返回空分页，避免空 IN 导致全表扫描
+            return Result.success(new PageResult<>(0L, pageNum, pageSize, 0L, List.of()));
+        }
+
         var refundQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Refund>();
-        refundQw.inSql(Refund::getOrderId,
-                "SELECT id FROM `order` WHERE shop_id = " + shopId + " AND is_deleted = 0")
+        refundQw.in(Refund::getOrderId, orderIds)
               .orderByDesc(Refund::getCreateTime);
         List<Refund> pageResult = refundMapper.selectPage(page, refundQw).getRecords();
 

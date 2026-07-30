@@ -35,6 +35,9 @@ public class AdminUserController {
     @Resource
     private OperationLogService operationLogService;
 
+    @Resource
+    private com.pzhu.mall.security.AccountStatusService accountStatusService;
+
     @Operation(summary = "用户列表")
     @GetMapping
     public Result<PageResult<AdminUserVO>> list(@RequestParam(defaultValue = "1") Integer pageNum,
@@ -72,12 +75,24 @@ public class AdminUserController {
         if (user == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
+        Long operatorId = LoginUserContext.getCurrentUserId();
+        boolean disabling = !Integer.valueOf(1).equals(dto.getStatus());
+        if (disabling) {
+            // H-03 修复：禁止管理员禁用自己，也禁止禁用其他管理员账号
+            if (id.equals(operatorId)) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "不能禁用自己的账号");
+            }
+            if (user.getRole() != null && user.getRole() == 3) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "不能禁用其他管理员账号");
+            }
+        }
         user.setStatus(dto.getStatus());
         userMapper.updateById(user);
+        // H-2 修复：清除账号状态缓存，使禁用/启用立即对该用户已签发的 JWT 生效
+        accountStatusService.evict(id);
 
-        Long operatorId = LoginUserContext.getCurrentUserId();
         operationLogService.record(operatorId,
-                dto.getStatus() == 1 ? "启用用户" : "禁用用户",
+                Integer.valueOf(1).equals(dto.getStatus()) ? "启用用户" : "禁用用户",
                 "用户#" + id);
         return Result.success();
     }

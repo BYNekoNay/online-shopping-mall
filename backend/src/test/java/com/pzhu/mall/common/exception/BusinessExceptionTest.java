@@ -13,7 +13,7 @@ class BusinessExceptionTest {
     void constructor_withErrorCode_setsCodeAndMessage() {
         BusinessException ex = new BusinessException(ErrorCode.UNAUTHORIZED);
         assertEquals(10002, ex.getCode());
-        assertEquals("Not logged in or session expired", ex.getMessage());
+        assertEquals("登录已过期，请重新登录", ex.getMessage());
     }
 
     @Test

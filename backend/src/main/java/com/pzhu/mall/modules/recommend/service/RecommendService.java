@@ -32,6 +32,7 @@ public class RecommendService {
     private static final Logger log = LoggerFactory.getLogger(RecommendService.class);
 
     private static final String RECOMMEND_ZSET_KEY_PREFIX = RedisKeyPrefix.RECOMMEND + ":";
+    private static final String SIMILAR_ZSET_KEY_PREFIX = RedisKeyPrefix.RECOMMEND + ":similar:";
     private static final String HOT_PRODUCTS_KEY = RedisKeyPrefix.RECOMMEND + ":hot:products";
     private static final int DEFAULT_RECOMMEND_NUM = 10;
 
@@ -43,6 +44,9 @@ public class RecommendService {
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private RecommendCalculateService recommendCalculateService;
 
     /**
      * 猜你喜欢（优先 Redis → 数据库 → 热门兜底）。
@@ -106,49 +110,62 @@ public class RecommendService {
     }
 
     /**
-     * 相似商品推荐。
+     * 相似商品推荐（ItemCF 余弦相似度）。
      *
-     * <p>查询 recommend_result 表中 product_id = 目标商品 的记录（按 score 排序），
-     * 这些记录由 RecommendCalculateService 的 ItemCF 计算后写入（algorithm_type=2 或 3）。
+     * <p>查询优先级：Redis Sorted Set → ItemCF 实时计算 → 同分类热门兜底。
+     * 返回与目标商品被同一批用户喜爱的其他商品，而非目标商品自身。
      */
     public List<RecommendVO> similar(Long productId, Integer num) {
         int limit = num != null ? num : DEFAULT_RECOMMEND_NUM;
 
-        Page<RecommendResult> resultPage = new Page<>(1, limit);
-        recommendResultMapper.selectPage(resultPage,
-                new LambdaQueryWrapper<RecommendResult>()
-                        .eq(RecommendResult::getProductId, productId)
-                        .orderByDesc(RecommendResult::getScore)
-        );
-        List<RecommendResult> results = resultPage.getRecords();
-
-        if (results.isEmpty()) {
-            // 兜底：同分类热门商品
-            Product current = productMapper.selectById(productId);
-            if (current != null) {
-                log.info("[推荐-相似商品] 商品={} 无相似结果，使用同分类热门兜底", productId);
-                Page<Product> similarHotPage = new Page<>(1, limit);
-                productMapper.selectPage(similarHotPage,
-                        new LambdaQueryWrapper<Product>()
-                                .eq(Product::getCategoryId, current.getCategoryId())
-                                .ne(Product::getId, productId)
-                                .eq(Product::getStatus, 1)
-                                .orderByDesc(Product::getSales)
-                );
-                return similarHotPage.getRecords().stream()
-                        .map(p -> RecommendVO.from(p, 0.0, 4))
-                        .collect(Collectors.toList());
-            }
-            log.info("[推荐-相似商品] 商品={} 不存在，返回空列表", productId);
-            return List.of();
+        // 1. 优先读 Redis 缓存
+        List<RecommendVO> cached = readSimilarFromRedis(productId, limit);
+        if (!cached.isEmpty()) {
+            log.info("[推荐-相似商品] 商品={} 命中Redis缓存，返回{}条", productId, cached.size());
+            return cached;
         }
 
-        List<Long> productIds = results.stream()
-                .map(RecommendResult::getProductId)
-                .collect(Collectors.toList());
-        List<Product> products = productMapper.selectBatchIds(productIds);
-        log.info("[推荐-相似商品] 商品={} 命中{}条相似结果", productId, results.size());
-        return toRecommendVOList(products, results);
+        // 2. ItemCF 实时计算相似商品
+        Map<Long, Double> similarScores = recommendCalculateService.computeSimilarProducts(productId, limit);
+        if (!similarScores.isEmpty()) {
+            List<Long> productIds = new ArrayList<>(similarScores.keySet());
+            List<Product> products = productMapper.selectBatchIds(productIds);
+            // 过滤下架商品，并按相似度得分构建 VO
+            Map<Long, Product> productMap = products.stream()
+                    .filter(p -> Integer.valueOf(1).equals(p.getStatus()))
+                    .collect(Collectors.toMap(Product::getId, p -> p));
+            List<RecommendVO> vos = new ArrayList<>();
+            for (Map.Entry<Long, Double> e : similarScores.entrySet()) {
+                Product p = productMap.get(e.getKey());
+                if (p != null) {
+                    vos.add(RecommendVO.from(p, e.getValue(), 2));
+                }
+            }
+            if (!vos.isEmpty()) {
+                writeSimilarToRedis(productId, similarScores);
+                log.info("[推荐-相似商品] 商品={} ItemCF计算返回{}条", productId, vos.size());
+                return vos;
+            }
+        }
+
+        // 3. 兜底：同分类热门商品
+        Product current = productMapper.selectById(productId);
+        if (current != null) {
+            log.info("[推荐-相似商品] 商品={} 无相似结果，使用同分类热门兜底", productId);
+            Page<Product> similarHotPage = new Page<>(1, limit);
+            productMapper.selectPage(similarHotPage,
+                    new LambdaQueryWrapper<Product>()
+                            .eq(Product::getCategoryId, current.getCategoryId())
+                            .ne(Product::getId, productId)
+                            .eq(Product::getStatus, 1)
+                            .orderByDesc(Product::getSales)
+            );
+            return similarHotPage.getRecords().stream()
+                    .map(p -> RecommendVO.from(p, 0.0, 4))
+                    .collect(Collectors.toList());
+        }
+        log.info("[推荐-相似商品] 商品={} 不存在，返回空列表", productId);
+        return List.of();
     }
 
     // ==================== Redis 读写 ====================
@@ -208,6 +225,54 @@ public class RecommendService {
         // 设置过期时间（24 小时，与定时任务周期匹配）
         stringRedisTemplate.expire(key, java.time.Duration.ofHours(24));
         log.info("[推荐-缓存] 用户={} 写入Redis Sorted Set {}条，过期24h", userId, results.size());
+    }
+
+    /**
+     * 从 Redis Sorted Set 读取相似商品缓存。
+     */
+    private List<RecommendVO> readSimilarFromRedis(Long productId, int limit) {
+        String key = SIMILAR_ZSET_KEY_PREFIX + productId;
+        Set<org.springframework.data.redis.core.ZSetOperations.TypedTuple<String>> tuples =
+                stringRedisTemplate.opsForZSet().reverseRangeWithScores(key, 0, limit - 1);
+        if (tuples == null || tuples.isEmpty()) {
+            return List.of();
+        }
+        List<Long> productIds = new ArrayList<>();
+        Map<Long, Double> scoreMap = new HashMap<>();
+        for (org.springframework.data.redis.core.ZSetOperations.TypedTuple<String> t : tuples) {
+            try {
+                Long pid = Long.parseLong(t.getValue());
+                productIds.add(pid);
+                scoreMap.put(pid, t.getScore() != null ? t.getScore() : 0.0);
+            } catch (NumberFormatException e) {
+                log.warn("[推荐-Redis] 跳过非数字 member: key={}, value={}", key, t.getValue());
+            }
+        }
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        List<Product> products = productMapper.selectBatchIds(productIds);
+        Map<Long, Product> productMap = products.stream().collect(Collectors.toMap(Product::getId, p -> p));
+        List<RecommendVO> vos = new ArrayList<>();
+        for (Long pid : productIds) {
+            Product p = productMap.get(pid);
+            if (p != null && Integer.valueOf(1).equals(p.getStatus())) {
+                vos.add(RecommendVO.from(p, scoreMap.getOrDefault(pid, 0.0), 2));
+            }
+        }
+        return vos;
+    }
+
+    /**
+     * 将相似商品结果写入 Redis Sorted Set（24h 过期）。
+     */
+    private void writeSimilarToRedis(Long productId, Map<Long, Double> scores) {
+        String key = SIMILAR_ZSET_KEY_PREFIX + productId;
+        stringRedisTemplate.delete(key);
+        for (Map.Entry<Long, Double> e : scores.entrySet()) {
+            stringRedisTemplate.opsForZSet().add(key, String.valueOf(e.getKey()), e.getValue());
+        }
+        stringRedisTemplate.expire(key, java.time.Duration.ofHours(24));
     }
 
     /**

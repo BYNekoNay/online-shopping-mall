@@ -23,7 +23,7 @@
       <div class="discount-section">
         <div class="coupon-row">
           <span>优惠券：</span>
-          <el-select v-model="selectedCouponId" placeholder="选择优惠券" clearable style="width: 260px;">
+          <el-select v-model="selectedCouponId" placeholder="选择优惠券" clearable style="width: 260px;" @change="estimateOrder">
             <el-option
               v-for="c in availableCoupons"
               :key="c.id"
@@ -33,7 +33,7 @@
           </el-select>
         </div>
         <div class="points-row">
-          <el-checkbox v-model="usePoints">使用积分抵扣</el-checkbox>
+          <el-checkbox v-model="usePoints" @change="estimateOrder">使用积分抵扣</el-checkbox>
           <span v-if="usePoints" class="points-info">
             可用积分：{{ userPoints }}，可抵扣 ¥{{ maxPointsDeduct.toFixed(2) }}
           </span>
@@ -140,7 +140,7 @@ onMounted(async () => {
 
   // 加载用户积分
   try {
-    const pointsData = await userRequest.getPoints()
+    const pointsData = await couponRequest.getPoints()
     userPoints.value = pointsData.points || 0
   } catch {
     userPoints.value = 0

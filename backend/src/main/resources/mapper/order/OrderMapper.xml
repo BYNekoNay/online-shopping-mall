@@ -5,7 +5,9 @@
     <select id="selectTimeoutUnpaidOrders" resultType="com.pzhu.mall.modules.order.entity.Order">
         SELECT * FROM orders
         WHERE status = 0
-          AND create_time &lt;= DATE_SUB(#{now}, INTERVAL #{timeoutMinutes} MINUTE)
+          <!-- H-9 修复：threshold 已由调用方按 timeout-minutes 计算完成，
+               此处不再 DATE_SUB，避免与 Java 侧重复相减导致超时时间减半 -->
+          AND create_time &lt;= #{threshold}
           AND is_deleted = 0
         ORDER BY create_time ASC
         LIMIT 100
@@ -16,6 +18,9 @@
         FROM orders
         WHERE is_deleted = 0
           AND pay_amount IS NOT NULL
+          <!-- H-15 修复：GMV 仅统计已支付订单（1待发货/2已发货/3已收货/4已完成/6退款中），
+               排除待付款(0)、已取消(5)、已退款(7)，避免数据虚高 -->
+          AND status IN (1, 2, 3, 4, 6)
     </select>
 
 </mapper>

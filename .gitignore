@@ -33,6 +33,9 @@ dump.rdb
 backend/target/
 
 # Temp files
+# H-11 修复：忽略根目录下所有 _* 前缀的调试残留文件（含密码哈希、管理员 JWT、
+# 硬编码凭据的启动脚本等），防止再次入库
+/_*
 _tmp_*
 *.err
 

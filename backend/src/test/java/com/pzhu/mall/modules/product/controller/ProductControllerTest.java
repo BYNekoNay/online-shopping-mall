@@ -67,10 +67,12 @@ class ProductControllerTest {
         inject(controller, "reviewService", reviewService);
 
         List<Review> reviews = List.of(new Review());
-        when(reviewService.listByProduct(1L)).thenReturn(reviews);
+        // H-22 配套：评价列表改为分页返回
+        PageResult<Review> pageResult = new PageResult<>(1L, 1L, 20L, 1L, reviews);
+        when(reviewService.listByProduct(1L, 1L, 20L)).thenReturn(pageResult);
 
-        var result = controller.reviews(1L);
-        assertEquals(reviews, result.getData());
+        var result = controller.reviews(1L, 1L, 20L);
+        assertEquals(pageResult, result.getData());
     }
 
     @Test

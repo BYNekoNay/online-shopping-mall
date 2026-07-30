@@ -46,8 +46,10 @@ public class OrderTimeoutTask {
 
     @Scheduled(cron = "0 * * * * ?")
     public void cancelTimeoutOrders() {
+        // H-9 修复：阈值仅在此处计算一次（原实现 Java 与 SQL 各减一次 timeoutMinutes，
+        // 订单在配置超时时间的一半即被取消）
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(timeoutMinutes);
-        List<Order> timeoutOrders = orderMapper.selectTimeoutUnpaidOrders(timeoutMinutes, threshold);
+        List<Order> timeoutOrders = orderMapper.selectTimeoutUnpaidOrders(threshold);
         for (Order order : timeoutOrders) {
             Long orderId = order.getId();
             // 使用 Redis SET NX 作幂等标记，避免同一订单被多个实例重复取消
@@ -59,7 +61,8 @@ public class OrderTimeoutTask {
                 continue;
             }
             try {
-                orderService.cancelOrder(orderId);
+                // H-16 修复：任务线程无登录上下文，使用系统级取消入口（不做用户归属校验，幂等跳过）
+                orderService.cancelOrderBySystem(orderId);
             } catch (Exception e) {
                 log.error("Failed to cancel timeout order: {}", orderId, e);
             }

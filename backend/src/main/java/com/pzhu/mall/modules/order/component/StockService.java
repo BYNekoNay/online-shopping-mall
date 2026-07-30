@@ -4,7 +4,9 @@ import com.pzhu.mall.common.config.RedisKeyPrefix;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
+import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.entity.Sku;
+import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.product.mapper.SkuMapper;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -44,6 +46,10 @@ public class StockService {
     @Resource
     private SkuMapper skuMapper;
 
+    // H-4 修复：无 SKU 商品的库存控制需要读取 product.stock 作懒加载兜底
+    @Resource
+    private ProductMapper productMapper;
+
     @Value("${mall.stock.lock-wait-seconds:3}")
     private long lockWaitSeconds;
 
@@ -77,6 +83,15 @@ public class StockService {
         return RedisKeyPrefix.STOCK_LOCK + ":" + skuId;
     }
 
+    // H-4 修复：商品维度使用独立 key 命名空间（product 与 sku 的自增 id 空间重叠，禁止复用同一 key）
+    private String productStockKey(Long productId) {
+        return RedisKeyPrefix.STOCK + ":product:" + productId;
+    }
+
+    private String productLockKey(Long productId) {
+        return RedisKeyPrefix.STOCK_LOCK + ":product:" + productId;
+    }
+
     /**
      * 从数据库加载 sku.stock 并写入 Redis（stock key 不设 TTL）。
      */
@@ -93,8 +108,48 @@ public class StockService {
      * @return true 扣减成功，false 库存不足
      */
     public boolean deduct(Long skuId, int quantity) {
-        String stockKey = stockKey(skuId);
-        RLock lock = redissonClient.getLock(lockKey(skuId));
+        return deductWithLock(stockKey(skuId), lockKey(skuId), quantity,
+                () -> {
+                    Sku sku = skuMapper.selectById(skuId);
+                    return sku != null && sku.getStock() != null ? sku.getStock() : 0;
+                },
+                "skuId=" + skuId);
+    }
+
+    /**
+     * H-4 修复：无 SKU 商品的库存预扣减（基于 product.stock，与 SKU 同构的 Redis 方案）。
+     *
+     * @return true 扣减成功，false 库存不足
+     */
+    public boolean deductProduct(Long productId, int quantity) {
+        return deductWithLock(productStockKey(productId), productLockKey(productId), quantity,
+                () -> {
+                    Product product = productMapper.selectById(productId);
+                    return product != null && product.getStock() != null ? product.getStock() : 0;
+                },
+                "productId=" + productId);
+    }
+
+    /**
+     * 归还预扣减的库存（使用 Redisson 分布式锁）。
+     */
+    public void rollback(Long skuId, int quantity) {
+        rollbackWithLock(stockKey(skuId), lockKey(skuId), quantity);
+    }
+
+    /**
+     * H-4 修复：归还无 SKU 商品预扣减的库存。
+     */
+    public void rollbackProduct(Long productId, int quantity) {
+        rollbackWithLock(productStockKey(productId), productLockKey(productId), quantity);
+    }
+
+    /**
+     * 通用扣减：分布式锁 + Lua 懒加载扣减（SKU 与商品维度共用）。
+     */
+    private boolean deductWithLock(String stockKey, String lockKey, int quantity,
+                                   java.util.function.IntSupplier fallbackLoader, String logTag) {
+        RLock lock = redissonClient.getLock(lockKey);
 
         try {
             // 尝试获取锁，等待 lockWaitSeconds 秒，锁自动释放 lockLeaseSeconds 秒（看门狗自动续期）
@@ -110,8 +165,7 @@ public class StockService {
             // 懒加载 + 扣减：使用 Lua 脚本保证原子性（ARGV[1]=quantity, ARGV[2]=fallbackStock）
             int fallbackStock = 0;
             if (!stringRedisTemplate.hasKey(stockKey)) {
-                Sku sku = skuMapper.selectById(skuId);
-                fallbackStock = sku != null ? sku.getStock() : 0;
+                fallbackStock = fallbackLoader.getAsInt();
             }
             Long remaining = stringRedisTemplate.execute(
                     DEDUCT_STOCK_SCRIPT,
@@ -124,7 +178,7 @@ public class StockService {
             }
             // 低库存预警
             if (remaining <= alertThreshold) {
-                log.warn("Low stock alert: skuId={}, remaining={}, threshold={}", skuId, remaining, alertThreshold);
+                log.warn("Low stock alert: {}, remaining={}, threshold={}", logTag, remaining, alertThreshold);
             }
             return true;
         } finally {
@@ -135,12 +189,11 @@ public class StockService {
     }
 
     /**
-     * 归还预扣减的库存（使用 Redisson 分布式锁）。
+     * 通用归还：分布式锁 + INCR（SKU 与商品维度共用）。
      */
-    public void rollback(Long skuId, int quantity) {
+    private void rollbackWithLock(String stockKey, String lockKey, int quantity) {
         if (quantity <= 0) return;
-        String stockKey = stockKey(skuId);
-        RLock lock = redissonClient.getLock(lockKey(skuId));
+        RLock lock = redissonClient.getLock(lockKey);
         lock.lock();
         try {
             stringRedisTemplate.opsForValue().increment(stockKey, quantity);

@@ -176,11 +176,18 @@ public class MerchantProductController {
             }
             try {
                 if ("on".equals(dto.getAction())) {
-                    if (ProductStatus.of(product.getStatus()) != ProductStatus.PENDING) {
-                        failed.add("商品 " + productId + " 非待审核状态，无法上架");
+                    // H-02 修复：商家不得直接将商品置为 ONLINE（会绕过管理员审核）。
+                    // "上架"仅表示提交审核：OFFLINE/REJECTED -> PENDING，最终上架由管理员审核完成。
+                    ProductStatus st = ProductStatus.of(product.getStatus());
+                    if (st == ProductStatus.ONLINE) {
+                        failed.add("商品 " + productId + " 已上架，无需重复操作");
                         continue;
                     }
-                    product.setStatus(ProductStatus.ONLINE.getCode());
+                    if (st == ProductStatus.PENDING) {
+                        failed.add("商品 " + productId + " 已在待审核队列中");
+                        continue;
+                    }
+                    product.setStatus(ProductStatus.PENDING.getCode());
                 } else if ("off".equals(dto.getAction())) {
                     product.setStatus(ProductStatus.OFFLINE.getCode());
                 } else if ("delete".equals(dto.getAction())) {

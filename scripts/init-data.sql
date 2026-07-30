@@ -1,26 +1,16 @@
 -- ============================================================
 -- 初始化数据脚本
 -- 在 V1__init_schema.sql 之后执行
+-- 注意：管理员账号 admin 已由 V1__init_schema.sql 创建，此处不再重复插入
 -- ============================================================
 
 USE mall;
 
--- 管理员初始账号（密码: admin123）
-INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `status`, `points`)
-VALUES (
-    'admin',
-    '$2b$10$zED.4.xcM8BJVOoDY4RaoOhAWf95O9Bsn6N8qCrYmsIa6vzyV24eC',
-    '系统管理员',
-    3,
-    1,
-    0
-);
-
--- 测试消费者账号（密码: user123）
+-- 测试消费者账号（H-11 修复：密码由 user123 轮换为 Mall@2026）
 INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `status`, `points`)
 VALUES (
     'testuser',
-    '$2b$10$KnoKqbk8aBkq9qP/mbV6eO2fxlEf63TaIlVGLnGGLgSu2F/.IvyZy',
+    '$2a$10$WvEVuxzCG5dhPoM7ZXN9cuKBo52OX7nySsVN/3/TiP0AKBD5NAt6u',
     '测试用户',
     1,
     1,
@@ -36,16 +26,16 @@ VALUES
     ('upload_max_size', '10485760', '上传文件大小限制（字节），默认10MB')
 ON DUPLICATE KEY UPDATE `config_value` = VALUES(`config_value`);
 
--- 运费模板示例（全国默认运费）
-INSERT INTO `freight_template` (`shop_id`, `name`, `type`, `default_fee`, `free_threshold`, `rule_json`, `is_default`)
+-- 运费模板示例（全国默认运费，满99包邮）
+INSERT INTO `freight_template` (`shop_id`, `name`, `region_rule_json`, `free_shipping_threshold`, `default_fee`)
 VALUES
-    (1, '默认全国运费', 1, 10.00, 99.00, '[]', 1);
+    (1, '默认全国运费', '[]', 99.00, 10.00);
 
--- 优惠券示例
-INSERT INTO `coupon` (`name`, `type`, `discount_rule`, `min_amount`, `total_count`, `remain_count`, `valid_from`, `valid_to`, `status`, `create_time`)
+-- 优惠券示例（discount_rule 格式与 CouponService 解析逻辑一致：{threshold, discount}）
+INSERT INTO `coupon` (`name`, `type`, `discount_rule`, `stock`, `received_count`, `valid_from`, `valid_to`, `create_time`)
 VALUES
-    ('新人立减10元', 1, '{"type":"fixed","value":10}', 50.00, 1000, 1000, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, NOW()),
-    ('满200减20', 2, '{"type":"threshold","threshold":200,"reduce":20}', 200.00, 500, 500, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, NOW());
+    ('新人立减10元', 1, '{"threshold":0,"discount":10}', 1000, 0, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), NOW()),
+    ('满200减20', 2, '{"threshold":200,"discount":20}', 500, 0, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), NOW());
 
 -- 促销活动示例
 INSERT INTO `promotion` (`name`, `type`, `rule_json`, `scope`, `scope_id`, `start_time`, `end_time`, `status`, `create_time`)

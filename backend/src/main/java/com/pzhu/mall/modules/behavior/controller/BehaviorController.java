@@ -45,10 +45,12 @@ public class BehaviorController {
     @Operation(summary = "记录行为（浏览/收藏/购买/评价）")
     @PostMapping("/record")
     public Result<Void> record(@RequestBody BehaviorRecordDTO dto) {
-        // 已登录用户使用 LoginUserContext 中的 userId，忽略前端传入的 userId（防越权伪造）
-        Long userId = LoginUserContext.getCurrentUserId() != null
-                ? LoginUserContext.getCurrentUserId()
-                : dto.getUserId();
+        // M-11 修复：userId 只取登录态，不信任前端传入的 userId，防止伪造他人 userId 污染行为数据；
+        // 未登录时不记录（user_behavior.user_id 为 NOT NULL，匿名行为不入库），直接返回成功
+        Long userId = LoginUserContext.getCurrentUserId();
+        if (userId == null) {
+            return Result.success();
+        }
         behaviorService.record(userId, dto.getProductId(), dto.getBehaviorType());
         return Result.success();
     }
@@ -65,6 +67,8 @@ public class BehaviorController {
     @RequireRole(1)
     @PostMapping("/recommend-click")
     public Result<Void> recommendClick(@Valid @RequestBody RecommendClickDTO dto) {
+        // M-11 修复：userId 强制取登录态，不信任 DTO 传入值，防止已登录用户伪造他人点击污染推荐输入
+        dto.setUserId(LoginUserContext.getCurrentUserId());
         behaviorService.recordRecommendClick(dto);
         return Result.success();
     }

@@ -23,7 +23,7 @@ mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # H-06 修复：SQL 日志（StdOutImpl）移至 application-dev.yml，避免生产环境全量打印 SQL
   global-config:
     db-config:
       logic-delete-field: isDeleted
@@ -31,13 +31,22 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 jwt:
-  secret: ${JWT_SECRET:pzhu-mall-dev-secret-key-please-change-in-production}
+  # M-30 修复：移除 base 配置中的硬编码 fallback（已知密钥风险）；未设 JWT_SECRET 时启动即失败，
+  # 开发环境使用 dev profile（application-dev.yml 提供开发默认值），生产必须显式注入
+  secret: ${JWT_SECRET:}
   expire-seconds: 604800
 
 mall:
+  security:
+    # H-1 修复：可信反向代理 IP 列表（逗号分隔，支持 CIDR，如 127.0.0.1,10.0.0.0/8）。
+    # 仅当请求直连来源 remoteAddr 落在该列表内，才读取 X-Forwarded-For/X-Real-IP 取真实客户端 IP；
+    # 否则一律使用 remoteAddr，防止攻击者伪造代理头绕过登录限流或伪造受害者 IP 制造锁定 DoS。
+    # 默认空=不信任任何代理（安全默认）；nginx 反代部署时注入代理 IP，如 TRUSTED_PROXIES=127.0.0.1
+    trusted-proxies: ${TRUSTED_PROXIES:}
   upload:
-    dir: /data/mall/uploads
-    base-url: http://localhost:8080/uploads
+    # M-33 修复：目录改为环境变量注入 + 相对路径默认值（跨平台）；容器内设置 MALL_UPLOAD_DIR=/data/mall/uploads
+    dir: ${MALL_UPLOAD_DIR:./uploads}
+    base-url: ${MALL_UPLOAD_BASE_URL:http://localhost:8080/uploads}
   order:
     timeout-minutes: 30
   stock:
@@ -45,7 +54,8 @@ mall:
     lock-lease-seconds: 10
 
 cors:
-  allowed-origins: http://localhost:5173
+  # M-32 修复：允许源改为环境变量可覆盖；生产环境由 prod 配置/环境变量注入（默认空=同源部署不放行跨域）
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
 logging:
   level:

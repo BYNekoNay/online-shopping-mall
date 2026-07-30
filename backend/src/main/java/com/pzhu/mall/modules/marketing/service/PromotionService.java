@@ -73,7 +73,9 @@ public class PromotionService {
                 case 4 -> { // 组合套餐：ruleJson={"packagePrice":299}
                     Object priceObj = rule.get("packagePrice");
                     if (priceObj != null) {
-                        yield goodsAmount.subtract(new BigDecimal(priceObj.toString()));
+                        // H-14 修复：套餐价高于商品金额时折扣为负，会把订单金额越减越大，需与 0 取较大值
+                        BigDecimal diff = goodsAmount.subtract(new BigDecimal(priceObj.toString()));
+                        yield diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
                     }
                     yield BigDecimal.ZERO;
                 }
@@ -93,6 +95,7 @@ public class PromotionService {
         return promotionMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Promotion>()
                         .eq(Promotion::getStatus, 1)
+                        .eq(Promotion::getIsDeleted, 0) // H-12 修复：排除已软删除的促销，避免其仍被应用到订单
                         .eq(Promotion::getScope, "SHOP")
                         .eq(Promotion::getScopeId, shopId)
                         .le(Promotion::getStartTime, now)

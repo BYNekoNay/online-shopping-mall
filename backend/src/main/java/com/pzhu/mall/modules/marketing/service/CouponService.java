@@ -49,6 +49,10 @@ public class CouponService {
         if (LocalDateTime.now().isAfter(coupon.getValidTo())) {
             throw new BusinessException(ErrorCode.COUPON_EXPIRED);
         }
+        // M-08 修复：校验领取开始时间（validFrom 为 null 视为不限制，兼容历史数据）
+        if (coupon.getValidFrom() != null && LocalDateTime.now().isBefore(coupon.getValidFrom())) {
+            throw new BusinessException(ErrorCode.COUPON_NOT_STARTED);
+        }
         if (coupon.getReceivedCount() >= coupon.getStock()) {
             throw new BusinessException(ErrorCode.COUPON_SOLD_OUT);
         }
@@ -77,7 +81,12 @@ public class CouponService {
     /**
      * 计算优惠券抵扣金额。
      *
-     * <p>按 discount_rule JSON 解析，支持满减模式。
+     * <p>按 discount_rule JSON 解析，支持两种模式：
+     * <ul>
+     *   <li>满减：{@code {"threshold":100,"discount":20}} —— 满 100 减 20</li>
+     *   <li>折扣（M-09 修复新增）：{@code {"threshold":100,"rate":0.8}} —— 满 100 打八折，
+     *       rate 口径与促销 discountPercent 一致（0.8 = 八折），抵扣额 = 商品金额 × (1 - rate)</li>
+     * </ul>
      */
     public BigDecimal calculateDiscount(Long couponId, BigDecimal goodsAmount) {
         Coupon coupon = couponMapper.selectById(couponId);
@@ -87,40 +96,52 @@ public class CouponService {
         if (LocalDateTime.now().isAfter(coupon.getValidTo())) {
             return BigDecimal.ZERO;
         }
-        if (coupon.getDiscountRule() == null || coupon.getDiscountRule().isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = MAPPER;
-            java.util.Map<String, Object> rule = mapper.readValue(coupon.getDiscountRule(), java.util.Map.class);
-            int threshold = ((Number) rule.getOrDefault("threshold", 0)).intValue();
-            int discount = ((Number) rule.getOrDefault("discount", 0)).intValue();
-            if (goodsAmount.compareTo(new BigDecimal(threshold)) >= 0) {
-                return new BigDecimal(discount);
-            }
-        } catch (Exception e) {
-            log.warn("[优惠券] 解析 discount_rule 失败 couponId={}", couponId, e);
-        }
-        return BigDecimal.ZERO;
+        return parseAndCalc(coupon.getDiscountRule(), goodsAmount, "couponId=" + couponId);
     }
 
     /**
      * 计算优惠券抵扣金额（传入 discountRule JSON 字符串，避免重复查库）。
      */
     public BigDecimal calculateDiscount(String discountRule, BigDecimal goodsAmount) {
-        if (discountRule == null || discountRule.isEmpty()) {
+        return parseAndCalc(discountRule, goodsAmount, "rule=" + discountRule);
+    }
+
+    /**
+     * M-09 修复：统一的 discount_rule 解析入口，同时支持满减（discount）与折扣率（rate）两种规则，
+     * 消除原先两个重载各自复制一份解析逻辑的问题。规则同时含 discount 与 rate 时优先按满减处理。
+     *
+     * @param ruleJson    discount_rule JSON 字符串
+     * @param goodsAmount 参与优惠的商品金额
+     * @param logTag      日志标签（定位问题用）
+     */
+    private BigDecimal parseAndCalc(String ruleJson, BigDecimal goodsAmount, String logTag) {
+        if (ruleJson == null || ruleJson.isEmpty()) {
             return BigDecimal.ZERO;
         }
         try {
             com.fasterxml.jackson.databind.ObjectMapper mapper = MAPPER;
-            java.util.Map<String, Object> rule = mapper.readValue(discountRule, java.util.Map.class);
+            java.util.Map<String, Object> rule = mapper.readValue(ruleJson, java.util.Map.class);
             int threshold = ((Number) rule.getOrDefault("threshold", 0)).intValue();
-            int discount = ((Number) rule.getOrDefault("discount", 0)).intValue();
-            if (goodsAmount.compareTo(new BigDecimal(threshold)) >= 0) {
+            if (goodsAmount.compareTo(new BigDecimal(threshold)) < 0) {
+                return BigDecimal.ZERO;
+            }
+            if (rule.containsKey("discount")) {
+                // 满减模式：{"threshold":100,"discount":20}
+                int discount = ((Number) rule.get("discount")).intValue();
                 return new BigDecimal(discount);
             }
+            if (rule.containsKey("rate")) {
+                // M-09 修复：折扣率模式：{"threshold":100,"rate":0.8}，rate 为 0~1 的折扣比例
+                double rate = ((Number) rule.get("rate")).doubleValue();
+                if (rate <= 0 || rate >= 1) {
+                    log.warn("[优惠券] 折扣率异常 {} rate={}", logTag, rate);
+                    return BigDecimal.ZERO;
+                }
+                return goodsAmount.multiply(BigDecimal.ONE.subtract(new BigDecimal(String.valueOf(rate))))
+                        .setScale(2, java.math.RoundingMode.HALF_UP);
+            }
         } catch (Exception e) {
-            log.warn("[优惠券] 解析 discount_rule 失败 rule={}", discountRule, e);
+            log.warn("[优惠券] 解析 discount_rule 失败 {}", logTag, e);
         }
         return BigDecimal.ZERO;
     }
@@ -163,7 +184,12 @@ public class CouponService {
         LambdaUpdateWrapper<UserCoupon> uw = new LambdaUpdateWrapper<>();
         uw.eq(UserCoupon::getId, userCouponId)
           .eq(UserCoupon::getStatus, 0);
-        userCouponMapper.update(update, uw);
+        // H-08 修复：检查 UPDATE 影响行数，行数为 0 说明优惠券已被使用（并发重复核销），
+        // 抛出异常使订单事务回滚，防止一张优惠券被重复使用
+        int updated = userCouponMapper.update(update, uw);
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.COUPON_UNAVAILABLE);
+        }
     }
 
     /**

@@ -8,7 +8,6 @@ import com.pzhu.mall.modules.cart.entity.Cart;
 import com.pzhu.mall.modules.cart.mapper.CartMapper;
 import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
-import com.pzhu.mall.modules.recommend.entity.RecommendResult;
 import com.pzhu.mall.modules.recommend.mapper.RecommendResultMapper;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
@@ -23,7 +22,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 平台级数据统计服务。
@@ -76,41 +74,26 @@ public class PlatformStatisticsService {
                         .ge(User::getCreateTime, dayStart)
         );
 
-        // 推荐点击率（近7天）— 使用 selectCount 聚合查询
+        // 推荐点击率（近7天）
+        // M-13 修复：分子分母改用统一推荐归因口径——分母为去重推荐曝光（用户,商品）对数，
+        // 分子为"先被推荐、后被浏览"的去重对数；原实现用全站浏览量除以推荐生成数，口径不一致导致指标严重虚高
         LocalDateTime weekAgo = now.minusDays(7);
-        long exposureCount = recommendResultMapper.selectCount(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<RecommendResult>()
-                        .ge(RecommendResult::getGenerateTime, weekAgo)
-        );
-        long clickCount = userBehaviorMapper.selectCount(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserBehavior>()
-                        .eq(UserBehavior::getBehaviorType, 1)
-                        .ge(UserBehavior::getCreateTime, weekAgo)
-        );
+        long exposureCount = recommendResultMapper.countDistinctExposure(weekAgo);
+        long clickCount = recommendResultMapper.countDistinctRecommendClick(weekAgo);
         String recommendCtr = exposureCount > 0 ? String.format("%.2f%%", clickCount * 100.0 / exposureCount) : "0.00%";
 
-        // 转化率（浏览商品用户中下单用户占比）— R3-C3: 用 selectList + in-memory distinct 替代 selectCount 去重
-        List<UserBehavior> browseBehaviors = userBehaviorMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserBehavior>()
-                        .eq(UserBehavior::getBehaviorType, 1)
-                        .select(UserBehavior::getUserId)
-        );
-        long browseUserCount = browseBehaviors.stream()
-                .map(UserBehavior::getUserId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .count();
-
-        List<Order> orderUsers = orderMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
-                        .eq(Order::getIsDeleted, 0)
-                        .select(Order::getUserId)
-        );
-        long orderUserCount = orderUsers.stream()
-                .map(Order::getUserId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .count();
+        // 转化率（浏览商品用户中下单用户占比）
+        // H-21 修复：原实现 selectList 全表加载进内存做 distinct，数据量大时 OOM；改为 SQL COUNT(DISTINCT) 聚合
+        long browseUserCount = firstLong(userBehaviorMapper.selectObjs(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<UserBehavior>()
+                        .select("COUNT(DISTINCT user_id)")
+                        .eq("behavior_type", 1)
+        ));
+        long orderUserCount = firstLong(orderMapper.selectObjs(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Order>()
+                        .select("COUNT(DISTINCT user_id)")
+                        .eq("is_deleted", 0)
+        ));
         double conversionRate = browseUserCount == 0 ? 0 :
                 (double) orderUserCount / browseUserCount;
 
@@ -138,31 +121,40 @@ public class PlatformStatisticsService {
                         .ge(PageViewLog::getEnterTime, start)
                         .le(PageViewLog::getEnterTime, end)
         );
-        // UV 需要去重，用 selectList 仅查 userId 字段（数据量通常不大，且分页范围有限）
-        List<PageViewLog> logs = pageViewLogMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PageViewLog>()
-                        .ge(PageViewLog::getEnterTime, start)
-                        .le(PageViewLog::getEnterTime, end)
-                        .select(PageViewLog::getUserId, PageViewLog::getSessionId, PageViewLog::getStayDuration)
-        );
-        int uv = (int) logs.stream()
-                .map(PageViewLog::getUserId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .count();
+        // H-21 修复：UV 改为 SQL COUNT(DISTINCT) 聚合，不再全量加载日志进内存
+        long uv = firstLong(pageViewLogMapper.selectObjs(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<PageViewLog>()
+                        .select("COUNT(DISTINCT user_id)")
+                        .ge("enter_time", start)
+                        .le("enter_time", end)
+        ));
 
         // 跳出率：session 内仅有 1 条记录的会话数 / 总会话数
-        Map<String, Long> sessionCounts = logs.stream()
-                .collect(Collectors.groupingBy(PageViewLog::getSessionId, Collectors.counting()));
-        long bounceSessions = sessionCounts.values().stream().filter(c -> c == 1).count();
-        double bounceRate = sessionCounts.isEmpty() ? 0 : (double) bounceSessions / sessionCounts.size();
+        // H-21 修复：改为 GROUP BY session_id 聚合（返回行数=会话数，远小于日志总行数），
+        // 同时避免原 groupingBy 在 sessionId 为 null 时抛 NPE
+        List<Map<String, Object>> sessionRows = pageViewLogMapper.selectMaps(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<PageViewLog>()
+                        .select("session_id AS sessionId", "COUNT(*) AS cnt")
+                        .ge("enter_time", start)
+                        .le("enter_time", end)
+                        .isNotNull("session_id")
+                        .groupBy("session_id")
+        );
+        long totalSessions = sessionRows.size();
+        long bounceSessions = sessionRows.stream()
+                .filter(m -> m.get("cnt") != null && ((Number) m.get("cnt")).longValue() == 1)
+                .count();
+        double bounceRate = totalSessions == 0 ? 0 : (double) bounceSessions / totalSessions;
 
-        // 平均停留时长（秒）
-        double avgStay = logs.stream()
-                .filter(l -> l.getStayDuration() != null)
-                .mapToInt(PageViewLog::getStayDuration)
-                .average()
-                .orElse(0.0);
+        // 平均停留时长（秒）— H-21 修复：改为 SQL AVG 聚合（自动忽略 NULL，与原过滤语义一致）
+        List<Object> avgObjs = pageViewLogMapper.selectObjs(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<PageViewLog>()
+                        .select("AVG(stay_duration)")
+                        .ge("enter_time", start)
+                        .le("enter_time", end)
+        );
+        double avgStay = (avgObjs == null || avgObjs.isEmpty() || avgObjs.get(0) == null)
+                ? 0.0 : ((Number) avgObjs.get(0)).doubleValue();
         int avgStayDuration = (int) Math.round(avgStay);
 
         // 转化漏斗（使用聚合查询）
@@ -206,5 +198,15 @@ public class PlatformStatisticsService {
         funnel.put("pay", payCount);
         result.put("funnel", funnel);
         return result;
+    }
+
+    /**
+     * H-21 修复：从 selectObjs 聚合查询结果中安全取出单个数值（空结果返回 0）。
+     */
+    private static long firstLong(List<Object> objs) {
+        if (objs == null || objs.isEmpty() || objs.get(0) == null) {
+            return 0L;
+        }
+        return ((Number) objs.get(0)).longValue();
     }
 }

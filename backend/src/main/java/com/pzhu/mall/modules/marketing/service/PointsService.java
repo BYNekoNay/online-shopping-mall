@@ -135,7 +135,9 @@ public class PointsService {
                         .ge(User::getPoints, clawbackAmount)
         );
         if (updated == 0) {
-            log.warn("[积分] 扣回失败：用户积分不足 userId={} amount={}", record.getUserId(), clawbackAmount);
+            // H-11 修复：扣减失败（积分不足）时不再插入扣减流水，避免账实不符
+            log.warn("[积分] 扣回失败：用户积分不足，跳过扣减流水 userId={} amount={}", record.getUserId(), clawbackAmount);
+            return;
         }
 
         PointsRecord clawback = new PointsRecord();
@@ -146,6 +148,54 @@ public class PointsService {
         clawback.setCreateTime(LocalDateTime.now());
         pointsRecordMapper.insert(clawback);
         log.info("[积分] 订单={} 退款扣回积分={} 用户={}", orderId, clawbackAmount, record.getUserId());
+    }
+
+    /**
+     * H-5 修复：返还下单时抵扣的积分（type=2 记录）。
+     * <p>用于取消未支付订单、退款审核通过两个场景。原 {@link #clawback(Long)} 仅处理
+     * type=1（下单获取）记录，未支付订单取消时抵扣的积分无人返还，造成积分永久丢失。</p>
+     * <p>幂等设计：同一订单已存在 type=4（取消/退款返还）记录时直接跳过，
+     * 防止重复取消、重复审核等场景下积分被多次返还。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void refundDeduct(Long orderId) {
+        // 幂等守卫：已返还过则跳过
+        Long returned = pointsRecordMapper.selectCount(
+                new LambdaQueryWrapper<PointsRecord>()
+                        .eq(PointsRecord::getRelatedOrderId, orderId)
+                        .eq(PointsRecord::getType, 4)
+        );
+        if (returned != null && returned > 0) {
+            return;
+        }
+
+        List<PointsRecord> records = pointsRecordMapper.selectList(
+                new LambdaQueryWrapper<PointsRecord>()
+                        .eq(PointsRecord::getRelatedOrderId, orderId)
+                        .eq(PointsRecord::getType, 2)
+                        .last("LIMIT 1")
+        );
+        if (records.isEmpty()) return;
+        PointsRecord record = records.get(0);
+        // 抵扣流水的 changeAmount 记为负数，取绝对值返还
+        int amount = Math.abs(record.getChangeAmount() != null ? record.getChangeAmount() : 0);
+        if (amount <= 0) return;
+
+        // 原子返还：points = points + amount（返还不会为负，无需下限守卫）
+        userMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<User>()
+                        .setSql("points = points + " + amount)
+                        .eq(User::getId, record.getUserId())
+        );
+
+        PointsRecord refund = new PointsRecord();
+        refund.setUserId(record.getUserId());
+        refund.setChangeAmount(amount);
+        refund.setType(4); // 取消/退款返还（H-5 修复新增类型）
+        refund.setRelatedOrderId(orderId);
+        refund.setCreateTime(LocalDateTime.now());
+        pointsRecordMapper.insert(refund);
+        log.info("[积分] 订单={} 取消/退款返还抵扣积分={} 用户={}", orderId, amount, record.getUserId());
     }
 
     /**
