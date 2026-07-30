@@ -1,16 +1,18 @@
-name: Deploy Production
+name: Deploy Test Server
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: production-deployment
+  group: test-server-deployment
   cancel-in-progress: false
 
 jobs:
@@ -18,11 +20,26 @@ jobs:
     name: Deploy with Docker Compose
     # Secrets cannot be used in job-level conditions. Enable deployment only
     # after configuring all secrets and setting the repository variable to true.
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    if: >-
+      ${{
+        vars.DEPLOY_ENABLED == 'true' &&
+        (
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_run' &&
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.head_branch == 'main')
+        )
+      }}
     runs-on: ubuntu-latest
-    environment: production
+    environment: test
     steps:
       - uses: actions/checkout@v4
+        with:
+          # workflow_run runs from the default branch; deploy the verified CI SHA instead.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - id: release
+        name: Select verified release
+        run: echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
       - name: Validate deployment configuration
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -70,13 +87,13 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes release.tgz \
-            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/mall-release-${{ github.sha }}.tgz"
+            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/mall-release-${{ steps.release.outputs.sha }}.tgz"
       - name: Activate release
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          RELEASE_NAME: ${{ github.sha }}
+          RELEASE_NAME: ${{ steps.release.outputs.sha }}
         run: |
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
