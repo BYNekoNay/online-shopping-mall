@@ -8,6 +8,10 @@
 - 后端使用 JDK 17 执行 `mvn -B verify`，并保留 JAR 构件 7 天；
 - 两端通过后构建后端 Docker 镜像，并校验 Compose 配置。
 
+当 CI 在 main 分支成功时，后端镜像会发布到 GitHub Container Registry：
+ghcr.io/bynekonay/online-shopping-mall-backend。每次发布都有不可变的
+sha-<commit> 标签，同时更新 latest 标签；Pull Request 只验证构建，不会上传镜像。
+
 ## CD
 
 `.github/workflows/deploy.yml` 面向测试服务器。只有 `main` 分支的 CI 成功完成后才会自动部署；也可以从 `main` 手动运行工作流。部署工作流检出并发布通过 CI 验证的精确提交，避免把其他提交误发到服务器。
@@ -32,4 +36,7 @@
 3. 将部署公钥加入目标用户的 `~/.ssh/authorized_keys`；把服务器主机密钥写入 GitHub Secret `DEPLOY_KNOWN_HOSTS`。
 4. 配置完所有 Secret 后再将 `DEPLOY_ENABLED` 设为 `true`。
 
-每次发布会解压到 `DEPLOY_PATH/releases/<commit-sha>`，再将 `DEPLOY_PATH/current` 切换到新版本。Compose 只重建后端和 Nginx，MySQL 与 Redis 数据卷保持不变。工作流会在 60 秒内检查四个服务及 Nginx HTTP 响应；失败时恢复到上一版本并重建后端与 Nginx。
+每次发布会解压到 DEPLOY_PATH/releases/<commit-sha>，再将 DEPLOY_PATH/current
+切换到新版本。部署工作流会拉取与通过 CI 的提交完全对应的 GHCR 后端镜像，Compose
+只重建后端和 Nginx，MySQL 与 Redis 数据卷保持不变。工作流会在 60 秒内检查四个服务及
+Nginx HTTP 响应；失败时恢复到上一版本并重建后端与 Nginx。

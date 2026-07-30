@@ -94,15 +94,20 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           RELEASE_NAME: ${{ steps.release.outputs.sha }}
+          BACKEND_IMAGE: ghcr.io/bynekonay/online-shopping-mall-backend:sha-${{ steps.release.outputs.sha }}
         run: |
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH=$(printf '%q' "$DEPLOY_PATH") RELEASE_NAME=$(printf '%q' "$RELEASE_NAME") bash -s" <<'REMOTE'
+            "DEPLOY_PATH=$(printf '%q' "$DEPLOY_PATH") RELEASE_NAME=$(printf '%q' "$RELEASE_NAME") BACKEND_IMAGE=$(printf '%q' "$BACKEND_IMAGE") bash -s" <<'REMOTE'
           set -euo pipefail
 
           release_dir="$DEPLOY_PATH/releases/$RELEASE_NAME"
           archive="/tmp/mall-release-$RELEASE_NAME.tgz"
           previous_release="$(readlink -f "$DEPLOY_PATH/current" 2>/dev/null || true)"
+          previous_image=""
+          if [ -n "$previous_release" ]; then
+            previous_image="ghcr.io/bynekonay/online-shopping-mall-backend:sha-$(basename "$previous_release")"
+          fi
 
           rollback() {
             status=$?
@@ -110,7 +115,7 @@ jobs:
               if [ -n "$previous_release" ]; then
                 ln -sfn "$previous_release" "$DEPLOY_PATH/current"
                 cd "$DEPLOY_PATH/current"
-                docker compose --env-file .env up -d --force-recreate backend nginx || true
+                BACKEND_IMAGE="$previous_image" docker compose --env-file .env up -d --force-recreate backend nginx || true
               else
                 rm -f "$DEPLOY_PATH/current"
               fi
@@ -125,7 +130,8 @@ jobs:
           cp "$DEPLOY_PATH/.env" "$release_dir/.env"
           ln -sfn "$release_dir" "$DEPLOY_PATH/current"
           cd "$DEPLOY_PATH/current"
-          docker compose --env-file .env up -d --build --force-recreate --remove-orphans backend nginx
+          BACKEND_IMAGE="$BACKEND_IMAGE" docker compose --env-file .env pull backend
+          BACKEND_IMAGE="$BACKEND_IMAGE" docker compose --env-file .env up -d --force-recreate --remove-orphans backend nginx
 
           for attempt in $(seq 1 30); do
             services_ready=true
