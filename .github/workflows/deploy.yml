@@ -1,0 +1,134 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy with Docker Compose
+    # Secrets cannot be used in job-level conditions. Enable deployment only
+    # after configuring all secrets and setting the repository variable to true.
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend assets
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Create deployment archive
+        run: |
+          tar \
+            --exclude-vcs \
+            --exclude='./backend/target' \
+            --exclude='./frontend/node_modules' \
+            --exclude='./.github' \
+            -czf release.tgz .
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Upload release
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes release.tgz \
+            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/mall-release-${{ github.sha }}.tgz"
+      - name: Activate release
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          RELEASE_NAME: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH=$(printf '%q' "$DEPLOY_PATH") RELEASE_NAME=$(printf '%q' "$RELEASE_NAME") bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          release_dir="$DEPLOY_PATH/releases/$RELEASE_NAME"
+          archive="/tmp/mall-release-$RELEASE_NAME.tgz"
+          previous_release="$(readlink -f "$DEPLOY_PATH/current" 2>/dev/null || true)"
+
+          rollback() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              if [ -n "$previous_release" ]; then
+                ln -sfn "$previous_release" "$DEPLOY_PATH/current"
+                cd "$DEPLOY_PATH/current"
+                docker compose --env-file .env up -d --force-recreate backend nginx || true
+              else
+                rm -f "$DEPLOY_PATH/current"
+              fi
+            fi
+            exit "$status"
+          }
+          trap rollback EXIT
+
+          test -f "$DEPLOY_PATH/.env"
+          mkdir -p "$release_dir"
+          tar -xzf "$archive" -C "$release_dir"
+          cp "$DEPLOY_PATH/.env" "$release_dir/.env"
+          ln -sfn "$release_dir" "$DEPLOY_PATH/current"
+          cd "$DEPLOY_PATH/current"
+          docker compose --env-file .env up -d --build --force-recreate --remove-orphans backend nginx
+
+          for attempt in $(seq 1 30); do
+            services_ready=true
+            for service in mysql redis backend nginx; do
+              container_id="$(docker compose ps -q "$service")"
+              if [ -z "$container_id" ] || [ "$(docker inspect -f '{{.State.Status}}' "$container_id")" != "running" ]; then
+                services_ready=false
+                break
+              fi
+            done
+            if [ "$services_ready" = true ] && docker compose exec -T nginx wget -q -O /dev/null http://127.0.0.1/; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "Deployment health check failed" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          rm -f "$archive"
+          trap - EXIT
+          REMOTE
