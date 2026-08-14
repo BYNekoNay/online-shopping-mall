@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git add backend/src/main/java/com/pzhu/mall/modules/product/vo/ProductVO.java backend/src/main/java/com/pzhu/mall/modules/product/service/ProductService.java backend/src/main/java/com/pzhu...",
-  "error": "Exit code 127\n/usr/bin/bash: export TEMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' TMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' && shopt -u extglob 2>/dev/null || true && eval 'git add backend/src/main/java/com/pzhu/mall/modules/product/vo/ProductVO.java backend/src/main/java/com/pzhu/mall/modules/product/service/ProductService.java backend/src/main/java/com/pzhu/mall/modules/statistics/service/SearchHistoryService.java backend/src/main/java/com/pzhu/mall/modules/user/controller/UserController.java bac...",
-  "timestamp": "2026-07-07T16:22:37.342Z",
-  "retry_count": 1
-}

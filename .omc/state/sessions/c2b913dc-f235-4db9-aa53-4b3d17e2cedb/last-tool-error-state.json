@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git commit --amend -m \\\"fix: 补齐第2步+第3步缺口 — 路由守卫meta继承、@RequireRole覆盖、Redis key前缀规范\\\"\",\"description\":\"Amend test commit with proper message\"}",
-  "error": "Exit code 127\n/usr/bin/bash: export TEMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' TMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' && shopt -u extglob 2>/dev/null || true && eval 'git commit --amend -m \"fix: 补齐第2步+第3步缺口 — 路由守卫meta继承、@RequireRole覆盖、Redis key前缀规范\"' < /dev/null && pwd -P >| /c/Users/lby0403/AppData/Local/Temp/claude-e72c-cwd: No such file or directory",
-  "timestamp": "2026-07-06T15:33:00.036Z",
-  "retry_count": 1
-}

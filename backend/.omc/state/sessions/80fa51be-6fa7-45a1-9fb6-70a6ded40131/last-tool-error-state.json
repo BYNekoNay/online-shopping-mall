@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"mysql --default-character-set=utf8mb4 -u root mall -e \\\"\\n-- 查看 Step 7 插入的完整行为数据\\nSELECT ub.id, u.username, p.name, ub.behavior_type, ub.behavior_weight, ub.create_time\\nFROM user_behavior...",
-  "error": "Exit code 127\n/usr/bin/bash: line 8: export TEMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' TMP='C:\\Users\\lby0403\\AppData\\Local\\Temp' && shopt -u extglob 2>/dev/null || true && eval 'mysql --default-character-set=utf8mb4 -u root mall -e \"\n-- 查看 Step 7 插入的完整行为数据\nSELECT ub.id, u.username, p.name, ub.behavior_type, ub.behavior_weight, ub.create_time\nFROM user_behavior ub\nJOIN user u ON ub.user_id = u.id\nJOIN product p ON ub.product_id = p.id\nWHERE u.username IN ('\"'\"'user1'\"'\"','\"'\"'user2'\"'\"','\"'\"'user...",
-  "timestamp": "2026-07-07T07:24:54.443Z",
-  "retry_count": 2
-}
