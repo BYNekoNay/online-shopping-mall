@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createApp } from 'vue'
-import { ElMessage } from 'element-plus'
 
-// 模拟 ElMessage
+// 模拟 ElMessage（避免直接导入未使用的 vue/element-plus）
 vi.mock('element-plus', () => ({
   ElMessage: {
     error: vi.fn(),

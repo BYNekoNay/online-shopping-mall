@@ -47,6 +47,8 @@ class RefundServiceTest {
     private PointsService pointsService;
     private StringRedisTemplate stringRedisTemplate;
     private ValueOperations<String, String> valueOperations;
+    private com.pzhu.mall.modules.product.mapper.ProductMapper productMapper;
+    private com.pzhu.mall.modules.product.mapper.SkuMapper skuMapper;
     private RefundService service;
 
     @BeforeAll
@@ -54,6 +56,7 @@ class RefundServiceTest {
         var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
         TableInfoHelper.initTableInfo(assistant, Refund.class);
         TableInfoHelper.initTableInfo(assistant, Order.class);
+        TableInfoHelper.initTableInfo(assistant, OrderItem.class);
     }
 
     @BeforeEach
@@ -66,6 +69,8 @@ class RefundServiceTest {
         stringRedisTemplate = mock(StringRedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        productMapper = mock(com.pzhu.mall.modules.product.mapper.ProductMapper.class);
+        skuMapper = mock(com.pzhu.mall.modules.product.mapper.SkuMapper.class);
 
         service = new RefundService();
         inject(service, "refundMapper", refundMapper);
@@ -73,6 +78,8 @@ class RefundServiceTest {
         inject(service, "orderItemMapper", orderItemMapper);
         inject(service, "pointsService", pointsService);
         inject(service, "stringRedisTemplate", stringRedisTemplate);
+        inject(service, "productMapper", productMapper);
+        inject(service, "skuMapper", skuMapper);
 
         LoginUserContext.set(100L, 1);
     }
@@ -102,11 +109,28 @@ class RefundServiceTest {
 
     @Test
     void apply_duplicateRequest_throws() {
+        // O-02 修复后语义：幂等键在所有校验通过后才写入，
+        // 此处先让校验通过（有效订单），再让 setIfAbsent 返回 false 表示重复提交
+        when(orderMapper.selectById(5L)).thenReturn(order(5L, 100L, 8L, new BigDecimal("200.00")));
+        when(refundMapper.selectCount(any())).thenReturn(0L);
         when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(false);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.apply(applyDto(5L, null, new BigDecimal("100.00"))));
         assertEquals(ErrorCode.PARAM_ERROR.getCode(), ex.getCode());
+        verify(refundMapper, never()).insert(any(Refund.class));
+    }
+
+    @Test
+    void apply_validationFailure_doesNotOccupyIdempotentKey() {
+        // O-02 修复验证：校验失败（金额超限）时不得写入幂等键，用户可立即重试
+        when(orderMapper.selectById(5L)).thenReturn(order(5L, 100L, 8L, new BigDecimal("200.00")));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.apply(applyDto(5L, null, new BigDecimal("200.01"))));
+        assertEquals(ErrorCode.PARAM_ERROR.getCode(), ex.getCode());
+        // 关键断言：校验失败路径下 setIfAbsent 从未被调用（幂等键未占用）
+        verify(valueOperations, never()).setIfAbsent(anyString(), anyString(), anyLong(), any());
         verify(refundMapper, never()).insert(any(Refund.class));
     }
 
@@ -244,12 +268,57 @@ class RefundServiceTest {
         when(orderMapper.selectById(5L)).thenReturn(order(5L, 100L, 8L, new BigDecimal("200.00")));
         when(refundMapper.update(isNull(), any())).thenReturn(1);
         when(orderMapper.update(isNull(), any())).thenReturn(1);
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.emptyList());
 
         service.audit(1L, true, "同意退款", 8L);
 
         verify(orderMapper).update(isNull(), any());      // 订单 → 已退款(7)
         verify(pointsService).clawback(5L);               // 积分扣回
         verify(pointsService).refundDeduct(5L);           // H-5：返还下单抵扣积分
+    }
+
+    @Test
+    void audit_approve_restoresSkuStock() {
+        // O-01 修复验证：退款审核通过后按明细归还 SKU 库存（DB + Redis 双归还）
+        Refund refund = refund(1L, 5L, 0);
+        when(refundMapper.selectById(1L)).thenReturn(refund);
+        when(orderMapper.selectById(5L)).thenReturn(order(5L, 100L, 8L, new BigDecimal("200.00")));
+        when(refundMapper.update(isNull(), any())).thenReturn(1);
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        OrderItem skuItem = new OrderItem();
+        skuItem.setProductId(900L);
+        skuItem.setSkuId(700L);
+        skuItem.setQuantity(2);
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.singletonList(skuItem));
+
+        service.audit(1L, true, "同意退款", 8L);
+
+        // DB 层归还 SKU 库存
+        verify(skuMapper).restoreStock(700L, 2);
+        // Redis 预扣 key 归还
+        verify(valueOperations).increment("mall:stock:700", 2L);
+    }
+
+    @Test
+    void audit_approve_restoresProductStockForNoSkuItem() {
+        // O-01 修复验证：无 SKU 商品退款后归还 product 级库存
+        Refund refund = refund(1L, 5L, 0);
+        when(refundMapper.selectById(1L)).thenReturn(refund);
+        when(orderMapper.selectById(5L)).thenReturn(order(5L, 100L, 8L, new BigDecimal("200.00")));
+        when(refundMapper.update(isNull(), any())).thenReturn(1);
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        OrderItem noSkuItem = new OrderItem();
+        noSkuItem.setProductId(900L);
+        noSkuItem.setSkuId(null);
+        noSkuItem.setQuantity(3);
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.singletonList(noSkuItem));
+
+        service.audit(1L, true, "同意退款", 8L);
+
+        verify(productMapper).restoreStock(900L, 3);
+        verify(valueOperations).increment("mall:stock:product:900", 3L);
     }
 
     @Test

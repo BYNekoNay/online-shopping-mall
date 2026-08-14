@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -231,6 +232,102 @@ class CouponServiceTest {
         when(userCouponMapper.update(isNull(), any())).thenReturn(1);
         assertDoesNotThrow(() -> service.releaseByOrderId(55L));
         verify(userCouponMapper).update(isNull(), any());
+    }
+
+    // ==================== M-02 适用范围校验 ====================
+
+    @Test
+    void calculateByUserCoupon_shopCouponMismatchShop_returnsZero() {
+        // 店铺券（type=4, shopId=10）用于 shopId=20 的下单分组 → 不抵扣
+        Coupon c = coupon("{\"threshold\":100,\"discount\":20}");
+        c.setType(4);
+        c.setShopId(10L);
+        when(userCouponMapper.selectById(7L)).thenReturn(userCoupon(7L, 100L));
+        when(couponMapper.selectById(1L)).thenReturn(c);
+
+        assertEquals(BigDecimal.ZERO,
+                service.calculateDiscountByUserCoupon(7L, new BigDecimal("150"), 100L, 20L, List.of(1L)));
+    }
+
+    @Test
+    void calculateByUserCoupon_shopCouponMatchShop_returnsDiscount() {
+        // 店铺券匹配分组店铺 → 正常抵扣
+        Coupon c = coupon("{\"threshold\":100,\"discount\":20}");
+        c.setType(4);
+        c.setShopId(10L);
+        when(userCouponMapper.selectById(7L)).thenReturn(userCoupon(7L, 100L));
+        when(couponMapper.selectById(1L)).thenReturn(c);
+
+        assertEquals(new BigDecimal(20),
+                service.calculateDiscountByUserCoupon(7L, new BigDecimal("150"), 100L, 10L, List.of(1L)));
+    }
+
+    @Test
+    void calculateByUserCoupon_categoryCouponMismatchCategory_returnsZero() {
+        // 品类券（type=3, categoryId=5）用于不含该品类的分组 → 不抵扣
+        Coupon c = coupon("{\"threshold\":100,\"discount\":20,\"categoryId\":5}");
+        c.setType(3);
+        when(userCouponMapper.selectById(7L)).thenReturn(userCoupon(7L, 100L));
+        when(couponMapper.selectById(1L)).thenReturn(c);
+
+        assertEquals(BigDecimal.ZERO,
+                service.calculateDiscountByUserCoupon(7L, new BigDecimal("150"), 100L, null, List.of(1L, 2L)));
+    }
+
+    @Test
+    void calculateByUserCoupon_categoryCouponMatchCategory_returnsDiscount() {
+        // 品类券匹配分组内品类 → 正常抵扣
+        Coupon c = coupon("{\"threshold\":100,\"discount\":20,\"categoryId\":5}");
+        c.setType(3);
+        when(userCouponMapper.selectById(7L)).thenReturn(userCoupon(7L, 100L));
+        when(couponMapper.selectById(1L)).thenReturn(c);
+
+        assertEquals(new BigDecimal(20),
+                service.calculateDiscountByUserCoupon(7L, new BigDecimal("150"), 100L, null, List.of(1L, 5L)));
+    }
+
+    @Test
+    void calculateByUserCoupon_notOwner_returnsZero() {
+        // M-02 修复①：他人优惠券不得用于本用户订单
+        when(userCouponMapper.selectById(7L)).thenReturn(userCoupon(7L, 999L));
+        assertEquals(BigDecimal.ZERO,
+                service.calculateDiscountByUserCoupon(7L, new BigDecimal("150"), 100L, null, null));
+    }
+
+    @Test
+    void calculateByUserCoupon_usedStatus_returnsZero() {
+        // M-02 修复②：已使用优惠券不抵扣
+        UserCoupon uc = userCoupon(7L, 100L);
+        uc.setStatus(1);
+        when(userCouponMapper.selectById(7L)).thenReturn(uc);
+        assertEquals(BigDecimal.ZERO,
+                service.calculateDiscountByUserCoupon(7L, new BigDecimal("150"), 100L, null, null));
+    }
+
+    @Test
+    void calculateByUserCoupon_expired_returnsZero() {
+        // M-02 修复③：过期券不抵扣
+        Coupon c = coupon("{\"threshold\":100,\"discount\":20}");
+        c.setValidTo(LocalDateTime.now().minusDays(1));
+        when(userCouponMapper.selectById(7L)).thenReturn(userCoupon(7L, 100L));
+        when(couponMapper.selectById(1L)).thenReturn(c);
+        assertEquals(BigDecimal.ZERO,
+                service.calculateDiscountByUserCoupon(7L, new BigDecimal("150"), 100L, null, null));
+    }
+
+    @Test
+    void receive_alreadyReceived_throws() {
+        // M-03 修复验证：每人限领 1 张，已领取过（任何状态）则拒绝重复领取
+        Coupon c = coupon("{\"threshold\":100,\"discount\":20}");
+        c.setStock(10);
+        c.setReceivedCount(0);
+        when(couponMapper.selectById(1L)).thenReturn(c);
+        when(userCouponMapper.selectCount(any())).thenReturn(1L);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.receive(100L, 1L));
+        assertEquals(ErrorCode.PARAM_ERROR.getCode(), ex.getCode());
+        // 已领取时不得扣减库存
+        verify(couponMapper, never()).update(any(), any());
     }
 
     // ==================== helpers ====================

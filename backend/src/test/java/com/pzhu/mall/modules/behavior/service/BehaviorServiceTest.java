@@ -1,16 +1,27 @@
 package com.pzhu.mall.modules.behavior.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.modules.behavior.dto.PageViewDTO;
+import com.pzhu.mall.modules.behavior.dto.RecommendClickDTO;
+import com.pzhu.mall.modules.behavior.dto.RecommendExposureDTO;
 import com.pzhu.mall.modules.behavior.entity.PageViewLog;
+import com.pzhu.mall.modules.behavior.entity.RecommendExposureLog;
+import com.pzhu.mall.modules.behavior.entity.UserBehavior;
 import com.pzhu.mall.modules.behavior.mapper.PageViewLogMapper;
+import com.pzhu.mall.modules.behavior.mapper.RecommendExposureLogMapper;
 import com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper;
 import com.pzhu.mall.security.LoginUserContext;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,15 +36,25 @@ class BehaviorServiceTest {
 
     private UserBehaviorMapper userBehaviorMapper;
     private PageViewLogMapper pageViewLogMapper;
+    private RecommendExposureLogMapper recommendExposureLogMapper;
     private BehaviorService service;
+
+    @BeforeAll
+    static void initTableInfo() {
+        var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, UserBehavior.class);
+        TableInfoHelper.initTableInfo(assistant, RecommendExposureLog.class);
+    }
 
     @BeforeEach
     void setUp() {
         userBehaviorMapper = mock(UserBehaviorMapper.class);
         pageViewLogMapper = mock(PageViewLogMapper.class);
+        recommendExposureLogMapper = mock(RecommendExposureLogMapper.class);
         service = new BehaviorService();
         inject(service, "userBehaviorMapper", userBehaviorMapper);
         inject(service, "pageViewLogMapper", pageViewLogMapper);
+        inject(service, "recommendExposureLogMapper", recommendExposureLogMapper);
     }
 
     @AfterEach
@@ -168,6 +189,62 @@ class BehaviorServiceTest {
         when(pageViewLogMapper.selectById(1L)).thenReturn(null);
         assertDoesNotThrow(() -> service.recordPageLeave(1L, 120));
         verify(pageViewLogMapper, never()).updateById(any());
+    }
+
+    // ==================== BE-02 曝光/点击落库 ====================
+
+    @Test
+    void recordRecommendExposure_persistsPerProduct_clickedZero() {
+        // BE-02 修复验证：曝光逐商品落库（clicked=0），供 CTR 统计
+        RecommendExposureDTO dto = new RecommendExposureDTO();
+        dto.setUserId(100L);
+        dto.setSource("home-guess");
+        dto.setProductIds(List.of(10L, 20L, 30L));
+
+        service.recordRecommendExposure(dto);
+
+        ArgumentCaptor<RecommendExposureLog> captor = ArgumentCaptor.forClass(RecommendExposureLog.class);
+        verify(recommendExposureLogMapper, times(3)).insert(captor.capture());
+        assertEquals(3, captor.getAllValues().size());
+        assertEquals(0, captor.getAllValues().get(0).getClicked());
+        assertEquals(10L, captor.getAllValues().get(0).getProductId());
+        assertEquals("home-guess", captor.getAllValues().get(0).getSource());
+        assertEquals(100L, captor.getAllValues().get(0).getUserId());
+    }
+
+    @Test
+    void recordRecommendClick_marksExposureClicked() {
+        // BE-02 修复验证：点击回标最近一条未点击曝光（clicked 0→1），无曝光时插入 clicked=1
+        RecommendClickDTO dto = new RecommendClickDTO();
+        dto.setUserId(100L);
+        dto.setSource("home-guess");
+        dto.setProductId(10L);
+        dto.setPosition(1);
+        when(recommendExposureLogMapper.update(any(), any())).thenReturn(1);
+
+        service.recordRecommendClick(dto);
+
+        // 曝光被回标（未走插入分支）
+        verify(recommendExposureLogMapper).update(any(), any());
+        verify(recommendExposureLogMapper, never()).insert(any());
+    }
+
+    @Test
+    void recordRecommendClick_noExposure_insertsClicked() {
+        // BE-02 修复验证：无曝光记录时插入 clicked=1
+        RecommendClickDTO dto = new RecommendClickDTO();
+        dto.setUserId(100L);
+        dto.setSource("product-similar");
+        dto.setProductId(10L);
+        dto.setPosition(2);
+        when(recommendExposureLogMapper.update(any(), any())).thenReturn(0);
+
+        service.recordRecommendClick(dto);
+
+        ArgumentCaptor<RecommendExposureLog> captor = ArgumentCaptor.forClass(RecommendExposureLog.class);
+        verify(recommendExposureLogMapper).insert(captor.capture());
+        assertEquals(1, captor.getValue().getClicked());
+        assertEquals(10L, captor.getValue().getProductId());
     }
 
     private static void inject(Object target, String fieldName, Object value) {

@@ -4,7 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // 纯 mock 组件，避免 jsdom 中加载 .vue 文件
 const MockComp = { template: '<div />' }
 
-const createTestRouter = (overrides = {}) => {
+const createTestRouter = (_overrides = {}) => {
   const routes = [
     {
       path: '/',

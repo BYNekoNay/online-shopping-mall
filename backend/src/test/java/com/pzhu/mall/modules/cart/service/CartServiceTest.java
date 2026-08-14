@@ -253,10 +253,13 @@ class CartServiceTest {
     void update_onlyWritesWhitelistedFields() {
         // M-03 修复验证：updateById 的实体只含 id/quantity/selected，
         // userId/productId/skuId 一律为 null（MP 忽略 null 字段）
+        // CR-02 修复：update 会校验商品 ONLINE 与库存，需 mock 商品查询
         Cart exist = new Cart();
         exist.setId(1L);
         exist.setUserId(100L);
+        exist.setProductId(10L);
         when(cartMapper.selectById(1L)).thenReturn(exist);
+        when(productMapper.selectById(10L)).thenReturn(onlineProduct(10L, 100));
 
         Cart data = new Cart();
         data.setQuantity(5);
@@ -376,7 +379,8 @@ class CartServiceTest {
         CartVO v2 = vos.get(1);
         assertEquals(new BigDecimal("99.00"), v2.getPrice());
         assertEquals(8, v2.getStock()); // 无 SKU 时展示商品库存
-        assertNull(v2.getStockEnough()); // stockEnough 仅 SKU 行填充
+        // CR-04 修复：无 SKU 行同样填充 stockEnough（库存 8 >= 数量 2）
+        assertTrue(v2.getStockEnough());
     }
 
     // ==================== helpers ====================

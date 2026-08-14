@@ -190,6 +190,8 @@ class MainChainIntegrationTest {
         inject(orderService, "freightService", freightService);
         inject(orderService, "logisticsMapper", logisticsMapper);
         inject(orderService, "orderGroupProcessor", orderGroupProcessor);
+        // O-05 修复适配：支付落库 payment 记录
+        inject(orderService, "paymentMapper", mock(com.pzhu.mall.modules.order.mapper.PaymentMapper.class));
 
         // pay() 内部注册事务提交后回调，需要激活事务同步
         TransactionSynchronizationManager.initSynchronization();

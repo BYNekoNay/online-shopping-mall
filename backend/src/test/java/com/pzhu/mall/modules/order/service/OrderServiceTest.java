@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
@@ -58,6 +59,7 @@ class OrderServiceTest {
     private ProductMapper productMapper;
     private StringRedisTemplate stringRedisTemplate;
     private BehaviorService behaviorService;
+    private com.pzhu.mall.modules.order.mapper.PaymentMapper paymentMapper;
     private OrderService service;
 
     @BeforeAll
@@ -81,6 +83,7 @@ class OrderServiceTest {
         productMapper = mock(ProductMapper.class);
         stringRedisTemplate = mock(StringRedisTemplate.class);
         behaviorService = mock(BehaviorService.class);
+        paymentMapper = mock(com.pzhu.mall.modules.order.mapper.PaymentMapper.class);
 
         service = new OrderService();
         inject(service, "orderMapper", orderMapper);
@@ -92,6 +95,7 @@ class OrderServiceTest {
         inject(service, "productMapper", productMapper);
         inject(service, "stringRedisTemplate", stringRedisTemplate);
         inject(service, "behaviorService", behaviorService);
+        inject(service, "paymentMapper", paymentMapper);
 
         // pay() 内部注册事务提交后回调，需要激活事务同步（单元测试无真实事务）
         TransactionSynchronizationManager.initSynchronization();
@@ -123,6 +127,11 @@ class OrderServiceTest {
         when(orderItemMapper.selectList(any())).thenReturn(Arrays.asList(withSku, noSku));
 
         service.cancelOrder(1L);
+
+        // L2-02 修复：库存归还在事务提交后（afterCommit）执行；单元测试无真实提交，
+        // 手动触发已注册的事务回调以验证归还逻辑
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(TransactionSynchronization::afterCommit);
 
         // 仅有 skuId 的订单项归还 SKU 级库存
         verify(stockService).rollback(2L, 1);
@@ -198,6 +207,9 @@ class OrderServiceTest {
 
         assertDoesNotThrow(() -> service.cancelOrderBySystem(1L));
 
+        // L2-02 修复：库存归还在事务提交后（afterCommit）执行，手动触发已注册回调
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(TransactionSynchronization::afterCommit);
         verify(stockService).rollback(2L, 1);
         verify(couponService).releaseByOrderId(1L);
     }
@@ -282,22 +294,19 @@ class OrderServiceTest {
         OrderItem item = item(1L, 10L, 2L, 3);
         when(orderItemMapper.selectList(any())).thenReturn(Collections.singletonList(item));
         when(skuMapper.deductStock(2L, 3)).thenReturn(true);
-
-        Product product = new Product();
-        product.setId(10L);
-        product.setStock(8);
-        when(productMapper.selectById(10L)).thenReturn(product);
-        when(productMapper.updateById(any(Product.class))).thenReturn(1);
+        when(productMapper.deductStockUnchecked(10L, 3)).thenReturn(1);
 
         service.pay(1L, 1);
 
-        // 商品库存同步扣减：8 - 3 = 5
-        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
-        verify(productMapper).updateById(captor.capture());
-        assertEquals(5, captor.getValue().getStock());
-        // 积分结算与购买行为记录
+        // O-04 修复：商品总库存使用原子 UPDATE 扣减（替代读改写），并发下不漂移
+        verify(skuMapper).deductStock(2L, 3);
+        verify(productMapper).deductStockUnchecked(10L, 3);
+        // O-05 修复：支付记录落库
+        verify(paymentMapper).insert(any(com.pzhu.mall.modules.order.entity.Payment.class));
+        // 积分结算
         verify(pointsService).settleEarn(1L, 100L, new BigDecimal("199.00"));
-        verify(behaviorService).record(100L, 10L, 3);
+        // 购买行为（behaviorType=3）已于 OrderGroupProcessor 下单时记录一次，pay() 不再重复记录
+        verify(behaviorService, never()).record(100L, 10L, 3);
     }
 
     @Test

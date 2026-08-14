@@ -33,10 +33,12 @@ class ProductControllerTest {
         ProductVO vo = new ProductVO();
         vo.setId(1L);
         vo.setName("Test Product");
-        when(productService.getDetail(1L)).thenReturn(vo);
+        // P-01/P-03 修复：消费者详情调用 getDetail(id, true)
+        when(productService.getDetail(1L, true)).thenReturn(vo);
 
         var result = controller.detail(1L);
         assertEquals(vo, result.getData());
+        verify(productService).getDetail(1L, true);
     }
 
     @Test

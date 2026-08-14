@@ -10,6 +10,7 @@ import com.pzhu.mall.modules.marketing.service.CouponService;
 import com.pzhu.mall.modules.marketing.service.PointsService;
 import com.pzhu.mall.modules.marketing.service.PromotionService;
 import com.pzhu.mall.modules.order.component.OrderNoGenerator;
+import com.pzhu.mall.modules.order.component.StockService;
 import com.pzhu.mall.modules.order.dto.CreateOrderDTO;
 import com.pzhu.mall.modules.order.dto.ProductItemDTO;
 import com.pzhu.mall.modules.order.entity.Order;
@@ -30,6 +31,7 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -52,6 +54,7 @@ class OrderGroupProcessorTest {
     private CouponService couponService;
     private BehaviorService behaviorService;
     private CartMapper cartMapper;
+    private StockService stockService;
     private OrderGroupProcessor processor;
 
     @BeforeAll
@@ -76,6 +79,7 @@ class OrderGroupProcessorTest {
         couponService = mock(CouponService.class);
         behaviorService = mock(BehaviorService.class);
         cartMapper = mock(CartMapper.class);
+        stockService = mock(StockService.class);
 
         processor = new OrderGroupProcessor();
         inject(processor, "orderMapper", orderMapper);
@@ -89,6 +93,7 @@ class OrderGroupProcessorTest {
         inject(processor, "couponService", couponService);
         inject(processor, "behaviorService", behaviorService);
         inject(processor, "cartMapper", cartMapper);
+        inject(processor, "stockService", stockService);
 
         // 公共桩：单商品 100 元、免运费、无促销、订单号生成
         Product product = new Product();
@@ -119,14 +124,15 @@ class OrderGroupProcessorTest {
 
     @Test
     void processGroup_applyCouponTrue_calculatesDiscountAndMarksUsed() {
-        when(couponService.calculateDiscountByUserCoupon(eq(7L), any()))
+        // M-02 修复：改用带适用范围校验的重载（userCouponId, goodsAmount, userId, shopId, categoryIds）
+        when(couponService.calculateDiscountByUserCoupon(eq(7L), any(), eq(100L), eq(1L), any()))
                 .thenReturn(new BigDecimal("10.00"));
 
         processor.processGroup(100L, 1L, Collections.singletonList(item(10L, 1)),
                 "{}", "GD", dtoWithCoupon(7L), false, true, null);
 
         // 计价并核销各一次
-        verify(couponService).calculateDiscountByUserCoupon(eq(7L), any());
+        verify(couponService).calculateDiscountByUserCoupon(eq(7L), any(), eq(100L), eq(1L), any());
         verify(couponService).markUsed(eq(7L), any(), eq(100L));
 
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
@@ -144,7 +150,7 @@ class OrderGroupProcessorTest {
         processor.processGroup(100L, 1L, Collections.singletonList(item(10L, 1)),
                 "{}", "GD", dtoWithCoupon(7L), false, false, null);
 
-        verify(couponService, never()).calculateDiscountByUserCoupon(anyLong(), any());
+        verify(couponService, never()).calculateDiscountByUserCoupon(anyLong(), any(), any(), any(), any());
         verify(couponService, never()).markUsed(anyLong(), any(), anyLong());
 
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
@@ -185,6 +191,115 @@ class OrderGroupProcessorTest {
 
         verify(cartMapper, never()).delete(any());
         verify(cartMapper, never()).deleteBatchIds(any());
+    }
+
+    // ==================== M-01 满赠促销用例 ====================
+
+    @Test
+    void processGroup_giftThresholdMet_addsGiftItemAndDeductsStock() {
+        // 满赠达标：金额 200 ≥ threshold 150 → 插入赠品行（isGift=1, price=0）+ 预扣赠品库存
+        Product product = new Product();
+        product.setId(10L);
+        product.setName("商品A");
+        product.setPrice(new BigDecimal("100"));
+        when(productMapper.selectById(10L)).thenReturn(product);
+
+        Product giftProduct = new Product();
+        giftProduct.setId(5001L);
+        giftProduct.setName("赠品B");
+        giftProduct.setIsDeleted(0);
+        when(productMapper.selectById(5001L)).thenReturn(giftProduct);
+
+        com.pzhu.mall.modules.product.entity.Sku giftSku = new com.pzhu.mall.modules.product.entity.Sku();
+        giftSku.setId(50011L);
+        giftSku.setProductId(5001L);
+        giftSku.setImage("gift.jpg");
+        when(skuMapper.selectById(50011L)).thenReturn(giftSku);
+
+        when(promotionService.matchGift(eq(1L), any()))
+                .thenReturn(new PromotionService.GiftInfo(5001L, 50011L, 2));
+        when(stockService.deduct(50011L, 2)).thenReturn(true);
+
+        processor.processGroup(100L, 1L, java.util.Arrays.asList(item(10L, 2)),
+                "{}", "GD", dtoWithCoupon(null), false, false, null);
+
+        // 赠品库存被预扣
+        verify(stockService).deduct(50011L, 2);
+        // 订单明细中应有赠品行（isGift=1, price=0, qty=2）
+        ArgumentCaptor<OrderItem> captor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemMapper, atLeast(2)).insert(captor.capture());
+        OrderItem giftItem = captor.getAllValues().stream()
+                .filter(oi -> oi.getIsGift() != null && oi.getIsGift() == 1)
+                .findFirst().orElse(null);
+        assertNotNull(giftItem, "应存在赠品行");
+        assertEquals(5001L, giftItem.getProductId());
+        assertEquals(50011L, giftItem.getSkuId());
+        assertEquals(0, giftItem.getPrice().compareTo(BigDecimal.ZERO));
+        assertEquals(2, giftItem.getQuantity());
+        // 赠品不参与购买行为埋点（赠品 productId 不应被记录）
+        verify(behaviorService, never()).record(eq(100L), eq(5001L), eq(3));
+    }
+
+    @Test
+    void processGroup_giftNotMet_skipsGift() {
+        // 满赠不达标：金额 100 < threshold 150 → 无赠品行、不扣赠品库存
+        when(promotionService.matchGift(eq(1L), any())).thenReturn(null);
+
+        processor.processGroup(100L, 1L, Collections.singletonList(item(10L, 1)),
+                "{}", "GD", dtoWithCoupon(null), false, false, null);
+
+        verify(stockService, never()).deduct(anyLong(), anyInt());
+        ArgumentCaptor<OrderItem> captor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemMapper, atMost(1)).insert(captor.capture());
+        assertTrue(captor.getAllValues().stream()
+                .noneMatch(oi -> oi.getIsGift() != null && oi.getIsGift() == 1));
+    }
+
+    @Test
+    void processGroup_giftStockNotEnough_skipsGiftWithoutBlocking() {
+        // 赠品库存不足：deduct 返回 false → 静默跳过赠送，订单正常创建
+        Product giftProduct = new Product();
+        giftProduct.setId(5001L);
+        giftProduct.setName("赠品B");
+        giftProduct.setIsDeleted(0);
+        when(productMapper.selectById(5001L)).thenReturn(giftProduct);
+        com.pzhu.mall.modules.product.entity.Sku giftSku = new com.pzhu.mall.modules.product.entity.Sku();
+        giftSku.setId(50011L);
+        giftSku.setProductId(5001L);
+        when(skuMapper.selectById(50011L)).thenReturn(giftSku);
+
+        when(promotionService.matchGift(eq(1L), any()))
+                .thenReturn(new PromotionService.GiftInfo(5001L, 50011L, 1));
+        when(stockService.deduct(50011L, 1)).thenReturn(false);
+
+        processor.processGroup(100L, 1L, Collections.singletonList(item(10L, 1)),
+                "{}", "GD", dtoWithCoupon(null), false, false, null);
+
+        verify(stockService).deduct(50011L, 1);
+        verify(orderMapper).insert(any(Order.class)); // 订单未被阻断
+    }
+
+    @Test
+    void processGroup_giftSkuBindingInvalid_skipsGift() {
+        // 赠品 SKU 不属于赠品商品：跳过赠送
+        Product giftProduct = new Product();
+        giftProduct.setId(5001L);
+        giftProduct.setName("赠品B");
+        giftProduct.setIsDeleted(0);
+        when(productMapper.selectById(5001L)).thenReturn(giftProduct);
+        com.pzhu.mall.modules.product.entity.Sku wrongSku = new com.pzhu.mall.modules.product.entity.Sku();
+        wrongSku.setId(50011L);
+        wrongSku.setProductId(9999L); // 绑定错误
+        when(skuMapper.selectById(50011L)).thenReturn(wrongSku);
+
+        when(promotionService.matchGift(eq(1L), any()))
+                .thenReturn(new PromotionService.GiftInfo(5001L, 50011L, 1));
+
+        processor.processGroup(100L, 1L, Collections.singletonList(item(10L, 1)),
+                "{}", "GD", dtoWithCoupon(null), false, false, null);
+
+        verify(stockService, never()).deduct(anyLong(), anyInt());
+        verify(orderMapper).insert(any(Order.class)); // 订单未被阻断
     }
 
     private static void inject(Object target, String fieldName, Object value) {
