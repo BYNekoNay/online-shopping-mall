@@ -40,7 +40,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/api/admin'
-import { ProductStatus, ProductStatusLabel, ProductStatusTagType } from '@/constants/product'
+import { ProductStatusLabel, ProductStatusTagType } from '@/constants/product'
 
 const products = ref([])
 const statusMap = ProductStatusLabel

@@ -1,6 +1,6 @@
 <template>
   <div class="order-detail">
-    <div v-if="!order.id" class="loading">
+    <div v-if="!order.orderId" class="loading">
       <el-empty description="加载中..." />
     </div>
     <template v-else>
@@ -113,11 +113,11 @@ function parseAddress(snapshot) {
   }
 }
 function goPay() {
-  router.push(`/order/pay/${order.value.id}`)
+  router.push(`/order/pay/${order.value.orderId}`)
 }
 async function cancelOrder() {
   try {
-    await request.cancelOrder(order.value.id)
+    await request.cancelOrder(order.value.orderId)
     ElMessage.success('已取消')
     order.value.status = 5
   } catch {
@@ -126,7 +126,7 @@ async function cancelOrder() {
 }
 async function confirmOrder() {
   try {
-    await request.confirmOrder(order.value.id)
+    await request.confirmOrder(order.value.orderId)
     ElMessage.success('已确认收货')
     order.value.status = 4
   } catch {
@@ -144,7 +144,7 @@ async function showLogistics() {
   logisticsError.value = ''
   logisticsInfo.value = ''
   try {
-    const data = await queryLogistics(order.value.id)
+    const data = await queryLogistics(order.value.orderId)
     // 后端返回 JSON 字符串，尝试格式化
     try {
       logisticsInfo.value = JSON.stringify(JSON.parse(data), null, 2)

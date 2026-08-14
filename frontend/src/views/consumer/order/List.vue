@@ -13,7 +13,7 @@
     <div v-if="orders.length === 0" class="empty">
       <el-empty description="暂无订单" />
     </div>
-    <el-card v-for="order in orders" :key="order.id" class="order-card" style="margin-bottom: 15px;">
+    <el-card v-for="order in orders" :key="order.orderId" class="order-card" style="margin-bottom: 15px;">
       <div class="order-header">
         <span>订单号：{{ order.orderNo }}</span>
         <span class="order-status">{{ formatStatus(order.status) }}</span>
@@ -31,10 +31,10 @@
       <div class="order-footer">
         <span>实付：<strong>¥{{ order.payAmount }}</strong></span>
         <div>
-          <el-button v-if="order.status === 0" type="primary" @click="$router.push(`/order/pay/${order.id}`)">去支付</el-button>
-          <el-button v-if="order.status === 0" @click="cancelOrder(order.id)">取消订单</el-button>
-          <el-button v-if="order.status === 2" @click="confirmOrder(order.id)">确认收货</el-button>
-          <el-button type="default" @click="$router.push(`/orders/${order.id}`)">查看详情</el-button>
+          <el-button v-if="order.status === 0" type="primary" @click="$router.push(`/order/pay/${order.orderId}`)">去支付</el-button>
+          <el-button v-if="order.status === 0" @click="cancelOrder(order.orderId)">取消订单</el-button>
+          <el-button v-if="order.status === 2" @click="confirmOrder(order.orderId)">确认收货</el-button>
+          <el-button type="default" @click="$router.push(`/orders/${order.orderId}`)">查看详情</el-button>
         </div>
       </div>
     </el-card>

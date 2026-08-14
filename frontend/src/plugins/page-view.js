@@ -28,11 +28,10 @@ function reportPageEnter(to, requestFn) {
   // 仅对同页重复触发（组件复用、重复导航）去重。
   if (sessionStorage.getItem('current_page_path') === to.fullPath) return
 
-  const userId = localStorage.getItem('userId') || null
+  // F-06 修复：userId 由后端强制取登录态（M-26），前端不再传参
   const enterTime = new Date().toISOString()
 
   requestFn({
-    userId: userId ? Number(userId) : null,
     sessionId: getOrCreateSessionId(),
     pagePath: to.fullPath,
     referrerPage: sessionStorage.getItem('last_page_path') || '',
@@ -47,7 +46,7 @@ function reportPageEnter(to, requestFn) {
 }
 
 // 页面离开时回填
-function reportPageLeave(requestFn) {
+function reportPageLeave(_requestFn) {
   const idStr = sessionStorage.getItem('current_page_view_id')
   if (!idStr) return
 

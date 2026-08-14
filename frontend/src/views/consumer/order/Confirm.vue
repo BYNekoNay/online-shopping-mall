@@ -23,12 +23,13 @@
       <div class="discount-section">
         <div class="coupon-row">
           <span>优惠券：</span>
-          <el-select v-model="selectedCouponId" placeholder="选择优惠券" clearable style="width: 260px;" @change="estimateOrder">
+          <!-- F-01 修复：:value 绑定完整 UserCouponVO 对象，estimate 用 c.couponId（模板ID），createOrder 用 c.id（记录ID） -->
+          <el-select v-model="selectedCoupon" placeholder="选择优惠券" clearable style="width: 260px;" @change="estimateOrder">
             <el-option
               v-for="c in availableCoupons"
               :key="c.id"
               :label="`${c.name}（满${getCouponThreshold(c.discountRule)}减${getCouponDiscount(c.discountRule)}）`"
-              :value="c.id"
+              :value="c"
             />
           </el-select>
         </div>
@@ -105,7 +106,7 @@ const submitting = ref(false)
 const addresses = ref([])
 const selectedAddressId = ref(null)
 const availableCoupons = ref([])
-const selectedCouponId = ref(null)
+const selectedCoupon = ref(null)
 const usePoints = ref(false)
 const userPoints = ref(0)
 const maxPointsDeduct = ref(0)
@@ -176,10 +177,12 @@ async function estimateOrder() {
         quantity: item.quantity
       }))
     )
+    // F-01 修复：估价传 couponId = UserCouponVO.couponId（Coupon 模板 ID），
+    // 后端按模板 ID 查券计算折扣
     const data = await request.estimateOrder({
       addressId: selectedAddressId.value,
       productItems: allItems,
-      couponId: selectedCouponId.value || null,
+      couponId: selectedCoupon.value?.couponId || null,
       usePoints: usePoints.value || null
     })
     estimateResult.value = data || []
@@ -196,10 +199,12 @@ async function submitOrder() {
   submitting.value = true
   try {
     const cartItemIds = cartStore.items.filter(i => i.selected).map(i => i.id)
+    // F-01 修复：createOrder 传 userCouponId = UserCouponVO.id（UserCoupon 记录 ID），
+    // 后端 CreateOrderDTO 字段为 userCouponId，此前误传 couponId 导致券不生效/不核销
     const orders = await request.createOrder({
       cartItemIds,
       addressId: selectedAddressId.value,
-      couponId: selectedCouponId.value || null,
+      userCouponId: selectedCoupon.value?.id || null,
       usePoints: usePoints.value || null,
       requestId: generateRequestId()
     })

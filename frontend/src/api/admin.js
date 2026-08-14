@@ -8,6 +8,10 @@ export function updateUserStatus(id, data) {
   return request.put(`/admin/users/${id}/status`, data)
 }
 
+export function updateUserRole(id, data) {
+  return request.put(`/admin/users/${id}/role`, data)
+}
+
 export function getProducts(params) {
   return request.get('/admin/products', { params })
 }

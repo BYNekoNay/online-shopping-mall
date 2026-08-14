@@ -32,8 +32,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="注册时间" width="180" />
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
+            <el-select v-model="row.role" size="small" style="width: 100px; margin-right: 6px;" @change="(val) => changeRole(row, val)">
+              <el-option label="消费者" :value="1" />
+              <el-option label="商家" :value="2" />
+              <el-option label="管理员" :value="3" />
+            </el-select>
             <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
               {{ row.status === 1 ? '禁用' : '启用' }}
             </el-button>
@@ -76,6 +81,18 @@ async function toggleStatus(row) {
     ElMessage.success(`${action}成功`)
     load()
   } catch {}
+}
+
+async function changeRole(row, role) {
+  const original = row.role
+  if (original === role) return
+  try {
+    await ElMessageBox.confirm(`确认将用户 ${row.username} 的角色改为「${roleMap[role]}」？`, '提示', { type: 'warning' })
+    await request.updateUserRole(row.id, { role })
+    ElMessage.success('角色修改成功，该用户需重新登录后生效')
+  } catch {
+    row.role = original // 取消或失败时回滚下拉选择
+  }
 }
 
 onMounted(load)
