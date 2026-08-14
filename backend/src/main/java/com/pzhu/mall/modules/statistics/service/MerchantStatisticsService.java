@@ -48,9 +48,12 @@ public class MerchantStatisticsService {
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
         // 使用 SQL 聚合：统计订单数和总金额（排除赠品行在内存中处理）
+        // ST-01 修复：仅统计已支付有效订单（1待发货/2已发货/3已收货/4已完成/6退款中），
+        // 待付款(0)/已取消(5)/已退款(7)不产生有效销售，与平台 GMV 口径一致（此前全部计入导致虚高）
         var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
                 .eq(Order::getShopId, shopId)
                 .eq(Order::getIsDeleted, 0)
+                .in(Order::getStatus, 1, 2, 3, 4, 6)
                 .ge(Order::getCreateTime, start)
                 .le(Order::getCreateTime, end)
                 .orderByAsc(Order::getCreateTime);
@@ -88,10 +91,12 @@ public class MerchantStatisticsService {
             }
 
             List<Map<String, Object>> trend = new ArrayList<>();
-            for (String bucket : amountByBucket.keySet()) {
+            // WMI_WRONG_MAP_ITERATOR 修复：直接遍历 entrySet，避免 keySet 循环内重复 get
+            for (Map.Entry<String, BigDecimal> bucketEntry : amountByBucket.entrySet()) {
+                String bucket = bucketEntry.getKey();
                 Map<String, Object> entry = new HashMap<>();
                 entry.put("date", bucket);
-                entry.put("amount", amountByBucket.get(bucket));
+                entry.put("amount", bucketEntry.getValue());
                 entry.put("orders", ordersByBucket.getOrDefault(bucket, 0));
                 trend.add(entry);
             }
@@ -117,9 +122,11 @@ public class MerchantStatisticsService {
     public List<Map<String, Object>> getTopProducts(Long shopId) {
         log.info("[商家统计] 热销TOP10 shopId={}", shopId);
 
+        // ST-01 修复：热销 TOP10 同口径过滤订单状态，避免待付款/取消/退款订单虚高
         var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
                 .eq(Order::getShopId, shopId)
-                .eq(Order::getIsDeleted, 0);
+                .eq(Order::getIsDeleted, 0)
+                .in(Order::getStatus, 1, 2, 3, 4, 6);
         List<Order> orders = orderMapper.selectList(qw);
 
         if (orders.isEmpty()) {

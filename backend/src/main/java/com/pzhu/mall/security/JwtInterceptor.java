@@ -21,7 +21,8 @@ public class JwtInterceptor implements HandlerInterceptor {
             "/api/recommend/guess-you-like",
             "/api/recommend/similar/",
             "/api/promotions/active",
-            "/api/behavior/page-view"
+            "/api/behavior/page-view",
+            "/api/behavior/page-view/"
     };
 
     public JwtInterceptor(JwtUtil jwtUtil, AccountStatusService accountStatusService) {

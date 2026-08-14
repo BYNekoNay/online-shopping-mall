@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.Valid;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -70,7 +71,7 @@ public class AdminUserController {
 
     @Operation(summary = "禁用/启用用户")
     @PutMapping("/{id}/status")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody StatusDTO dto) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody StatusDTO dto) {
         User user = userMapper.selectById(id);
         if (user == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
@@ -97,7 +98,41 @@ public class AdminUserController {
         return Result.success();
     }
 
+    @Operation(summary = "用户角色分配（FR-A-01）")
+    @PutMapping("/{id}/role")
+    public Result<Void> updateRole(@PathVariable Long id, @Valid @RequestBody RoleDTO dto) {
+        User user = userMapper.selectById(id);
+        if (user == null || Integer.valueOf(1).equals(user.getIsDeleted())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        Integer role = dto.getRole();
+        if (role == null || (role != 1 && role != 2 && role != 3)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "角色仅支持 1=消费者/2=商家/3=管理员");
+        }
+        Long operatorId = LoginUserContext.getCurrentUserId();
+        // 防自降级：管理员不能把自己的角色从 3 改走（保持管理员账户稳定性）
+        if (id.equals(operatorId) && role != 3) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能修改自己的管理员角色");
+        }
+        user.setRole(role);
+        userMapper.updateById(user);
+        // 角色变更后旧 JWT 中的角色声明失效：清除账号状态缓存，强制重新登录
+        accountStatusService.evict(id);
+        operationLogService.record(operatorId, "分配用户角色", "用户#" + id + " → 角色" + role);
+        return Result.success();
+    }
+
+    public static class RoleDTO {
+        @javax.validation.constraints.NotNull(message = "role 不能为空")
+        private Integer role;
+        public Integer getRole() { return role; }
+        public void setRole(Integer role) { this.role = role; }
+    }
+
     public static class StatusDTO {
+        @javax.validation.constraints.NotNull(message = "status 不能为空")
+        @javax.validation.constraints.Min(value = 0, message = "status 仅支持 0/1")
+        @javax.validation.constraints.Max(value = 1, message = "status 仅支持 0/1")
         private Integer status;
         public Integer getStatus() { return status; }
         public void setStatus(Integer status) { this.status = status; }

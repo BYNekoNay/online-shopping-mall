@@ -59,6 +59,9 @@ public class OrderEstimateController {
     @Resource
     private com.pzhu.mall.modules.marketing.service.PointsService pointsService;
 
+    @Resource
+    private com.pzhu.mall.modules.shop.mapper.ShopMapper shopMapper;
+
     @Operation(summary = "订单估价（按店铺分组）")
     @PostMapping
     public Result<List<OrderEstimateVO>> estimate(@RequestBody EstimateRequest request) {
@@ -135,10 +138,16 @@ public class OrderEstimateController {
 
             BigDecimal discountAmount = promotionDiscount.add(couponDiscount).add(pointsDeduct);
             BigDecimal payAmount = goodsAmount.add(freightAmount).subtract(discountAmount);
+            // O-12 修复：实付金额负数钳制（与 OrderGroupProcessor 同口径）
+            if (payAmount.compareTo(BigDecimal.ZERO) < 0) {
+                payAmount = BigDecimal.ZERO;
+            }
 
             OrderEstimateVO vo = new OrderEstimateVO();
             vo.setShopId(shopId);
-            vo.setShopName("店铺" + shopId);
+            // O-12 修复：店铺名查库，不再写死"店铺"+id
+            com.pzhu.mall.modules.shop.entity.Shop shop = shopMapper.selectById(shopId);
+            vo.setShopName(shop != null && shop.getName() != null ? shop.getName() : "店铺" + shopId);
             vo.setGoodsAmount(goodsAmount);
             vo.setFreightAmount(freightAmount);
             vo.setPromotionDiscountAmount(promotionDiscount);

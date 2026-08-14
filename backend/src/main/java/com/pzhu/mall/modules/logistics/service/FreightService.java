@@ -36,17 +36,21 @@ public class FreightService {
         Map.entry("河南", "华中"), Map.entry("湖北", "华中"), Map.entry("湖南", "华中"),
         Map.entry("重庆", "西南"), Map.entry("四川", "西南"), Map.entry("贵州", "西南"), Map.entry("云南", "西南"), Map.entry("西藏", "西南"),
         Map.entry("陕西", "西北"), Map.entry("甘肃", "西北"), Map.entry("青海", "西北"), Map.entry("宁夏", "西北"), Map.entry("新疆", "西北"),
-        Map.entry("辽宁", "东北"), Map.entry("吉林", "东北"), Map.entry("黑龙江", "东北")
+        Map.entry("辽宁", "东北"), Map.entry("吉林", "东北"), Map.entry("黑龙江", "东北"),
+        // LG-03 修复：补港澳台地区（此前缺失，按大区配置时覆盖不全）
+        Map.entry("香港", "华南"), Map.entry("澳门", "华南"), Map.entry("台湾", "华东")
     );
 
     /**
      * 计算运费。
+     * <p>LG-01 修复：多模板时按 id 升序取最先创建的模板（原 LIMIT 1 无排序结果不确定）。</p>
      */
     public BigDecimal calculate(Long shopId, String province, BigDecimal goodsAmount) {
         List<FreightTemplate> templates = freightTemplateMapper.selectList(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<FreightTemplate>()
                 .eq(FreightTemplate::getShopId, shopId)
                 .eq(FreightTemplate::getIsDeleted, 0)
+                .orderByAsc(FreightTemplate::getId)
                 .last("LIMIT 1")
         );
 
@@ -103,8 +107,23 @@ public class FreightService {
 
     /**
      * 保存运费模板。
+     * <p>LG-02 修复：金额非负校验 + region_rule_json 合法性校验。</p>
      */
     public void save(FreightTemplate template) {
+        if (template.getDefaultFee() != null && template.getDefaultFee().compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new BusinessException(com.pzhu.mall.common.enums.ErrorCode.PARAM_ERROR, "默认运费不能为负数");
+        }
+        if (template.getFreeShippingThreshold() != null
+                && template.getFreeShippingThreshold().compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new BusinessException(com.pzhu.mall.common.enums.ErrorCode.PARAM_ERROR, "免邮门槛不能为负数");
+        }
+        if (template.getRegionRuleJson() != null && !template.getRegionRuleJson().isBlank()) {
+            try {
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(template.getRegionRuleJson());
+            } catch (Exception e) {
+                throw new BusinessException(com.pzhu.mall.common.enums.ErrorCode.PARAM_ERROR, "运费区域规则 JSON 格式不正确");
+            }
+        }
         if (template.getId() == null) {
             freightTemplateMapper.insert(template);
         } else {

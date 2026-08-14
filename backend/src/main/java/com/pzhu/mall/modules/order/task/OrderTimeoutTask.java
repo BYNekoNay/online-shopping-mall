@@ -49,24 +49,35 @@ public class OrderTimeoutTask {
         // H-9 修复：阈值仅在此处计算一次（原实现 Java 与 SQL 各减一次 timeoutMinutes，
         // 订单在配置超时时间的一半即被取消）
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(timeoutMinutes);
-        List<Order> timeoutOrders = orderMapper.selectTimeoutUnpaidOrders(threshold);
-        for (Order order : timeoutOrders) {
-            Long orderId = order.getId();
-            // 使用 Redis SET NX 作幂等标记，避免同一订单被多个实例重复取消
-            String cancelKey = RedisKeyPrefix.ORDER + ":cancel:lock:" + orderId;
-            Boolean alreadyCancelling = stringRedisTemplate.opsForValue()
-                    .setIfAbsent(cancelKey, "1", CANCEL_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
-            if (alreadyCancelling == null || !alreadyCancelling) {
-                // 其他实例正在处理或已完成，跳过
-                continue;
+        // O-13 修复：selectTimeoutUnpaidOrders 单批 LIMIT 100，循环取批直到取空，
+        // 避免订单积压 >100/分钟时延后处理（此前只处理第一批 100 条）
+        while (true) {
+            List<Order> timeoutOrders = orderMapper.selectTimeoutUnpaidOrders(threshold);
+            if (timeoutOrders == null || timeoutOrders.isEmpty()) {
+                break;
             }
-            try {
-                // H-16 修复：任务线程无登录上下文，使用系统级取消入口（不做用户归属校验，幂等跳过）
-                orderService.cancelOrderBySystem(orderId);
-            } catch (Exception e) {
-                log.error("Failed to cancel timeout order: {}", orderId, e);
+            for (Order order : timeoutOrders) {
+                Long orderId = order.getId();
+                // 使用 Redis SET NX 作幂等标记，避免同一订单被多个实例重复取消
+                String cancelKey = RedisKeyPrefix.ORDER + ":cancel:lock:" + orderId;
+                Boolean alreadyCancelling = stringRedisTemplate.opsForValue()
+                        .setIfAbsent(cancelKey, "1", CANCEL_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
+                if (alreadyCancelling == null || !alreadyCancelling) {
+                    // 其他实例正在处理或已完成，跳过
+                    continue;
+                }
+                try {
+                    // H-16 修复：任务线程无登录上下文，使用系统级取消入口（不做用户归属校验，幂等跳过）
+                    orderService.cancelOrderBySystem(orderId);
+                } catch (Exception e) {
+                    log.error("Failed to cancel timeout order: {}", orderId, e);
+                }
+                // 不主动删除 cancelKey (TTL 到期自动释放，防止任务异常中断后锁永久持有)
             }
-            // 不主动删除 cancelKey (TTL 到期自动释放，防止任务异常中断后锁永久持有)
+            // 本批不足一批说明已处理完
+            if (timeoutOrders.size() < 100) {
+                break;
+            }
         }
     }
 }

@@ -93,16 +93,6 @@ public class StockService {
     }
 
     /**
-     * 从数据库加载 sku.stock 并写入 Redis（stock key 不设 TTL）。
-     */
-    private void loadFromDb(Long skuId) {
-        Sku sku = skuMapper.selectById(skuId);
-        if (sku != null) {
-            stringRedisTemplate.opsForValue().set(stockKey(skuId), String.valueOf(sku.getStock()));
-        }
-    }
-
-    /**
      * 预扣减库存（使用 Redisson 分布式锁，自动续期）。
      *
      * @return true 扣减成功，false 库存不足

@@ -21,9 +21,12 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -39,11 +42,35 @@ import java.util.Objects;
 @RequireRole(2)
 public class MerchantProductController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MerchantProductController.class);
+
     @Resource
     private ProductService productService;
 
     @Resource
     private ShopService shopService;
+
+    @Resource
+    private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+
+    /**
+     * L2-03 修复：库存变更后同步/失效 Redis 预扣 key。
+     * <p>StockService 的库存 key（mall:stock:{skuId} / mall:stock:product:{productId}）
+     * 由 DB 懒加载，此处删除 key 触发下次扣减时从 DB 重新加载，避免 Redis/DB 库存永久漂移。</p>
+     */
+    private void evictStockRedisKey(Long skuId, Long productId) {
+        try {
+            if (skuId != null) {
+                stringRedisTemplate.delete(com.pzhu.mall.common.config.RedisKeyPrefix.STOCK + ":" + skuId);
+            }
+            if (productId != null) {
+                stringRedisTemplate.delete(com.pzhu.mall.common.config.RedisKeyPrefix.STOCK + ":product:" + productId);
+            }
+        } catch (Exception e) {
+            // DE_MIGHT_IGNORE 修复：记录 debug（Redis 不可用时忽略，下次扣减从 DB 懒加载兜底）
+            log.debug("[商品] 失效 Redis 库存 key 失败 skuId={} productId={}", skuId, productId, e);
+        }
+    }
 
     @Operation(summary = "商家商品列表")
     @GetMapping
@@ -134,6 +161,9 @@ public class MerchantProductController {
         }
         productService.getProductMapper().updateById(product);
 
+        // L2-03 修复：商品级库存变更后失效 Redis 预扣 key（懒加载兜底）
+        evictStockRedisKey(null, product.getId());
+
         // 删除旧 SKU 并重新创建（简化处理）
         LambdaQueryWrapper<Sku> skuQw = new LambdaQueryWrapper<>();
         skuQw.eq(Sku::getProductId, id).eq(Sku::getIsDeleted, 0);
@@ -141,6 +171,8 @@ public class MerchantProductController {
         for (Sku oldSku : oldSkus) {
             oldSku.setIsDeleted(1);
             productService.getSkuMapper().updateById(oldSku);
+            // L2-03 修复：旧 SKU 库存 key 一并失效
+            evictStockRedisKey(oldSku.getId(), null);
         }
 
         if (dto.getSkus() != null && !dto.getSkus().isEmpty()) {
@@ -196,6 +228,8 @@ public class MerchantProductController {
                 productService.getProductMapper().updateById(product);
                 successCount++;
             } catch (Exception e) {
+                // P-05 修复：记录异常栈，避免批量操作失败根因不可查
+                log.error("[商品] 批量操作失败 productId={} action={}", productId, dto.getAction(), e);
                 failed.add("商品 " + productId + " 操作失败");
             }
         }
@@ -211,8 +245,14 @@ public class MerchantProductController {
 
     public static class SkuDTO {
         private String specJson;
+        // P-04 修复：SKU 价格/库存非负校验（此前可 null/负值入库）
+        @javax.validation.constraints.NotNull(message = "SKU价格不能为空")
+        @javax.validation.constraints.DecimalMin(value = "0", message = "SKU价格不能为负")
         private java.math.BigDecimal price;
+        @javax.validation.constraints.NotNull(message = "SKU库存不能为空")
+        @javax.validation.constraints.Min(value = 0, message = "SKU库存不能为负")
         private Integer stock;
+        @javax.validation.constraints.Size(max = 500, message = "SKU图片URL最长500字符")
         private String image;
 
         public String getSpecJson() { return specJson; }
@@ -229,14 +269,20 @@ public class MerchantProductController {
         @NotNull
         private Long categoryId;
         @NotBlank
+        @Size(max = 200, message = "商品名称最长200字符")
         private String name;
+        @Size(max = 500, message = "主图URL最长500字符")
         private String mainImage;
         private String images;
+        @Size(max = 20000, message = "商品详情最长20000字符")
         private String detail;
         @NotNull
+        @javax.validation.constraints.DecimalMin(value = "0", message = "价格不能为负")
         private java.math.BigDecimal price;
+        @javax.validation.constraints.DecimalMin(value = "0", message = "原价不能为负")
         private java.math.BigDecimal originalPrice;
         @NotNull
+        @javax.validation.constraints.Min(value = 0, message = "库存不能为负")
         private Integer stock;
         private List<SkuDTO> skus;
 

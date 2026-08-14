@@ -38,8 +38,10 @@ public class OrderController {
 
     @Operation(summary = "订单列表")
     @GetMapping
-    public Result<List<OrderVO>> list() {
-        return Result.success(orderService.listByUser());
+    public Result<List<OrderVO>> list(@RequestParam(required = false) Integer pageNum,
+                                      @RequestParam(required = false) Integer pageSize) {
+        // O-07 修复：支持分页参数（可选，缺省返回全量兼容既有前端）
+        return Result.success(orderService.listByUser(pageNum, pageSize));
     }
 
     @Operation(summary = "订单详情")

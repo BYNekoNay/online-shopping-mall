@@ -63,8 +63,19 @@ public class CouponController {
         Long userId = LoginUserContext.getCurrentUserId();
         List<UserCoupon> userCoupons = couponService.listUserCoupons(userId, status);
 
+        // M-05 修复：批量加载 Coupon 模板，消除循环 selectById 的 N+1
+        java.util.Set<Long> couponIds = userCoupons.stream()
+                .map(UserCoupon::getCouponId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.Map<Long, Coupon> couponMap = new java.util.HashMap<>();
+        if (!couponIds.isEmpty()) {
+            couponMapper.selectBatchIds(couponIds)
+                    .forEach(c -> couponMap.put(c.getId(), c));
+        }
+
         List<UserCouponVO> vos = userCoupons.stream().map(uc -> {
-            Coupon coupon = couponMapper.selectById(uc.getCouponId());
+            Coupon coupon = couponMap.get(uc.getCouponId());
             UserCouponVO vo = new UserCouponVO();
             vo.setId(uc.getId());
             vo.setCouponId(uc.getCouponId());

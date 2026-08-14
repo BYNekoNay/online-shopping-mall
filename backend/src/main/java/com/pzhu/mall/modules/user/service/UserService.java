@@ -120,9 +120,25 @@ public class UserService {
 
     /**
      * 更新用户个人信息（仅更新非 null 字段，避免覆盖已有数据）。
+     * <p>U-01 修复：更新手机号/邮箱前校验唯一性（排除自身），避免 DuplicateKeyException
+     * 落入全局 500；同时保留 DB 唯一索引兜底。</p>
      */
     @Transactional
     public void updateProfile(Long userId, String nickname, String avatar, String phone, String email) {
+        if (phone != null && !phone.isBlank()) {
+            LambdaQueryWrapper<User> pw = new LambdaQueryWrapper<>();
+            pw.eq(User::getPhone, phone).eq(User::getIsDeleted, 0).ne(User::getId, userId);
+            if (userMapper.selectCount(pw) > 0) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "该手机号已被他人使用");
+            }
+        }
+        if (email != null && !email.isBlank()) {
+            LambdaQueryWrapper<User> ew = new LambdaQueryWrapper<>();
+            ew.eq(User::getEmail, email).eq(User::getIsDeleted, 0).ne(User::getId, userId);
+            if (userMapper.selectCount(ew) > 0) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "该邮箱已被他人使用");
+            }
+        }
         LambdaUpdateWrapper<User> uw = new LambdaUpdateWrapper<>();
         if (nickname != null) uw.set(User::getNickname, nickname);
         if (avatar != null) uw.set(User::getAvatar, avatar);

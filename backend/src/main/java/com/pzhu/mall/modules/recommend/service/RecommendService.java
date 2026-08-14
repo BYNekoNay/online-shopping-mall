@@ -175,35 +175,37 @@ public class RecommendService {
      */
     private List<RecommendVO> readFromRedis(Long userId, int limit) {
         String key = RECOMMEND_ZSET_KEY_PREFIX + userId;
-        Set<String> members = stringRedisTemplate.opsForZSet()
-                .reverseRange(key, 0, limit - 1);
-        if (members == null || members.isEmpty()) {
+        // R-06 修复：ZSet 已存真实推荐分，用 reverseRangeWithScores 读取真实 score，
+        // 替代原"member 顺序 + 位置构造 score"（伪造分数且算法类型写死 3）
+        Set<org.springframework.data.redis.core.ZSetOperations.TypedTuple<String>> tuples =
+                stringRedisTemplate.opsForZSet().reverseRangeWithScores(key, 0, limit - 1);
+        if (tuples == null || tuples.isEmpty()) {
             return List.of();
         }
         List<Long> productIds = new ArrayList<>();
-        for (String member : members) {
+        Map<Long, Double> scoreMap = new HashMap<>();
+        for (org.springframework.data.redis.core.ZSetOperations.TypedTuple<String> t : tuples) {
             try {
-                productIds.add(Long.parseLong(member));
+                Long pid = Long.parseLong(t.getValue());
+                productIds.add(pid);
+                scoreMap.put(pid, t.getScore() != null ? t.getScore() : 0.0);
             } catch (NumberFormatException e) {
-                log.warn("[推荐-Redis] 跳过非数字 member: key={}, value={}", key, member);
+                log.warn("[推荐-Redis] 跳过非数字 member: key={}, value={}", key, t.getValue());
             }
         }
         if (productIds.isEmpty()) {
             return List.of();
         }
         List<Product> products = productMapper.selectBatchIds(productIds);
-        // 构建位置映射（selectBatchIds 返回无序，用 Map 替代 O(n²) 的 indexOf）
-        Map<Long, Integer> positionMap = new HashMap<>();
-        for (int i = 0; i < productIds.size(); i++) {
-            positionMap.put(productIds.get(i), i);
+        Map<Long, Product> productMap = products.stream().collect(Collectors.toMap(Product::getId, p -> p));
+        List<RecommendVO> vos = new ArrayList<>();
+        for (Long pid : productIds) {
+            Product p = productMap.get(pid);
+            if (p != null && Integer.valueOf(1).equals(p.getStatus())) {
+                vos.add(RecommendVO.from(p, scoreMap.getOrDefault(pid, 0.0), 3));
+            }
         }
-        return products.stream()
-                .map(p -> {
-                    int idx = positionMap.getOrDefault(p.getId(), -1);
-                    double score = idx >= 0 ? (double) (limit - idx) / limit : 0.0;
-                    return RecommendVO.from(p, score, 3);
-                })
-                .collect(Collectors.toList());
+        return vos;
     }
 
     /**

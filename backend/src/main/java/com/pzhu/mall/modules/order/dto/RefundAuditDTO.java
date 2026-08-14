@@ -5,6 +5,8 @@ package com.pzhu.mall.modules.order.dto;
  */
 public class RefundAuditDTO {
 
+    // O-14 修复：approved 必填（此前可空，null 时按"拒绝"处理语义含糊）
+    @javax.validation.constraints.NotNull(message = "approved 不能为空")
     private Boolean approved;
     private String handleRemark;
 

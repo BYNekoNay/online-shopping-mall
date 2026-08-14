@@ -13,6 +13,7 @@ import com.pzhu.mall.modules.order.entity.Order;
 import com.pzhu.mall.modules.order.entity.OrderItem;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
+import com.pzhu.mall.modules.order.mapper.PaymentMapper;
 import com.pzhu.mall.modules.order.component.OrderNoGenerator;
 import com.pzhu.mall.modules.order.component.StockService;
 import com.pzhu.mall.modules.order.vo.OrderItemVO;
@@ -71,6 +72,9 @@ public class OrderService {
     private OrderItemMapper orderItemMapper;
 
     @Resource
+    private PaymentMapper paymentMapper;
+
+    @Resource
     private CartMapper cartMapper;
 
     @Resource
@@ -123,17 +127,11 @@ public class OrderService {
     public List<OrderVO> createOrder(CreateOrderDTO dto) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
 
-        // 0. 幂等校验（Redis SET NX）
+        // 0. 校验幂等请求 ID 存在（O-08 修复：SET NX 写入延后至全部入参校验通过后，
+        // 避免校验失败也占用 24h 幂等键导致用户无法重试）
         String requestId = dto.getRequestId();
         if (requestId == null || requestId.isBlank()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "requestId 不能为空");
-        }
-        String idempotentKey = RedisKeyPrefix.ORDER + ":idempotent:" + requestId;
-        Boolean alreadySet = stringRedisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", IDEMPOTENT_TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
-        if (alreadySet != null && !alreadySet) {
-            // 重复请求：根据设计文档 §1.5，直接返回已创建的订单列表
-            // 此处简化处理：返回空列表（生产环境应缓存并返回原始订单列表）
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "订单已提交，请勿重复操作");
         }
 
         // 1. 获取商品列表
@@ -194,8 +192,28 @@ public class OrderService {
         if (address.getUserId() == null || !address.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        String addressSnapshot = String.format("{\"receiver\":\"%s\",\"phone\":\"%s\",\"province\":\"%s\",\"city\":\"%s\",\"district\":\"%s\",\"detail\":\"%s\"}",
-                address.getReceiver(), address.getPhone(), address.getProvince(), address.getCity(), address.getDistrict(), address.getDetail());
+        // O-11 修复：地址快照改用 Jackson 序列化（原手拼 JSON 在 receiver/phone 含引号时破坏结构）
+        String addressSnapshot;
+        try {
+            java.util.Map<String, String> addrMap = new LinkedHashMap<>();
+            addrMap.put("receiver", address.getReceiver());
+            addrMap.put("phone", address.getPhone());
+            addrMap.put("province", address.getProvince());
+            addrMap.put("city", address.getCity());
+            addrMap.put("district", address.getDistrict());
+            addrMap.put("detail", address.getDetail());
+            addressSnapshot = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(addrMap);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.SYSTEM_BUSY, "地址信息序列化失败");
+        }
+
+        // O-08 修复：所有入参校验通过后才写入幂等键（SET NX 24h），
+        // 校验失败路径不占用幂等键，用户可立即修正后重试
+        String idempotentKey = RedisKeyPrefix.ORDER + ":idempotent:" + requestId;
+        Boolean alreadySet = stringRedisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", IDEMPOTENT_TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
+        if (alreadySet != null && !alreadySet) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "订单已提交，请勿重复操作");
+        }
 
         List<OrderVO> allOrders = new ArrayList<>();
         boolean pointsProcessed = false;
@@ -239,6 +257,8 @@ public class OrderService {
                     }
                 }
             } catch (Exception e) {
+                // O-03 修复：记录异常栈，避免库存预扣失败根因不可查
+                log.error("[订单] 库存预扣减异常 shopId={} groupSize={}", shopId, groupItems.size(), e);
                 stockFailed = true;
             }
             if (stockFailed) {
@@ -275,7 +295,12 @@ public class OrderService {
                 for (int i = 0; i < deductedProducts.size(); i++) {
                     stockService.rollbackProduct(deductedProducts.get(i), deductedProductQtys.get(i));
                 }
-                failedShops.add("店铺" + shopId + "下单失败");
+                // O-03 修复：记录异常栈，避免 processGroup 失败根因不可查（此前仅记"店铺xx下单失败"）
+                log.error("[订单] 分组下单异常 shopId={} groupSize={}", shopId, groupItems.size(), e);
+                // DV-02 动态验证修复：透传业务异常信息（如"商品数量必须大于0"），
+                // 避免全失败时用户只看到笼统的"店铺X下单失败"
+                String reason = (e instanceof BusinessException) ? ((BusinessException) e).getMessage() : "下单失败";
+                failedShops.add("店铺" + shopId + reason);
                 continue;
             }
             allOrders.addAll(groupOrders);
@@ -290,9 +315,16 @@ public class OrderService {
             }
         }
 
-        // 汇总部分失败的提示（C5 修复：返回成功订单+记录警告，不再抛异常导致成功订单不可见）
+        // 汇总部分失败的提示（C5 修复：部分失败返回成功订单+记录警告，不抛异常隐藏成功订单）
         if (!failedShops.isEmpty()) {
             log.warn("订单部分失败: {}", String.join("；", failedShops));
+        }
+        // DV-01 动态验证修复：全部分组均失败时必须报错，禁止返回"成功+空订单"。
+        // 此前库存不足时 failedShops 累积后 continue，最终 allOrders 为空仍返回 code:0，
+        // 前端会把下单失败误判为成功（无订单可支付），严重误导用户。
+        if (allOrders.isEmpty() && !failedShops.isEmpty()) {
+            throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH,
+                    "下单失败：" + String.join("；", failedShops));
         }
 
         return allOrders;
@@ -312,15 +344,29 @@ public class OrderService {
 
     /**
      * 获取当前用户的订单列表。
+     * <p>O-07 修复：支持分页（pageNum/pageSize 可选，缺省返回全量以兼容既有前端）。</p>
+     */
+    public List<OrderVO> listByUser(Integer pageNum, Integer pageSize) {
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
+                .eq(Order::getUserId, userId)
+                .orderByDesc(Order::getCreateTime);
+        List<Order> orders;
+        if (pageNum != null && pageSize != null && pageSize > 0) {
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<Order> page =
+                    new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
+            orders = orderMapper.selectPage(page, qw).getRecords();
+        } else {
+            orders = orderMapper.selectList(qw);
+        }
+        return toVOList(orders);
+    }
+
+    /**
+     * 兼容旧调用（无分页参数）。
      */
     public List<OrderVO> listByUser() {
-        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
-        List<Order> orders = orderMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
-                .eq(Order::getUserId, userId)
-                .orderByDesc(Order::getCreateTime)
-        );
-        return toVOList(orders);
+        return listByUser(null, null);
     }
 
     /**
@@ -440,16 +486,49 @@ public class OrderService {
             return false;
         }
 
-        // 库存归还
+        // 库存归还（L2-02 修复：Redis 归还移至事务提交后执行，避免事务回滚时
+        // Redis 库存已归还而 DB 订单未取消，造成可售库存虚增；与支付幂等标记的 afterCommit 模式一致）
         var itemQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>();
         itemQw.eq(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId, orderId);
         List<com.pzhu.mall.modules.order.entity.OrderItem> items = orderItemMapper.selectList(itemQw);
+        List<Object[]> skuRollbacks = new ArrayList<>();
+        List<Object[]> productRollbacks = new ArrayList<>();
         for (com.pzhu.mall.modules.order.entity.OrderItem item : items) {
             if (item.getSkuId() != null) {
-                stockService.rollback(item.getSkuId(), item.getQuantity());
+                skuRollbacks.add(new Object[]{item.getSkuId(), item.getQuantity()});
             } else {
                 // H-4 修复：单规格商品归还商品级库存
-                stockService.rollbackProduct(item.getProductId(), item.getQuantity());
+                productRollbacks.add(new Object[]{item.getProductId(), item.getQuantity()});
+            }
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+                && (!skuRollbacks.isEmpty() || !productRollbacks.isEmpty())) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    for (Object[] r : skuRollbacks) {
+                        try {
+                            stockService.rollback((Long) r[0], (Integer) r[1]);
+                        } catch (Exception e) {
+                            log.error("[订单] 提交后 SKU 库存归还失败 orderId={} skuId={} qty={}（需人工对账）", orderId, r[0], r[1], e);
+                        }
+                    }
+                    for (Object[] r : productRollbacks) {
+                        try {
+                            stockService.rollbackProduct((Long) r[0], (Integer) r[1]);
+                        } catch (Exception e) {
+                            log.error("[订单] 提交后商品库存归还失败 orderId={} productId={} qty={}（需人工对账）", orderId, r[0], r[1], e);
+                        }
+                    }
+                }
+            });
+        } else {
+            // 无活动事务（防御分支，正常不会走到）：直接归还
+            for (Object[] r : skuRollbacks) {
+                stockService.rollback((Long) r[0], (Integer) r[1]);
+            }
+            for (Object[] r : productRollbacks) {
+                stockService.rollbackProduct((Long) r[0], (Integer) r[1]);
             }
         }
 
@@ -497,6 +576,10 @@ public class OrderService {
      */
     @Transactional
     public void pay(Long orderId, Integer payType) {
+        // O-15 修复：payType 仅支持 1（余额）/2（模拟支付宝）
+        if (payType == null || (payType != 1 && payType != 2)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "支付方式仅支持 1=余额/2=模拟支付宝");
+        }
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         Order order = orderMapper.selectById(orderId);
         // M-15 修复：校验订单归属，防止越权支付他人订单
@@ -555,13 +638,10 @@ public class OrderService {
                 if (!ok) {
                     throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH, "商品库存不足");
                 }
-                // 同步更新 Product.stock（保证 Product.stock 与 Sku.stock 一致）
-                com.pzhu.mall.modules.product.entity.Product product = productMapper.selectById(item.getProductId());
-                if (product != null && product.getStock() != null) {
-                    int newStock = Math.max(0, product.getStock() - item.getQuantity());
-                    product.setStock(newStock);
-                    productMapper.updateById(product);
-                }
+                // O-04 修复：同步更新 Product.stock 使用原子 UPDATE（GREATEST 防负），
+                // 替代原"selectById + setStock + updateById"读改写——并发支付同一商品不同 SKU 时
+                // 读改写会丢失更新导致商品总库存漂移。
+                productMapper.deductStockUnchecked(item.getProductId(), item.getQuantity());
             } else {
                 // H-4 修复：单规格商品走商品级原子扣减（UPDATE ... WHERE stock >= ?），
                 // 原实现此分支无任何数据库扣减，Redis 预扣减丢失后即可无限超卖
@@ -575,14 +655,19 @@ public class OrderService {
         // 积分正记录（按实付金额 1:1）
         pointsService.settleEarn(orderId, order.getUserId(), order.getPayAmount());
 
-        // 记录购买行为（behaviorType=3）
-        List<com.pzhu.mall.modules.order.entity.OrderItem> payItems = orderItemMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.OrderItem>()
-                .eq(com.pzhu.mall.modules.order.entity.OrderItem::getOrderId, orderId)
-        );
-        for (com.pzhu.mall.modules.order.entity.OrderItem item : payItems) {
-            behaviorService.record(order.getUserId(), item.getProductId(), 3);
-        }
+        // O-05 修复：支付记录落库（payment 表，任务书 7.3"支付记录管理"）。
+        // 支付流水号复用订单号（订单号全局唯一且与支付一一对应），状态=1 成功。
+        com.pzhu.mall.modules.order.entity.Payment payment = new com.pzhu.mall.modules.order.entity.Payment();
+        payment.setOrderId(orderId);
+        payment.setPayNo(order.getOrderNo());
+        payment.setAmount(order.getPayAmount());
+        payment.setPayType(payType);
+        payment.setStatus(1);
+        payment.setCallbackTime(LocalDateTime.now());
+        payment.setCreateTime(LocalDateTime.now());
+        paymentMapper.insert(payment);
+        // 说明：购买行为（behaviorType=3）已在 OrderGroupProcessor.processGroup 下单时记录一次，
+        // 此处不再重复记录（避免同一订单双倍购买行为污染推荐矩阵；赠品行也已在 processGroup 排除）。
     }
 
     /**
@@ -593,6 +678,10 @@ public class OrderService {
         OrderItem item = orderItemMapper.selectById(orderItemId);
         if (item == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        // M-01 修复：赠品行（is_gift=1）不可单独评价（docs/13：前端不展示入口，后端兜底拦截）
+        if (item.getIsGift() != null && item.getIsGift() == 1) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "赠品不支持单独评价");
         }
 
         // 写入 review 表（幂等：同一订单项只能评价一次）

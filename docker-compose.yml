@@ -63,6 +63,9 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       # M-33 配套：容器内上传目录（Dockerfile 已创建 /data/mall/uploads 并授权）
       MALL_UPLOAD_DIR: /data/mall/uploads
+    volumes:
+      # L3-01 修复：上传目录持久化，容器重建/升级不丢图片
+      - mall_uploads:/data/mall/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -91,6 +94,7 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  mall_uploads:
 
 networks:
   mall-network:

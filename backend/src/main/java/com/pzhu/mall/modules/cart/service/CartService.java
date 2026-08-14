@@ -93,8 +93,14 @@ public class CartService {
                     vo.setSpecText(sku.getSpecJson());
                     vo.setPrice(sku.getPrice());
                     vo.setStock(sku.getStock());
-                    vo.setStockEnough(sku.getStock() >= item.getQuantity());
+                    vo.setStockEnough(sku.getStock() != null && sku.getStock() >= item.getQuantity());
+                } else {
+                    // 引用已失效的 SKU（商品编辑后软删重建）：标记为库存不足，前端友好提示
+                    vo.setStockEnough(false);
                 }
+            } else {
+                // CR-04 修复：无 SKU 商品同样设置 stockEnough（此前为 null，前端可能误判库存）
+                vo.setStockEnough(product.getStock() != null && product.getStock() >= item.getQuantity());
             }
             voList.add(vo);
         }
@@ -158,11 +164,15 @@ public class CartService {
 
     /**
      * 对指定（用户+商品+SKU）的购物车行原子累加数量。
+     * <p>CR-01 修复：setSql 改用参数化占位，消除字符串拼接数值。
+     * <p>CR-03 修复：累加条件附加 {@code quantity + n <= MAX_CART_QUANTITY}，
+     * 并发累加（如两次各加 60）无法超过 99 上限——超限时 UPDATE 影响 0 行返回 0，由调用方处理。</p>
      * <p>skuId 可为空，为空时使用 IS NULL 匹配，避免生成 {@code sku_id = NULL} 恒假条件。</p>
      */
     private int incrementQuantity(Long userId, Long productId, Long skuId, int quantity) {
         LambdaUpdateWrapper<Cart> uw = new LambdaUpdateWrapper<Cart>()
-                .setSql("quantity = quantity + " + quantity)
+                .setSql("quantity = quantity + {0}", quantity)
+                .le(Cart::getQuantity, MAX_CART_QUANTITY - quantity)
                 .eq(Cart::getUserId, userId)
                 .eq(Cart::getProductId, productId);
         if (skuId == null) {
@@ -175,6 +185,8 @@ public class CartService {
 
     /**
      * 更新购物车项。
+     * <p>CR-02 修复：修改数量时复用加购校验（≤上限、≤库存、商品 ONLINE），
+     * 此前仅校验 >0，可将数量改成 9999。</p>
      */
     public void update(Long id, Cart data) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
@@ -185,6 +197,29 @@ public class CartService {
         // 校验数量必须为正数
         if (data.getQuantity() != null && data.getQuantity() <= 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "商品数量必须大于0");
+        }
+        // CR-02 修复：数量修改复用 add 的边界校验
+        if (data.getQuantity() != null) {
+            if (data.getQuantity() > MAX_CART_QUANTITY) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "单件商品数量不能超过 " + MAX_CART_QUANTITY);
+            }
+            // 库存校验：SKU 商品查 sku，无 SKU 商品查 product
+            int stock;
+            if (exist.getSkuId() != null) {
+                Sku sku = skuMapper.selectById(exist.getSkuId());
+                stock = sku != null && sku.getStock() != null ? sku.getStock() : 0;
+            } else {
+                Product product = productMapper.selectById(exist.getProductId());
+                stock = product != null && product.getStock() != null ? product.getStock() : 0;
+            }
+            if (data.getQuantity() > stock) {
+                throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+            }
+            // 商品 ONLINE 校验（下架商品不允许改数量继续加购）
+            Product product = productMapper.selectById(exist.getProductId());
+            if (product != null && ProductStatus.of(product.getStatus()) != ProductStatus.ONLINE) {
+                throw new BusinessException(ErrorCode.PRODUCT_OFFLINE_ORDER);
+            }
         }
         // M-03 修复：仅允许更新 quantity/selected，禁止覆写 userId/productId/skuId（Mass Assignment）。
         // updateById 忽略 null 字段，因此新建实体只会写入这两个可变字段。

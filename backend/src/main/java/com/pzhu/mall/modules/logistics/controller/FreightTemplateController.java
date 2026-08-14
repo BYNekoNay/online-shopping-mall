@@ -34,6 +34,9 @@ public class FreightTemplateController {
     @Resource
     private LogisticsQueryService logisticsQueryService;
 
+    @Resource
+    private com.pzhu.mall.modules.order.mapper.OrderMapper orderMapper;
+
     // ==================== 商家端 ====================
 
     @Operation(summary = "运费模板列表（商家）")
@@ -81,6 +84,28 @@ public class FreightTemplateController {
     @Operation(summary = "查询物流轨迹")
     @GetMapping("/logistics/{orderId}/track")
     public Result<String> track(@PathVariable Long orderId) {
+        // L2-04 修复：校验订单归属——消费者只能查自己的订单，商家只能查本店铺订单
+        Long currentUserId = LoginUserContext.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        com.pzhu.mall.modules.order.entity.Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        Integer role = LoginUserContext.getCurrentRole();
+        boolean isConsumer = role == null || role == 1;
+        if (isConsumer) {
+            if (order.getUserId() == null || !order.getUserId().equals(currentUserId)) {
+                throw new BusinessException(ErrorCode.NOT_FOUND);
+            }
+        } else {
+            // 商家/管理员：校验店铺归属
+            Long shopId = getShopIdQuietly(currentUserId);
+            if (shopId != null && (order.getShopId() == null || !order.getShopId().equals(shopId))) {
+                throw new BusinessException(ErrorCode.NOT_FOUND);
+            }
+        }
         try {
             String result = logisticsQueryService.query(orderId);
             return Result.success(result);
@@ -95,6 +120,15 @@ public class FreightTemplateController {
     private Long getShopId() {
         Long userId = LoginUserContext.getCurrentUserId();
         return shopService.getMerchantShopIdOrThrow(userId);
+    }
+
+    /** 静默获取店铺 ID（非商家返回 null，用于商家/管理员物流归属校验） */
+    private Long getShopIdQuietly(Long userId) {
+        try {
+            return shopService.getMerchantShopIdOrThrow(userId);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** 运费模板编辑 DTO（仅包含允许客户端控制的字段）。 */

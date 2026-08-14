@@ -13,4 +13,10 @@ public interface SkuMapper extends BaseMapper<Sku> {
      * 利用数据库行级锁防止并发超卖，返回 true 表示扣减成功。
      */
     boolean deductStock(@Param("skuId") Long skuId, @Param("quantity") int quantity);
+
+    /**
+     * 库存归还（原子操作：UPDATE ... SET stock = stock + ? WHERE id = ?）。
+     * 用于退款审核通过后的库存恢复（O-01 修复）。
+     */
+    int restoreStock(@Param("skuId") Long skuId, @Param("quantity") int quantity);
 }

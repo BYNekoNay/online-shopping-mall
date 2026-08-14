@@ -53,7 +53,8 @@ public class ProductController {
     @Operation(summary = "商品详情")
     @GetMapping("/{id}")
     public Result<ProductVO> detail(@PathVariable Long id) {
-        return Result.success(productService.getDetail(id));
+        // P-01/P-03 修复：消费者视角校验 ONLINE + 记录浏览行为
+        return Result.success(productService.getDetail(id, true));
     }
 
     @Operation(summary = "分类树")

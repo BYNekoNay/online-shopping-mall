@@ -89,7 +89,7 @@ public class BehaviorController {
     @Operation(summary = "我的收藏列表")
     @RequireRole(1)
     @GetMapping("/favorites")
-    public Result<List<Product>> favorites() {
+    public Result<List<com.pzhu.mall.modules.behavior.vo.FavoriteVO>> favorites() {
         Long userId = LoginUserContext.getCurrentUserId();
         LambdaQueryWrapper<UserBehavior> qw = new LambdaQueryWrapper<>();
         qw.eq(UserBehavior::getUserId, userId)
@@ -107,13 +107,14 @@ public class BehaviorController {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         List<Product> products = productMapper.selectBatchIds(productIds);
-        // 按收藏顺序返回，过滤已删除商品
+        // 按收藏顺序返回，过滤已删除商品（F-04 修复：返回轻量 FavoriteVO，避免 Product 大字段透出）
         Map<Long, Product> productMap = products.stream()
                 .filter(p -> p.getIsDeleted() == 0)
                 .collect(Collectors.toMap(Product::getId, p -> p, (a, b) -> a));
-        List<Product> ordered = behaviors.stream()
+        List<com.pzhu.mall.modules.behavior.vo.FavoriteVO> ordered = behaviors.stream()
                 .map(b -> productMap.get(b.getProductId()))
                 .filter(Objects::nonNull)
+                .map(com.pzhu.mall.modules.behavior.vo.FavoriteVO::from)
                 .collect(Collectors.toList());
         return Result.success(ordered);
     }

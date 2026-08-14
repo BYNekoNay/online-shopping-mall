@@ -13,4 +13,22 @@
       AND is_deleted = 0
   </update>
 
+  <!-- O-01 修复：退款审核通过后归还商品库存（单规格商品） -->
+  <update id="restoreStock">
+    UPDATE product
+    SET stock = stock + #{quantity},
+        update_time = NOW()
+    WHERE id = #{productId}
+      AND is_deleted = 0
+  </update>
+
+  <!-- O-04 修复：SKU 商品支付时同步 product.stock 的原子扣减（GREATEST 防负） -->
+  <update id="deductStockUnchecked">
+    UPDATE product
+    SET stock = GREATEST(stock - #{quantity}, 0),
+        update_time = NOW()
+    WHERE id = #{productId}
+      AND is_deleted = 0
+  </update>
+
 </mapper>

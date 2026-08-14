@@ -4,6 +4,7 @@ import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.shop.entity.Shop;
 import com.pzhu.mall.modules.shop.mapper.ShopMapper;
+import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
 import com.pzhu.mall.modules.shop.dto.ShopApplyDTO;
 import com.pzhu.mall.modules.shop.dto.ShopUpdateDTO;
@@ -29,6 +30,10 @@ public class ShopService {
      */
     @Transactional
     public ShopApplyStatusVO apply(Long merchantUserId, ShopApplyDTO dto) {
+        // SH-02 修复：空请求体防护（controller @Validated 仅校验非 null 请求体）
+        if (dto == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "入驻申请信息不能为空");
+        }
         // 查询是否已有申请记录
         var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Shop>();
         qw.eq(Shop::getMerchantUserId, merchantUserId).eq(Shop::getIsDeleted, 0);
@@ -122,6 +127,10 @@ public class ShopService {
 
     /**
      * 管理员审核店铺。
+     *
+     * <p>AD-01 修复：审核通过（approved=true）时，在同一事务内将店铺所属用户的角色
+     * 升级为 2（商家），使商家端 /api/merchant/* 与前端 /merchant 路由立即可用，
+     * 消除"入驻成功但商家端 403"的业务断裂。
      */
     @Transactional
     public void audit(Long shopId, boolean approved, String reason) {
@@ -141,6 +150,15 @@ public class ShopService {
         );
         if (updated == 0) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "店铺不处于待审核状态，无法审核");
+        }
+        // AD-01 修复：审核通过 → 联动升级商家角色（role=2），与店铺状态更新同事务
+        if (approved && shop.getMerchantUserId() != null) {
+            userMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<User>()
+                            .set(User::getRole, 2)
+                            .eq(User::getId, shop.getMerchantUserId())
+                            .eq(User::getIsDeleted, 0)
+            );
         }
     }
 

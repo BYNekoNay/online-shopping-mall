@@ -17,12 +17,19 @@ public class OperationLogService {
     private OperationLogMapper operationLogMapper;
 
     /**
-     * 记录操作日志。
+     * 记录操作日志（默认管理员角色）。
      */
     public void record(Long operatorId, String operation, String target) {
+        record(operatorId, 3, operation, target);
+    }
+
+    /**
+     * 记录操作日志（AD-06 修复：operatorRole 参数化，支持商家等非管理员操作方）。
+     */
+    public void record(Long operatorId, Integer operatorRole, String operation, String target) {
         OperationLog log = new OperationLog();
         log.setOperatorId(operatorId);
-        log.setOperatorRole(3); // 管理员
+        log.setOperatorRole(operatorRole != null ? operatorRole : 3);
         log.setOperation(operation);
         log.setTarget(target);
         log.setCreateTime(LocalDateTime.now());

@@ -32,15 +32,27 @@ public class AddressService {
 
     /**
      * 新增地址。
+     * <p>U-06 修复：用户无任何默认地址时，新地址自动设为默认（避免"无默认地址"状态）。</p>
      */
     @Transactional
     public Long add(Long userId, Address address) {
         address.setUserId(userId);
-        // 如果设为默认，先清除该用户的其他默认地址
-        if (address.getIsDefault() != null && address.getIsDefault() == 1) {
+        boolean isDefaultRequested = address.getIsDefault() != null && address.getIsDefault() == 1;
+        if (isDefaultRequested) {
+            // 如果设为默认，先清除该用户的其他默认地址
             var uw = new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Address>();
             uw.set(Address::getIsDefault, 0).eq(Address::getUserId, userId);
             addressMapper.update(null, uw);
+        } else {
+            // U-06 修复：用户还没有任何地址/默认地址时，自动设为默认
+            Long count = addressMapper.selectCount(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Address>()
+                            .eq(Address::getUserId, userId)
+                            .eq(Address::getIsDefault, 1)
+            );
+            if (count == null || count == 0) {
+                address.setIsDefault(1);
+            }
         }
         addressMapper.insert(address);
         return address.getId();
@@ -67,6 +79,7 @@ public class AddressService {
 
     /**
      * 删除地址。
+     * <p>U-05 修复：删除默认地址后，自动将最近创建的地址补为默认，避免"无默认地址"状态。</p>
      */
     @Transactional
     public void delete(Long userId, Long addressId) {
@@ -74,6 +87,20 @@ public class AddressService {
         if (exist == null || !Objects.equals(exist.getUserId(), userId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
+        boolean wasDefault = exist.getIsDefault() != null && exist.getIsDefault() == 1;
         addressMapper.deleteById(addressId);
+        // U-05 修复：删除默认地址后补位
+        if (wasDefault) {
+            List<Address> rest = addressMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Address>()
+                            .eq(Address::getUserId, userId)
+                            .orderByDesc(Address::getCreateTime)
+            );
+            if (!rest.isEmpty()) {
+                Address first = rest.get(0);
+                first.setIsDefault(1);
+                addressMapper.updateById(first);
+            }
+        }
     }
 }

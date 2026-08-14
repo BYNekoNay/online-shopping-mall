@@ -10,6 +10,7 @@ import com.pzhu.mall.modules.order.entity.OrderItem;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
 import com.pzhu.mall.modules.order.component.OrderNoGenerator;
+import com.pzhu.mall.modules.order.component.StockService;
 import com.pzhu.mall.modules.order.vo.OrderVO;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.entity.Sku;
@@ -23,6 +24,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -56,6 +59,9 @@ public class OrderGroupProcessor {
 
     @Resource
     private FreightService freightService;
+
+    @Resource
+    private StockService stockService;
 
     @Resource
     private com.pzhu.mall.modules.marketing.service.PromotionService promotionService;
@@ -127,6 +133,54 @@ public class OrderGroupProcessor {
             orderItems.add(oi);
         }
 
+        // M-01 修复：满赠促销（type=3）——商品金额达标时赠送指定 SKU（赠品行 price=0、is_gift=1）。
+        // 赠品需预扣库存，库存不足/配置非法/异常时静默跳过赠送、不阻断下单（docs/10 §2.4.2）。
+        // 赠品行不参与 goodsAmount/freight/payAmount 计算；随订单一并出库（支付时 DB 实扣），
+        // 事务回滚时通过 afterCompletion 自动归还预扣的 Redis 库存。
+        com.pzhu.mall.modules.marketing.service.PromotionService.GiftInfo gift =
+                promotionService.matchGift(shopId, goodsAmount);
+        if (gift != null) {
+            try {
+                Sku giftSku = skuMapper.selectById(gift.giftSkuId());
+                Product giftProduct = productMapper.selectById(gift.giftProductId());
+                boolean valid = giftSku != null && giftProduct != null
+                        && giftProduct.getIsDeleted() != null && giftProduct.getIsDeleted() == 0
+                        && gift.giftProductId().equals(giftSku.getProductId());
+                if (!valid) {
+                    log.warn("[订单] 满赠：赠品 SKU 绑定校验失败，跳过赠送 giftProductId={} giftSkuId={}",
+                            gift.giftProductId(), gift.giftSkuId());
+                } else if (stockService.deduct(gift.giftSkuId(), gift.giftQuantity())) {
+                    OrderItem giftItem = new OrderItem();
+                    giftItem.setProductId(gift.giftProductId());
+                    giftItem.setSkuId(gift.giftSkuId());
+                    giftItem.setProductNameSnapshot(giftProduct.getName());
+                    giftItem.setProductImageSnapshot(giftSku.getImage() != null ? giftSku.getImage() : giftProduct.getMainImage());
+                    giftItem.setPrice(BigDecimal.ZERO);
+                    giftItem.setQuantity(gift.giftQuantity());
+                    giftItem.setIsGift(1);
+                    orderItems.add(giftItem);
+                    // 事务回滚时自动归还赠品预扣的 Redis 库存（提交成功则随订单出库）
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                                try {
+                                    stockService.rollback(gift.giftSkuId(), gift.giftQuantity());
+                                } catch (Exception e) {
+                                    log.error("[订单] 回滚后赠品库存归还失败 skuId={}（需人工对账）", gift.giftSkuId(), e);
+                                }
+                            }
+                        }
+                    });
+                    log.info("[订单] 满赠：店铺{} 金额{} 赠送 SKU{} ×{}", shopId, goodsAmount, gift.giftSkuId(), gift.giftQuantity());
+                } else {
+                    log.warn("[订单] 满赠：赠品库存不足，跳过赠送 shopId={} giftSkuId={}", shopId, gift.giftSkuId());
+                }
+            } catch (Exception e) {
+                log.warn("[订单] 满赠处理异常，跳过赠送（不阻断下单）shopId={}", shopId, e);
+            }
+        }
+
         // 计算运费
         BigDecimal freightAmount = freightService.calculate(shopId, province, goodsAmount);
 
@@ -135,9 +189,18 @@ public class OrderGroupProcessor {
 
         // 优惠券抵扣（通过 userCouponId 查找关联的 Coupon 模板）
         // H-6 修复：仅在首个成功分组计价，防止一张券在多个店铺分组被重复抵扣
+        // M-02 修复：传 userId/shopId/品类ID 列表，校验券适用范围（店铺券/品类券），不匹配返回 0
         BigDecimal couponDiscount = BigDecimal.ZERO;
         if (applyCoupon && dto.getUserCouponId() != null) {
-            couponDiscount = couponService.calculateDiscountByUserCoupon(dto.getUserCouponId(), goodsAmount);
+            List<Long> categoryIds = new ArrayList<>();
+            for (ProductItemDTO item : groupItems) {
+                Product p = productMapper.selectById(item.getProductId());
+                if (p != null && p.getCategoryId() != null) {
+                    categoryIds.add(p.getCategoryId());
+                }
+            }
+            couponDiscount = couponService.calculateDiscountByUserCoupon(
+                    dto.getUserCouponId(), goodsAmount, userId, shopId, categoryIds);
         }
 
         // 积分抵扣
@@ -196,8 +259,12 @@ public class OrderGroupProcessor {
 
         // 记录购买行为
         // M-06 修复：行为埋点为 best-effort，失败不应回滚订单事务
+        // M-01 修复：排除赠品行（is_gift=1），避免赠品商品被记为"购买"污染推荐矩阵
         try {
             for (OrderItem oi : orderItems) {
+                if (oi.getIsGift() != null && oi.getIsGift() == 1) {
+                    continue;
+                }
                 behaviorService.record(userId, oi.getProductId(), 3);
             }
         } catch (Exception e) {

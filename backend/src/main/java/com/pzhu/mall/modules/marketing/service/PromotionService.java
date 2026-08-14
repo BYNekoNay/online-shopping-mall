@@ -111,6 +111,61 @@ public class PromotionService {
     }
 
     /**
+     * 满赠信息（type=3 促销命中后的赠品配置）。
+     *
+     * @param giftProductId 赠品商品 ID
+     * @param giftSkuId     赠品 SKU ID（须属于 giftProductId）
+     * @param giftQuantity  赠送数量
+     */
+    public record GiftInfo(Long giftProductId, Long giftSkuId, Integer giftQuantity) {
+    }
+
+    /**
+     * M-01 修复：匹配店铺当前生效的满赠促销（type=3）。
+     * <p>ruleJson = {"threshold":150.00,"giftProductId":5001,"giftSkuId":50011,"giftQuantity":1}，
+     * 商品金额（不含运费）达到 threshold 时返回赠品配置；不达标/配置非法/解析失败返回 null（容错）。
+     * 满赠不产生金额抵扣（金额计算维持 0），赠品行由下单处理器插入。</p>
+     *
+     * @param shopId      下单店铺 ID
+     * @param goodsAmount 该分组商品金额（不含运费）
+     * @return 命中满赠的赠品配置，未命中返回 null
+     */
+    public GiftInfo matchGift(Long shopId, BigDecimal goodsAmount) {
+        if (goodsAmount == null || shopId == null) {
+            return null;
+        }
+        List<Promotion> promotions = listActiveByShop(shopId);
+        for (Promotion p : promotions) {
+            if (p.getType() == null || p.getType() != 3 || p.getRuleJson() == null || p.getRuleJson().isEmpty()) {
+                continue;
+            }
+            try {
+                java.util.Map<String, Object> rule = OBJECT_MAPPER.readValue(p.getRuleJson(), java.util.Map.class);
+                Object thresholdObj = rule.getOrDefault("threshold", 0);
+                BigDecimal threshold = new BigDecimal(thresholdObj.toString());
+                if (goodsAmount.compareTo(threshold) < 0) {
+                    continue;
+                }
+                Object giftProductObj = rule.get("giftProductId");
+                Object giftSkuObj = rule.get("giftSkuId");
+                if (giftProductObj == null || giftSkuObj == null) {
+                    log.warn("[促销] 满赠配置缺少 giftProductId/giftSkuId promotionId={}", p.getId());
+                    continue;
+                }
+                int giftQuantity = ((Number) rule.getOrDefault("giftQuantity", 1)).intValue();
+                if (giftQuantity <= 0) {
+                    giftQuantity = 1;
+                }
+                log.info("[促销] 满赠命中 shopId={} 金额={} 赠送 SKU={} ×{}", shopId, goodsAmount, giftSkuObj, giftQuantity);
+                return new GiftInfo(Long.valueOf(giftProductObj.toString()), Long.valueOf(giftSkuObj.toString()), giftQuantity);
+            } catch (Exception e) {
+                log.warn("[促销] 解析满赠 rule_json 失败 promotionId={} rule={}", p.getId(), p.getRuleJson(), e);
+            }
+        }
+        return null;
+    }
+
+    /**
      * 查询所有进行中促销（消费者端）。
      */
     public List<Promotion> listActive() {
@@ -136,20 +191,56 @@ public class PromotionService {
 
     /**
      * 创建促销活动（管理端）。
+     * <p>M-06 修复：入参校验（名称/类型/scope/时间窗/rule_json 合法性）。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public void create(Promotion promotion) {
+        validatePromotion(promotion);
         promotionMapper.insert(promotion);
         log.info("[促销] 管理员创建促销 name={} type={} scope={}", promotion.getName(), promotion.getType(), promotion.getScope());
     }
 
     /**
      * 更新促销活动（管理端）。
+     * <p>M-06 修复：同 create 校验（部分更新场景仅校验非 null 字段）。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public void update(Promotion promotion) {
+        validatePromotion(promotion);
         promotionMapper.updateById(promotion);
         log.info("[促销] 管理员更新促销 id={}", promotion.getId());
+    }
+
+    /**
+     * M-06 修复：管理端促销入参校验。
+     */
+    private void validatePromotion(Promotion p) {
+        if (p == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销信息不能为空");
+        }
+        if (p.getName() == null || p.getName().isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销名称不能为空");
+        }
+        if (p.getName().length() > 50) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销名称过长（≤50）");
+        }
+        if (p.getType() == null || (p.getType() < 1 || p.getType() > 4)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销类型仅支持 1=限时折扣/2=满减/3=满赠/4=组合套餐");
+        }
+        if (p.getScope() == null || p.getScope().isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销范围 scope 不能为空（PRODUCT/CATEGORY/SHOP）");
+        }
+        if (p.getStartTime() != null && p.getEndTime() != null
+                && !p.getEndTime().isAfter(p.getStartTime())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "活动结束时间必须晚于开始时间");
+        }
+        if (p.getRuleJson() != null && !p.getRuleJson().isBlank()) {
+            try {
+                OBJECT_MAPPER.readTree(p.getRuleJson());
+            } catch (Exception e) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "活动规则 rule_json 必须是合法 JSON");
+            }
+        }
     }
 
     /**

@@ -13,12 +13,17 @@ import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
 import com.pzhu.mall.modules.order.mapper.RefundMapper;
 import com.pzhu.mall.modules.order.vo.RefundVO;
 import com.pzhu.mall.security.LoginUserContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -28,6 +33,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class RefundService {
+
+    private static final Logger log = LoggerFactory.getLogger(RefundService.class);
 
     @Resource
     private RefundMapper refundMapper;
@@ -43,6 +50,12 @@ public class RefundService {
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private com.pzhu.mall.modules.product.mapper.ProductMapper productMapper;
+
+    @Resource
+    private com.pzhu.mall.modules.product.mapper.SkuMapper skuMapper;
 
     /** 退款幂等 key 过期时间（3 天） */
     private static final long REFUND_IDEMPOTENT_TTL_HOURS = 72;
@@ -60,13 +73,6 @@ public class RefundService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void apply(RefundApplyDTO dto) {
-        // 0. 幂等校验（Redis SET NX）
-        String idempotentKey = RedisKeyPrefix.ORDER + ":refund:apply:" + dto.getOrderId() + ":" + (dto.getOrderItemId() != null ? dto.getOrderItemId() : "all");
-        Boolean alreadyApplied = stringRedisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", REFUND_IDEMPOTENT_TTL_HOURS, TimeUnit.HOURS);
-        if (alreadyApplied != null && !alreadyApplied) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "已提交过退款申请，请勿重复操作");
-        }
-
         // 1. 校验退款金额不超过订单实付金额
         Order order = orderMapper.selectById(dto.getOrderId());
         if (order == null) {
@@ -114,6 +120,14 @@ public class RefundService {
             if (item.getIsGift() != null && item.getIsGift() == 1) {
                 throw new BusinessException(ErrorCode.PARAM_ERROR, "赠品不允许单独退款");
             }
+        }
+
+        // O-02 修复：幂等键移至全部校验通过后写入。
+        // 此前在校验前 SET NX，校验失败（金额超限/状态不符/赠品）后同订单 72h 内无法重试。
+        String idempotentKey = RedisKeyPrefix.ORDER + ":refund:apply:" + dto.getOrderId() + ":" + (dto.getOrderItemId() != null ? dto.getOrderItemId() : "all");
+        Boolean alreadyApplied = stringRedisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", REFUND_IDEMPOTENT_TTL_HOURS, TimeUnit.HOURS);
+        if (alreadyApplied != null && !alreadyApplied) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "已提交过退款申请，请勿重复操作");
         }
 
         // 3. 创建退款记录
@@ -179,10 +193,79 @@ public class RefundService {
                                 .ne(Order::getStatus, 7)
                 );
             }
+            // O-01 修复：退款审核通过后恢复库存。
+            // 支付时已 DB 实扣（skuMapper.deductStock / productMapper.deductStock），
+            // 此处按订单明细逐行归还 DB 库存（sku/product 原子 UPDATE），并同步 Redis 预扣 key 归还，
+            // 与 doCancel 的归还口径一致（DB 实扣必须 DB 归还，仅 Redis INCR 会造成 DB 库存永久丢失）。
+            restoreStock(order.getId());
             // 扣回积分
             pointsService.clawback(refund.getOrderId());
             // H-5 修复：返还下单时抵扣的积分（支付已撤销，作为支付手段的积分应退回；方法自带幂等守卫）
             pointsService.refundDeduct(refund.getOrderId());
+            // L2-05 规则声明：退款审核通过后优惠券不退还（券已核销，退款不恢复用券资格，
+            // 与主流电商"退款退钱不退券"规则一致）；如后续需求要求按比例退券，在此补充实现
+        }
+    }
+
+    /**
+     * O-01 + RV-01 修复：退款审核通过后恢复库存。
+     * <p>支付时已 DB 实扣，此处按订单明细逐行归还 DB 库存（sku/product 原子 UPDATE，事务内，
+     * 与订单状态更新原子一致）；Redis 预扣 key 的归还注册 {@code afterCommit}（事务提交后执行）——
+     * 事务回滚时 DB 自动回滚、Redis 不误还，与 L2-02 doCancel 的归还口径一致。</p>
+     */
+    private void restoreStock(Long orderId) {
+        List<OrderItem> items = orderItemMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
+                        .eq(OrderItem::getOrderId, orderId)
+        );
+        if (items == null) return;
+        List<Object[]> skuRestores = new ArrayList<>();
+        List<Object[]> productRestores = new ArrayList<>();
+        for (OrderItem item : items) {
+            if (item.getQuantity() == null || item.getQuantity() <= 0) continue;
+            if (item.getSkuId() != null) {
+                skuMapper.restoreStock(item.getSkuId(), item.getQuantity());
+                skuRestores.add(new Object[]{item.getSkuId(), item.getQuantity()});
+            } else {
+                productMapper.restoreStock(item.getProductId(), item.getQuantity());
+                productRestores.add(new Object[]{item.getProductId(), item.getQuantity()});
+            }
+        }
+        // Redis 预扣 key 归还：事务提交后执行（RV-01，回滚时不误还）
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+                && (!skuRestores.isEmpty() || !productRestores.isEmpty())) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    for (Object[] r : skuRestores) {
+                        try {
+                            stringRedisTemplate.opsForValue().increment(RedisKeyPrefix.STOCK + ":" + r[0], (Integer) r[1]);
+                        } catch (Exception e) {
+                            // DB 已归还，Redis key 下次扣减时由懒加载兜底覆盖
+                            if (log.isDebugEnabled()) {
+                                log.debug("[退款] Redis SKU 库存归还失败 skuId={}（DB 已归还）", r[0], e);
+                            }
+                        }
+                    }
+                    for (Object[] r : productRestores) {
+                        try {
+                            stringRedisTemplate.opsForValue().increment(RedisKeyPrefix.STOCK + ":product:" + r[0], (Integer) r[1]);
+                        } catch (Exception e) {
+                            if (log.isDebugEnabled()) {
+                                log.debug("[退款] Redis 商品库存归还失败 productId={}（DB 已归还）", r[0], e);
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            // 无活动事务（防御分支）：直接归还
+            for (Object[] r : skuRestores) {
+                stringRedisTemplate.opsForValue().increment(RedisKeyPrefix.STOCK + ":" + r[0], (Integer) r[1]);
+            }
+            for (Object[] r : productRestores) {
+                stringRedisTemplate.opsForValue().increment(RedisKeyPrefix.STOCK + ":product:" + r[0], (Integer) r[1]);
+            }
         }
     }
 

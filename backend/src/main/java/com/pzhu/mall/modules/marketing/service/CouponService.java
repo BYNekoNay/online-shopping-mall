@@ -56,6 +56,16 @@ public class CouponService {
         if (coupon.getReceivedCount() >= coupon.getStock()) {
             throw new BusinessException(ErrorCode.COUPON_SOLD_OUT);
         }
+        // M-03 修复：每人限领 1 张（与 listAvailable"已领排除"口径一致）。
+        // 原实现仅靠列表接口排除已领，receive 接口可被直接调用重复领取，此处后端兜底校验
+        Long alreadyCount = userCouponMapper.selectCount(
+                new LambdaQueryWrapper<UserCoupon>()
+                        .eq(UserCoupon::getUserId, userId)
+                        .eq(UserCoupon::getCouponId, couponId)
+        );
+        if (alreadyCount != null && alreadyCount > 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "每人限领 1 张，请勿重复领取");
+        }
 
         // 乐观更新防超发
         int updated = couponMapper.update(null,
@@ -151,11 +161,77 @@ public class CouponService {
      *
      * <p>与 {@link #calculateDiscount(Long, BigDecimal)} 的区别在于
      * 此方法先通过 UserCoupon 记录找到对应的 Coupon 模板。
+     *
+     * <p>M-02 修复：使用前校验适用范围——归属、状态（未使用）、有效期、
+     * 店铺券（type=4）须匹配下单店铺 shopId、品类券（type=3）须匹配分组内商品品类。
+     * 校验不通过返回 0（不抵扣、不阻断下单），避免跨店/跨品类错误折扣。
+     *
+     * @param userCouponId UserCoupon 记录 ID
+     * @param goodsAmount  参与优惠的商品金额
+     * @param userId       当前用户 ID（归属校验）
+     * @param shopId       下单店铺 ID（店铺券校验，null 时不校验）
+     * @param categoryIds  分组内商品品类 ID 列表（品类券校验，null 时不校验）
      */
-    public BigDecimal calculateDiscountByUserCoupon(Long userCouponId, BigDecimal goodsAmount) {
+    public BigDecimal calculateDiscountByUserCoupon(Long userCouponId, BigDecimal goodsAmount,
+                                                    Long userId, Long shopId, List<Long> categoryIds) {
         UserCoupon uc = userCouponMapper.selectById(userCouponId);
         if (uc == null) return BigDecimal.ZERO;
-        return calculateDiscount(uc.getCouponId(), goodsAmount);
+        // M-02 修复①：归属校验
+        if (userId != null && (uc.getUserId() == null || !uc.getUserId().equals(userId))) {
+            return BigDecimal.ZERO;
+        }
+        // M-02 修复②：状态校验（仅未使用）
+        if (uc.getStatus() == null || uc.getStatus() != 0) {
+            return BigDecimal.ZERO;
+        }
+        Coupon coupon = couponMapper.selectById(uc.getCouponId());
+        if (coupon == null || coupon.getIsDeleted() == 1) {
+            return BigDecimal.ZERO;
+        }
+        // M-02 修复③：有效期校验
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isAfter(coupon.getValidTo())
+                || (coupon.getValidFrom() != null && now.isBefore(coupon.getValidFrom()))) {
+            return BigDecimal.ZERO;
+        }
+        // M-02 修复④：店铺券（type=4）须匹配下单店铺
+        if (coupon.getType() != null && coupon.getType() == 4 && shopId != null) {
+            if (coupon.getShopId() == null || !coupon.getShopId().equals(shopId)) {
+                log.warn("[优惠券] 店铺券不适用当前店铺 userCouponId={} couponShopId={} orderShopId={}", userCouponId, coupon.getShopId(), shopId);
+                return BigDecimal.ZERO;
+            }
+        }
+        // M-02 修复⑤：品类券（type=3）须匹配分组内商品品类
+        if (coupon.getType() != null && coupon.getType() == 3 && categoryIds != null && !categoryIds.isEmpty()) {
+            Long ruleCategoryId = parseCategoryId(coupon.getDiscountRule());
+            if (ruleCategoryId != null && !categoryIds.contains(ruleCategoryId)) {
+                log.warn("[优惠券] 品类券不适用当前品类 userCouponId={} ruleCategoryId={} orderCategories={}", userCouponId, ruleCategoryId, categoryIds);
+                return BigDecimal.ZERO;
+            }
+        }
+        return parseAndCalc(coupon.getDiscountRule(), goodsAmount, "userCouponId=" + userCouponId);
+    }
+
+    /**
+     * 兼容旧调用：不校验适用范围（仅保留归属查询语义，建议使用带校验的新重载）。
+     */
+    public BigDecimal calculateDiscountByUserCoupon(Long userCouponId, BigDecimal goodsAmount) {
+        return calculateDiscountByUserCoupon(userCouponId, goodsAmount, null, null, null);
+    }
+
+    /**
+     * M-02 修复：解析品类券 discount_rule 内嵌的 categoryId。
+     */
+    private Long parseCategoryId(String ruleJson) {
+        if (ruleJson == null || ruleJson.isEmpty()) return null;
+        try {
+            java.util.Map<String, Object> rule = MAPPER.readValue(ruleJson, java.util.Map.class);
+            Object v = rule.get("categoryId");
+            return v == null ? null : Long.valueOf(((Number) v).longValue());
+        } catch (Exception e) {
+            log.warn("[优惠券] 解析品类券 categoryId 失败 rule={}", ruleJson, e);
+            return null;
+        }
     }
 
     /**
@@ -241,18 +317,54 @@ public class CouponService {
 
     /**
      * 创建优惠券（管理端）。
+     * <p>M-06 修复：入参校验（名称/类型/库存/有效期/discount_rule JSON 合法性）。</p>
      */
     public void create(Coupon coupon) {
+        validateCoupon(coupon);
         couponMapper.insert(coupon);
         log.info("[优惠券] 管理员创建优惠券 name={} type={}", coupon.getName(), coupon.getType());
     }
 
     /**
      * 更新优惠券（管理端）。
+     * <p>M-06 修复：同 create 校验（部分更新场景仅校验非 null 字段）。</p>
      */
     public void update(Coupon coupon) {
+        validateCoupon(coupon);
         couponMapper.updateById(coupon);
         log.info("[优惠券] 管理员更新优惠券 id={}", coupon.getId());
+    }
+
+    /**
+     * M-06 修复：管理端券入参校验（创建必填，更新按非 null 字段校验）。
+     */
+    private void validateCoupon(Coupon coupon) {
+        if (coupon == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "优惠券信息不能为空");
+        }
+        if (coupon.getName() == null || coupon.getName().isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "优惠券名称不能为空");
+        }
+        if (coupon.getName().length() > 50) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "优惠券名称过长（≤50）");
+        }
+        if (coupon.getType() == null || (coupon.getType() < 1 || coupon.getType() > 4)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "优惠券类型仅支持 1=新人/2=满减/3=品类/4=店铺");
+        }
+        if (coupon.getStock() != null && coupon.getStock() < 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "库存不能为负数");
+        }
+        if (coupon.getValidFrom() != null && coupon.getValidTo() != null
+                && !coupon.getValidTo().isAfter(coupon.getValidFrom())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "有效期结束时间必须晚于开始时间");
+        }
+        if (coupon.getDiscountRule() != null && !coupon.getDiscountRule().isBlank()) {
+            try {
+                MAPPER.readTree(coupon.getDiscountRule());
+            } catch (Exception e) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "优惠规则 discount_rule 必须是合法 JSON");
+            }
+        }
     }
 
     /**

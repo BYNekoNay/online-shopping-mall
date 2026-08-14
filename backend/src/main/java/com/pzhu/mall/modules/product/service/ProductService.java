@@ -92,8 +92,10 @@ public class ProductService {
         }
         if (query.getKeyword() != null && !query.getKeyword().isEmpty()) {
             qw.like(Product::getName, query.getKeyword());
-            // 异步记录搜索历史（简单直接调用，量级小无需消息队列）
-            recordSearchHistory(query.getKeyword());
+            // P-08 修复：仅首页搜索记录历史，翻页不再重复写入（此前每条分页都记录导致重复）
+            if (query.getPageNum() == null || query.getPageNum() <= 1) {
+                recordSearchHistory(query.getKeyword());
+            }
         }
         if (query.getMinPrice() != null) {
             qw.ge(Product::getPrice, query.getMinPrice());
@@ -151,12 +153,27 @@ public class ProductService {
     }
 
     /**
-     * 商品详情。
+     * 商品详情（消费者视角：校验 ONLINE + 记浏览行为）。
+     * <p>P-01/P-03 修复：拆分消费者与商家/管理员视角——
+     * 消费者端直链下架/待审核商品返回下架错误；商家/管理员查看自家商品详情放行且不记浏览行为（避免污染推荐矩阵）。</p>
      */
     public ProductVO getDetail(Long productId) {
+        return getDetail(productId, false);
+    }
+
+    /**
+     * 商品详情。
+     *
+     * @param consumerView true=消费者视角（校验 ONLINE、记浏览行为）；false=商家/管理端视角（放行、不记行为）
+     */
+    public ProductVO getDetail(Long productId, boolean consumerView) {
         Product product = productMapper.selectById(productId);
         if (product == null || product.getIsDeleted() == 1) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+        // P-01 修复：消费者视角下，非上架商品（下架/待审核/已拒绝）通过直链访问返回下架错误
+        if (consumerView && ProductStatus.of(product.getStatus()) != ProductStatus.ONLINE) {
+            throw new BusinessException(ErrorCode.PRODUCT_OFFLINE_ORDER);
         }
         ProductVO vo = toVO(product);
 
@@ -166,10 +183,12 @@ public class ProductService {
             vo.setActivePromotion(promotions.get(0));
         }
 
-        // 记录浏览行为（behaviorType=1）
-        Long currentUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
-        if (currentUserId != null) {
-            behaviorService.record(currentUserId, productId, 1);
+        // P-03 修复：仅消费者视角记录浏览行为（商家/管理员看详情不污染推荐数据）
+        if (consumerView) {
+            Long currentUserId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+            if (currentUserId != null) {
+                behaviorService.record(currentUserId, productId, 1);
+            }
         }
 
         return vo;
@@ -177,6 +196,39 @@ public class ProductService {
 
     public ProductVO toVO(Product product) {
         return toVO(product, null, null);
+    }
+
+    /**
+     * AD-04 修复：批量构建 VO（一次查询 category + sku，消除 N+1）。
+     * 供管理员商品列表等场景使用。
+     */
+    public java.util.List<ProductVO> toVOList(java.util.List<Product> products) {
+        if (products == null || products.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        java.util.Set<Long> categoryIds = products.stream()
+                .map(Product::getCategoryId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, String> categoryNameMap = new java.util.HashMap<>();
+        if (!categoryIds.isEmpty()) {
+            categoryMapper.selectBatchIds(categoryIds)
+                    .forEach(c -> categoryNameMap.put(c.getId(), c.getName()));
+        }
+        java.util.Set<Long> productIds = products.stream()
+                .map(Product::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, List<com.pzhu.mall.modules.product.entity.Sku>> skuMap = new java.util.HashMap<>();
+        if (!productIds.isEmpty()) {
+            var skuQw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.product.entity.Sku>();
+            skuQw.in(com.pzhu.mall.modules.product.entity.Sku::getProductId, productIds)
+                    .eq(com.pzhu.mall.modules.product.entity.Sku::getIsDeleted, 0);
+            skuMapper.selectList(skuQw).forEach(sku ->
+                    skuMap.computeIfAbsent(sku.getProductId(), k -> new java.util.ArrayList<>()).add(sku));
+        }
+        return products.stream()
+                .map(p -> toVO(p, categoryNameMap.get(p.getCategoryId()), skuMap.getOrDefault(p.getId(), null)))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /**

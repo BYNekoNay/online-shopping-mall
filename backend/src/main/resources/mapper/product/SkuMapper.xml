@@ -12,4 +12,13 @@
       AND is_deleted = 0
   </update>
 
+  <!-- O-01 修复：退款审核通过后归还 SKU 库存 -->
+  <update id="restoreStock">
+    UPDATE sku
+    SET stock = stock + #{quantity},
+        update_time = NOW()
+    WHERE id = #{skuId}
+      AND is_deleted = 0
+  </update>
+
 </mapper>

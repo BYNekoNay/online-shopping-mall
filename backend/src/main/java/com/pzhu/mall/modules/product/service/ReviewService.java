@@ -46,6 +46,10 @@ public class ReviewService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void submit(Long orderItemId, Long userId, Integer rating, String content, String imagesJson) {
+        // O-10/P-11 修复：评分必须为 1~5 的整数，越界直接拒绝（此前任意值可入库）
+        if (rating == null || rating < 1 || rating > 5) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "评分必须在 1~5 之间");
+        }
         OrderItem item = orderItemMapper.selectById(orderItemId);
         if (item == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);

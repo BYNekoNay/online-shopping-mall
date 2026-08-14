@@ -148,18 +148,18 @@ public class RecommendCalculateService {
         // 7. 对每个有行为的用户生成推荐
         LocalDateTime now = LocalDateTime.now();
         List<RecommendResult> allResults = new ArrayList<>();
-        int hybridCount = 0, coldStartCount = 0, hotFallbackCount = 0;
+        int hybridCount = 0, coldStartCount = 0;
 
-        for (Long userId : ratingMatrix.keySet()) {
-            Map<Long, Double> userRatings = ratingMatrix.get(userId);
+        // WMI_WRONG_MAP_ITERATOR 修复：直接遍历 entrySet，避免 keySet 循环内重复 get
+        for (Map.Entry<Long, Map<Long, Double>> matrixEntry : ratingMatrix.entrySet()) {
+            Long userId = matrixEntry.getKey();
+            Map<Long, Double> userRatings = matrixEntry.getValue();
             int behaviorCount = userRatings.size();
 
             List<RecommendResult> userResults;
-            if (behaviorCount == 0) {
-                // 纯新用户：纯热门兜底（user_id=NULL，全局共享）
-                userResults = buildHotResults(null, hotRank, productMap, ALGO_HOT);
-                hotFallbackCount++;
-            } else if (behaviorCount < T_LOW) {
+            // R-01 修复：ratingMatrix 仅含有行为用户，behaviorCount==0 分支为死代码，删除。
+            // 匿名/纯新用户（无 user_behavior 记录）不在本循环内，查询时走 RecommendService 热门兜底。
+            if (behaviorCount < T_LOW) {
                 // 低活跃：ItemCF + 热门补位
                 userResults = buildColdStartResults(userId, userRatings, itemSimilarity, hotRank, productMap);
                 coldStartCount++;
@@ -175,14 +175,6 @@ public class RecommendCalculateService {
             allResults.addAll(userResults);
         }
 
-        // 8. 为纯新用户（无任何行为）也生成全局热门兜底
-        List<Long> allUserIds = userBehaviorMapper.selectList(
-                new LambdaQueryWrapper<UserBehavior>().select(UserBehavior::getUserId)
-        ).stream().map(UserBehavior::getUserId).collect(Collectors.toList());
-        Set<Long> existingUserIds = new HashSet<>(ratingMatrix.keySet());
-        // 注意：纯新用户（无 user_behavior 记录）不在 ratingMatrix 中
-        // 他们的推荐结果将在查询时动态返回热门兜底，无需在此预生成
-
         // 9. 批量写入数据库（清旧数据 + batch insert，事务保护）
         if (!allResults.isEmpty()) {
             boolean removed = recommendResultService.remove(new LambdaQueryWrapper<>());
@@ -193,8 +185,8 @@ public class RecommendCalculateService {
         }
 
         long totalMs = System.currentTimeMillis() - start;
-        log.info("[推荐-全量计算] 完成！混合={} 冷启动={} 热门兜底={} 总耗时={}ms",
-                hybridCount, coldStartCount, hotFallbackCount, totalMs);
+        log.info("[推荐-全量计算] 完成！混合={} 冷启动={} 总耗时={}ms",
+                hybridCount, coldStartCount, totalMs);
     }
 
     // ==================== 评分矩阵构建 ====================
@@ -420,7 +412,10 @@ public class RecommendCalculateService {
         }
 
         // 计算销量的最大最小值（用于归一化）
-        double maxSales = products.stream().mapToDouble(p -> p.getSales() != null ? p.getSales() : 0).max().orElse(0.0);
+        // BX_UNBOXED 修复：Integer 拆箱显式化（避免三元装箱再强转）
+        double maxSales = products.stream()
+                .mapToDouble(p -> p.getSales() != null ? p.getSales().intValue() : 0)
+                .max().orElse(0.0);
         double maxSalesSafe = Math.max(maxSales, 1.0);
 
         // 计算交互数的最大最小值（用于归一化）
@@ -429,7 +424,7 @@ public class RecommendCalculateService {
 
         List<Map.Entry<Long, Double>> ranked = new ArrayList<>();
         for (Product p : products) {
-            double normSales = (p.getSales() != null ? p.getSales() : 0) / maxSalesSafe;
+            double normSales = (p.getSales() != null ? p.getSales().intValue() : 0) / maxSalesSafe;
             double normViews = interactionCount.getOrDefault(p.getId(), 0) / maxInteractSafe;
             double hotScore = HOT_W1 * normSales + HOT_W2 * normViews;
             ranked.add(new AbstractMap.SimpleEntry<>(p.getId(), hotScore));

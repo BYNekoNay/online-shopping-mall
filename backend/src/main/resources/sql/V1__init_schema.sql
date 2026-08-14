@@ -472,3 +472,16 @@ INSERT INTO `dict` (`dict_type`, `dict_key`, `dict_value`, `sort`) VALUES
 ('ORDER_STATUS', '5', '已取消', 6),
 ('ORDER_STATUS', '6', '退款中', 7),
 ('ORDER_STATUS', '7', '已退款', 8);
+
+-- ==================== BE-02：推荐位曝光/点击日志（CTR 真实统计） ====================
+CREATE TABLE IF NOT EXISTS `recommend_exposure_log` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT NULL COMMENT '曝光用户（未登录为 NULL）',
+  `source` VARCHAR(32) NOT NULL DEFAULT 'home-guess' COMMENT '推荐位来源：home-guess / product-similar',
+  `product_id` BIGINT NOT NULL COMMENT '曝光/点击商品',
+  `clicked` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否被点击：0-仅曝光，1-点击',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_product_time` (`user_id`, `product_id`, `create_time`),
+  KEY `idx_source_time` (`source`, `create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推荐位曝光/点击日志（CTR 统计）';

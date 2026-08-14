@@ -14,4 +14,17 @@ public interface ProductMapper extends BaseMapper<Product> {
      * 在下单、支付全链路零库存控制，可被无限超卖。</p>
      */
     boolean deductStock(@Param("productId") Long productId, @Param("quantity") int quantity);
+
+    /**
+     * 库存归还（原子操作：UPDATE ... SET stock = stock + ? WHERE id = ?）。
+     * 用于退款审核通过后的库存恢复（O-01 修复）。
+     */
+    int restoreStock(@Param("productId") Long productId, @Param("quantity") int quantity);
+
+    /**
+     * O-04 修复：商品总库存的原子扣减（GREATEST 防负），
+     * 用于 SKU 商品支付时同步 product.stock，替代"select + set + updateById"非原子读改写。
+     * 与 deductStock 的区别：不做 stock >= ? 条件判断（sku 已原子扣减，product.stock 为汇总冗余）。
+     */
+    int deductStockUnchecked(@Param("productId") Long productId, @Param("quantity") int quantity);
 }

@@ -26,6 +26,8 @@ public class RecommendController {
     @Operation(summary = "猜你喜欢（公开，可选登录）")
     @GetMapping("/guess-you-like")
     public Result<List<RecommendVO>> guessYouLike(@RequestParam(defaultValue = "10") Integer num) {
+        // R-08 修复：num 钳制到 [1,50]，防超大值大查询（DoS 面）
+        num = clampNum(num);
         Long userId = LoginUserContext.getCurrentUserId();
         return Result.success(recommendService.guessYouLike(userId, num));
     }
@@ -34,6 +36,16 @@ public class RecommendController {
     @GetMapping("/similar/{productId}")
     public Result<List<RecommendVO>> similar(@PathVariable Long productId,
                                             @RequestParam(defaultValue = "10") Integer num) {
+        // R-08 修复：num 钳制到 [1,50]
+        num = clampNum(num);
         return Result.success(recommendService.similar(productId, num));
+    }
+
+    /** R-08 修复：推荐数量参数钳制，非法/超限回退默认值 10 */
+    private static int clampNum(Integer num) {
+        if (num == null || num <= 0 || num > 50) {
+            return 10;
+        }
+        return num;
     }
 }

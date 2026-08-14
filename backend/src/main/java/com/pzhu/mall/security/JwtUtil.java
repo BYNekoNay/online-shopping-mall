@@ -22,7 +22,8 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
-        byte[] keyBytes = secret.getBytes();
+        // DM_DEFAULT_ENCODING 修复：显式 UTF-8，避免依赖平台默认编码导致不同环境密钥不一致
+        byte[] keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
             throw new IllegalArgumentException(
                     "JWT secret must be at least 256 bits (32 bytes), current: " + keyBytes.length + " bytes");

@@ -49,6 +49,9 @@ public class PlatformStatisticsService {
     @Resource
     private CartMapper cartMapper;
 
+    @Resource
+    private com.pzhu.mall.modules.behavior.mapper.RecommendExposureLogMapper recommendExposureLogMapper;
+
     /**
      * 平台看板总览指标。
      */
@@ -62,9 +65,11 @@ public class PlatformStatisticsService {
         BigDecimal gmv = orderMapper.selectAllTotalPayAmount();
 
         // 今日订单数
+        // ST-02 修复：过滤待付款(0)/已取消(5)/已退款(7)订单，与 GMV 口径一致，避免"订单创建数"虚高
         long todayOrders = orderMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
                         .eq(Order::getIsDeleted, 0)
+                        .in(Order::getStatus, 1, 2, 3, 4, 6)
                         .ge(Order::getCreateTime, dayStart)
         );
 
@@ -75,11 +80,20 @@ public class PlatformStatisticsService {
         );
 
         // 推荐点击率（近7天）
-        // M-13 修复：分子分母改用统一推荐归因口径——分母为去重推荐曝光（用户,商品）对数，
-        // 分子为"先被推荐、后被浏览"的去重对数；原实现用全站浏览量除以推荐生成数，口径不一致导致指标严重虚高
+        // BE-02 修复：CTR 改用 recommend_exposure_log 真实曝光/点击（任务书 7.6"推荐算法效果（点击率）"）。
+        // 分母=窗口内曝光记录数（含点击回标），分子=被点击的记录数（clicked=1）。
+        // 原实现用"预生成推荐数"近似曝光、用"浏览+推荐结果 EXISTS"近似点击，口径失真；
+        // RecommendResultMapper.countDistinctExposure/countDistinctRecommendClick 已弃用。
         LocalDateTime weekAgo = now.minusDays(7);
-        long exposureCount = recommendResultMapper.countDistinctExposure(weekAgo);
-        long clickCount = recommendResultMapper.countDistinctRecommendClick(weekAgo);
+        long exposureCount = recommendExposureLogMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.behavior.entity.RecommendExposureLog>()
+                        .ge(com.pzhu.mall.modules.behavior.entity.RecommendExposureLog::getCreateTime, weekAgo)
+        );
+        long clickCount = recommendExposureLogMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.behavior.entity.RecommendExposureLog>()
+                        .ge(com.pzhu.mall.modules.behavior.entity.RecommendExposureLog::getCreateTime, weekAgo)
+                        .eq(com.pzhu.mall.modules.behavior.entity.RecommendExposureLog::getClicked, 1)
+        );
         String recommendCtr = exposureCount > 0 ? String.format("%.2f%%", clickCount * 100.0 / exposureCount) : "0.00%";
 
         // 转化率（浏览商品用户中下单用户占比）
@@ -158,6 +172,9 @@ public class PlatformStatisticsService {
         int avgStayDuration = (int) Math.round(avgStay);
 
         // 转化漏斗（使用聚合查询）
+        // ST-04 口径声明：漏斗各层单位为"业务事件发生次数"（view=浏览行为条数、cart=加购行数、
+        // order=订单数、pay=已支付订单数），各层分母不同，仅作趋势参考，不构成严格比率；
+        // 如需严格转化率（用户级漏斗）需按 DISTINCT user_id 重算，属后续增强项
         long viewCount = userBehaviorMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserBehavior>()
                         .eq(UserBehavior::getBehaviorType, 1)

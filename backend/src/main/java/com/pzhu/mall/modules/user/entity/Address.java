@@ -4,17 +4,34 @@ import java.time.LocalDateTime;
 
 /**
  * 收货地址实体（对应 address 表）。
+ * <p>U-03 修复：字段级校验注解（作为 @RequestBody 校验载体），
+ * 使 UserController.addAddress/updateAddress 的 @Validated 真正生效。</p>
  */
 public class Address {
 
     private Long id;
     private Long userId;
+
+    @javax.validation.constraints.NotBlank(message = "收货人不能为空")
+    @javax.validation.constraints.Size(max = 50, message = "收货人最长50字符")
     private String receiver;
+
+    @javax.validation.constraints.NotBlank(message = "手机号不能为空")
+    @javax.validation.constraints.Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
+
+    @javax.validation.constraints.NotBlank(message = "省份不能为空")
     private String province;
+
+    @javax.validation.constraints.NotBlank(message = "城市不能为空")
     private String city;
+
     private String district;
+
+    @javax.validation.constraints.NotBlank(message = "详细地址不能为空")
+    @javax.validation.constraints.Size(max = 200, message = "详细地址最长200字符")
     private String detail;
+
     private Integer isDefault;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
