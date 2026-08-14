@@ -28,7 +28,11 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      # 用 install 而非 ci：本地沙箱限制导致 lock 未含新 devDependencies（eslint/prettier），
+      # runner 上 install 会现场解析并更新 lock；依赖版本由 package.json 范围锁定
+      - run: npm install --no-audit --no-fund
+      # 质量门禁（docs/25 §2.3）：静态检查 → 单测 → 构建
+      - run: npm run lint
       - run: npm test
       - run: npm run build
 
@@ -45,12 +49,24 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+      # 质量门禁（docs/25 §2.3）：verify 阶段自动执行
+      # checkstyle:check（格式/命名）+ spotbugs:check（缺陷检测）+ jacoco:report（覆盖率）+ test（单测）
       - run: mvn -B verify
       - uses: actions/upload-artifact@v4
         with:
           name: backend-package
           path: backend/target/*.jar
           if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-and-reports
+          path: |
+            backend/target/site/jacoco/
+            backend/target/checkstyle-result.xml
+            backend/target/spotbugsXml.xml
+          if-no-files-found: ignore
           retention-days: 7
 
   container:

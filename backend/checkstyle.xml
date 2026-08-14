@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+  "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+  "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  项目 Checkstyle 规则（基于 Google Java Style 裁剪，适配项目现状）
+  分级策略：error 级仅放"格式/导入/命名"类硬规范；逻辑类问题交给 SpotBugs。
+  规则调整历史：
+  - 2026-08-13 建立初始规则集（与 docs/25 §2.3.2 配置建议一致）
+-->
+<module name="Checker">
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="warning"/>
+  <property name="fileExtensions" value="java"/>
+
+  <!-- 行长度限制：120 字符（注释行放宽到 160，避免 Javadoc 长行误报） -->
+  <module name="LineLength">
+    <property name="fileExtensions" value="java"/>
+    <property name="max" value="120"/>
+    <property name="ignorePattern" value="^(\s*(\*|//).*)?$"/>
+  </module>
+
+  <!-- 文件结尾必须有换行 -->
+  <module name="NewlineAtEndOfFile"/>
+
+  <module name="TreeWalker">
+    <!-- ==================== 导入规范 ==================== -->
+    <!-- 禁止通配符导入 -->
+    <module name="AvoidStarImport"/>
+    <!-- 未使用的导入 -->
+    <module name="UnusedImports"/>
+    <!-- 禁止重复导入 -->
+    <module name="RedundantImport"/>
+
+    <!-- ==================== 命名规范 ==================== -->
+    <module name="PackageName">
+      <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+    </module>
+    <module name="TypeName"/>
+    <module name="MethodName"/>
+    <module name="ParameterName"/>
+    <module name="LocalVariableName"/>
+    <module name="MemberName"/>
+    <module name="ConstantName"/>
+    <module name="ClassTypeParameterName"/>
+    <module name="MethodTypeParameterName"/>
+
+    <!-- ==================== 格式规范（error 级） ==================== -->
+    <!-- 缩进 4 空格 -->
+    <module name="Indentation">
+      <property name="basicOffset" value="4"/>
+      <property name="braceAdjustment" value="0"/>
+      <property name="caseIndent" value="4"/>
+      <property name="throwsIndent" value="4"/>
+      <property name="lineWrappingIndentation" value="8"/>
+      <property name="arrayInitIndent" value="4"/>
+    </module>
+    <!-- if/else/for/while 必须使用花括号 -->
+    <module name="NeedBraces">
+      <property name="allowSingleLineStatement" value="true"/>
+    </module>
+    <!-- 空白规范 -->
+    <module name="WhitespaceAround"/>
+    <module name="WhitespaceAfter"/>
+    <module name="NoWhitespaceBefore"/>
+    <module name="GenericWhitespace"/>
+    <!-- 操作符换行风格：换行时操作符在行首 -->
+    <module name="OperatorWrap">
+      <property name="option" value="nl"/>
+      <property name="tokens"
+        value="BAND, BOR, BSR, BXOR, DIV, EQUAL, GE, GT, LAND, LE, LITERAL_INSTANCEOF, LOR, LT, MINUS, MOD, NOT_EQUAL, PLUS, QUESTION, SL, SR, STAR"/>
+    </module>
+
+    <!-- ==================== 代码质量（warning 级） ==================== -->
+    <!-- public 方法必须有 Javadoc（service/controller 层有文档要求） -->
+    <module name="JavadocMethod">
+      <property name="accessModifiers" value="public"/>
+      <property name="allowMissingParamTags" value="true"/>
+      <property name="allowMissingReturnTag" value="true"/>
+      <property name="allowedAnnotations" value="Override"/>
+      <property name="validateThrows" value="false"/>
+    </module>
+    <!-- 类必须有 Javadoc -->
+    <module name="JavadocType">
+      <property name="allowMissingParamTags" value="true"/>
+    </module>
+    <!-- 禁止使用 == 比较字符串（warning） -->
+    <module name="StringLiteralEquality"/>
+    <!-- 禁止空块（catch 空块必须有注释说明） -->
+    <module name="EmptyBlock">
+      <property name="option" value="text"/>
+      <property name="tokens"
+        value="LITERAL_TRY, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE, LITERAL_SWITCH"/>
+    </module>
+    <!-- 禁止 catch 后空语句 -->
+    <module name="EmptyStatement"/>
+    <!-- equals 调用者非 null 检查 -->
+    <module name="EqualsAvoidNull"/>
+    <!-- 禁止魔法数字（warning，允许常量与注解） -->
+    <module name="MagicNumber">
+      <property name="ignoreNumbers" value="-1, 0, 1, 2, 100"/>
+      <property name="ignoreHashCodeMethod" value="true"/>
+      <property name="ignoreAnnotation" value="true"/>
+      <property name="ignoreFieldDeclaration" value="true"/>
+      <property name="constantWaiverParentToken"
+        value="ASSIGN, ARRAY_INIT, EXPR, UNARY_PLUS, UNARY_MINUS, TYPECAST, ELIST, STAR, DIV, PLUS, MINUS"/>
+    </module>
+  </module>
+</module>

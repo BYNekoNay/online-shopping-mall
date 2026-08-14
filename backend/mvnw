@@ -1,0 +1,11 @@
+#!/bin/bash
+# Maven wrapper for Git Bash (bypass broken mvn script on this machine)
+export JAVA_HOME="D:/java"
+MVN_HOME="D:/bianyiheji/apache-maven-3.9.4"
+MVN_CW="$(pwd)"
+exec java \
+  -Dclassworlds.conf="$MVN_HOME/bin/m2.conf" \
+  -Dmaven.home="$MVN_HOME" \
+  -Dmaven.multiModuleProjectDirectory="$MVN_CW" \
+  -cp "$MVN_HOME/boot/plexus-classworlds-2.7.0.jar" \
+  org.codehaus.plexus.classworlds.launcher.Launcher "$@"

@@ -42,6 +42,14 @@ _tmp_*
 # IDE state
 .omc/
 
+# WorkBuddy 工作区数据（记忆/会话文件，不入库）
+.workbuddy/
+
+# 前端本地缓存与工具临时文件
+frontend/.npm-cache-local/
+frontend/npm-cache-local2/
+frontend/vitest.config.js.timestamp-*.mjs
+
 # Runtime
 query
 user-check.txt

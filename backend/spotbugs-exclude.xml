@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- 排除测试代码（单测中的 mock 技巧常见误报） -->
+  <Match>
+    <Source name="~.*Test\.java" />
+  </Match>
+  <!-- 排除实体类 getter/setter 集合浅拷贝告警（项目实体为纯 POJO，不对外暴露可变状态） -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+    <Class name="~com\.pzhu\.mall\.modules\..*\.entity\..*" />
+  </Match>
+  <!-- 排除 DTO/VO/Controller 内部类的集合浅拷贝告警（REST 序列化常规模式，防御性拷贝收益低） -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+    <Class name="~com\.pzhu\.mall\.modules\..*\.(dto|vo)\..*" />
+  </Match>
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+    <Class name="~com\.pzhu\.mall\.modules\..*\..*Controller\$.*" />
+  </Match>
+  <!-- 排除 common.result.PageResult（通用分页结构）与定时任务 keys 集合（Redis 键列表，读取型安全） -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+    <Class name="~com\.pzhu\.mall\.common\.result\..*" />
+  </Match>
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+    <Class name="~com\.pzhu\.mall\.modules\..*\.task\..*" />
+  </Match>
+  <!-- 排除 UserService 中 AddressService 依赖注入的 EI 误报（Spring 单例注入场景） -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+    <Class name="~com\.pzhu\.mall\.modules\.user\.service\.UserService" />
+  </Match>
+  <!-- 排除 DTO 类的 setter 未使用告警（序列化框架使用） -->
+  <Match>
+    <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD,URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    <Class name="~com\.pzhu\.mall\.modules\..*\.dto\..*" />
+  </Match>
+  <!-- 排除 lambda 中的瞬态通知类问题（项目无 GUI） -->
+  <Match>
+    <Bug pattern="DM_CONVERT_CASE" />
+  </Match>
+</FindBugsFilter>
