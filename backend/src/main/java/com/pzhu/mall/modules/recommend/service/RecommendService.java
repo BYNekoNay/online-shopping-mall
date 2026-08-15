@@ -3,6 +3,8 @@ package com.pzhu.mall.modules.recommend.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pzhu.mall.common.config.RedisKeyPrefix;
+import com.pzhu.mall.modules.behavior.entity.UserBehavior;
+import com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.recommend.entity.RecommendResult;
@@ -16,8 +18,10 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -47,6 +51,9 @@ public class RecommendService {
 
     @Resource
     private RecommendCalculateService recommendCalculateService;
+
+    @Resource
+    private UserBehaviorMapper userBehaviorMapper;
 
     /**
      * 猜你喜欢（优先 Redis → 数据库 → 热门兜底）。
@@ -166,6 +173,76 @@ public class RecommendService {
         }
         log.info("[推荐-相似商品] 商品={} 不存在，返回空列表", productId);
         return List.of();
+    }
+
+    /**
+     * 浏览历史推荐（A-1，任务书"浏览历史推荐"）。
+     *
+     * <p>基于用户最近浏览（user_behavior type=1）的商品，用 ItemCF 相似度召回"浏览过的同类商品"。
+     * 与猜你喜欢（UserCF）互补；仅登录用户调用，无浏览记录返回空列表。
+     * 准实时数据不做 Redis 缓存（每商品仅 TOP5 相似，计算成本低）。
+     */
+    public List<RecommendVO> historyBased(Long userId, Integer num) {
+        int limit = num != null ? Math.min(Math.max(num, 1), 50) : DEFAULT_RECOMMEND_NUM;
+
+        // 1. 取最近浏览的商品（去重，最多 10 个作为种子）
+        List<UserBehavior> recent = userBehaviorMapper.selectList(
+                new LambdaQueryWrapper<UserBehavior>()
+                        .eq(UserBehavior::getUserId, userId)
+                        .eq(UserBehavior::getBehaviorType, 1)
+                        .orderByDesc(UserBehavior::getCreateTime)
+                        .last("LIMIT 50"));
+        if (recent.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> viewedIds = recent.stream()
+                .map(UserBehavior::getProductId)
+                .filter(Objects::nonNull)
+                .limit(10)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (viewedIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. 对每个浏览过的商品计算 ItemCF 相似，按"平均相似分"聚合排序
+        Map<Long, Double> scoreAgg = new HashMap<>();
+        Map<Long, Integer> countAgg = new HashMap<>();
+        for (Long pid : viewedIds) {
+            Map<Long, Double> sim = recommendCalculateService.computeSimilarProducts(pid, 5);
+            for (Map.Entry<Long, Double> e : sim.entrySet()) {
+                if (viewedIds.contains(e.getKey())) {
+                    continue; // 排除已浏览商品自身
+                }
+                scoreAgg.merge(e.getKey(), e.getValue(), Double::sum);
+                countAgg.merge(e.getKey(), 1, Integer::sum);
+            }
+        }
+        if (scoreAgg.isEmpty()) {
+            return List.of();
+        }
+        List<Map.Entry<Long, Double>> ranked = scoreAgg.entrySet().stream()
+                .sorted((a, b) -> Double.compare(
+                        b.getValue() / countAgg.get(b.getKey()),
+                        a.getValue() / countAgg.get(a.getKey())))
+                .limit(limit)
+                .collect(Collectors.toList());
+
+        // 3. 批量加载商品并过滤下架
+        List<Long> productIds = ranked.stream().map(Map.Entry::getKey).collect(Collectors.toList());
+        List<Product> products = productMapper.selectBatchIds(productIds);
+        Map<Long, Product> productMap = products.stream()
+                .filter(p -> Integer.valueOf(1).equals(p.getStatus()))
+                .collect(Collectors.toMap(Product::getId, p -> p));
+        List<RecommendVO> vos = new ArrayList<>();
+        for (Map.Entry<Long, Double> e : ranked) {
+            Product p = productMap.get(e.getKey());
+            if (p != null) {
+                // algoType=2（ItemCF）：与相似商品推荐同算法口径
+                vos.add(RecommendVO.from(p, e.getValue() / countAgg.get(e.getKey()), 2));
+            }
+        }
+        log.info("[推荐-浏览历史] 用户={} 种子商品={} 返回{}条", userId, viewedIds.size(), vos.size());
+        return vos;
     }
 
     // ==================== Redis 读写 ====================

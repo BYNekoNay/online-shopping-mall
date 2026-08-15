@@ -296,11 +296,14 @@ CREATE TABLE `points_record` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `change_amount` INT NOT NULL COMMENT '变动数量，正数为获取，负数为消耗',
-  `type` TINYINT NOT NULL COMMENT '1-下单获取，2-订单抵扣，3-兑换，4-取消/退款返还',
+  `type` TINYINT NOT NULL COMMENT '1-下单获取，2-订单抵扣，3-兑换，4-取消/退款返还，5-积分商城兑换扣减',
   `related_order_id` BIGINT UNSIGNED DEFAULT NULL,
+  `expire_time` DATETIME DEFAULT NULL COMMENT 'C-2 积分过期时间（NULL=永不过期）',
+  `expired` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'C-2 是否已过期清理：1-是（防重复扣减）',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_user_id` (`user_id`)
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_expire_time` (`expire_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分记录表';
 
 CREATE TABLE `payment` (
@@ -485,3 +488,40 @@ CREATE TABLE IF NOT EXISTS `recommend_exposure_log` (
   KEY `idx_user_product_time` (`user_id`, `product_id`, `create_time`),
   KEY `idx_source_time` (`source`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推荐位曝光/点击日志（CTR 统计）';
+
+-- ============ C-1 积分商城 ============
+CREATE TABLE `points_goods` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL COMMENT '兑换商品名称',
+  `image` VARCHAR(500) DEFAULT NULL COMMENT '商品图URL',
+  `points_cost` INT NOT NULL COMMENT '所需积分',
+  `stock` INT NOT NULL DEFAULT 0 COMMENT '兑换库存',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '商品描述',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1-上架，0-下架',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `is_deleted` TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分兑换商品表';
+
+CREATE TABLE `points_exchange_log` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `goods_id` BIGINT UNSIGNED NOT NULL,
+  `points_cost` INT NOT NULL COMMENT '消耗积分',
+  `goods_name` VARCHAR(100) NOT NULL COMMENT '商品名称快照',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分兑换记录表';
+
+-- ============ C-4 物流公司字典 ============
+CREATE TABLE `logistics_company` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(50) NOT NULL COMMENT '公司名称（顺丰/圆通/中通等）',
+  `code` VARCHAR(20) NOT NULL COMMENT '公司编码（对接物流API用）',
+  `sort` INT NOT NULL DEFAULT 0 COMMENT '排序权重',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1-启用，0-停用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物流公司字典表';

@@ -57,6 +57,14 @@ public class OrderController {
         return Result.success();
     }
 
+    @Operation(summary = "删除订单（B-1，仅已取消/已退款）")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        orderService.deleteOrder(userId, id);
+        return Result.success();
+    }
+
     @Operation(summary = "确认收货")
     @PutMapping("/{id}/confirm")
     public Result<Void> confirm(@PathVariable Long id) {

@@ -39,6 +39,13 @@ public class AdminUserController {
     @Resource
     private com.pzhu.mall.security.AccountStatusService accountStatusService;
 
+    // B-2：用户详情聚合查询依赖（订单统计 + 行为概览）
+    @Resource
+    private com.pzhu.mall.modules.order.mapper.OrderMapper orderMapper;
+
+    @Resource
+    private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
+
     @Operation(summary = "用户列表")
     @GetMapping
     public Result<PageResult<AdminUserVO>> list(@RequestParam(defaultValue = "1") Integer pageNum,
@@ -120,6 +127,54 @@ public class AdminUserController {
         accountStatusService.evict(id);
         operationLogService.record(operatorId, "分配用户角色", "用户#" + id + " → 角色" + role);
         return Result.success();
+    }
+
+    @Operation(summary = "用户详情（B-2，任务书管理员-用户详情）")
+    @GetMapping("/{id}")
+    public Result<java.util.Map<String, Object>> detail(@PathVariable Long id) {
+        User user = userMapper.selectById(id);
+        if (user == null || Integer.valueOf(1).equals(user.getIsDeleted())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+        // B-2 审核修正：弃用 selectMaps 聚合，改 selectCount + selectList 内存求和（与既有代码风格一致）
+        Long orderCount = orderMapper.selectCount(
+                new LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.Order>()
+                        .eq(com.pzhu.mall.modules.order.entity.Order::getUserId, id)
+                        .eq(com.pzhu.mall.modules.order.entity.Order::getIsDeleted, 0)
+                        .in(com.pzhu.mall.modules.order.entity.Order::getStatus, 1, 2, 3, 4, 6));
+        java.math.BigDecimal totalSpend = orderMapper.selectList(
+                        new LambdaQueryWrapper<com.pzhu.mall.modules.order.entity.Order>()
+                                .select(com.pzhu.mall.modules.order.entity.Order::getPayAmount)
+                                .eq(com.pzhu.mall.modules.order.entity.Order::getUserId, id)
+                                .eq(com.pzhu.mall.modules.order.entity.Order::getIsDeleted, 0)
+                                .in(com.pzhu.mall.modules.order.entity.Order::getStatus, 1, 2, 3, 4, 6))
+                .stream()
+                .map(com.pzhu.mall.modules.order.entity.Order::getPayAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        // 最近 5 条行为（含商品名快照补查）
+        List<com.pzhu.mall.modules.behavior.entity.UserBehavior> behaviors =
+                userBehaviorMapper.selectList(
+                        new LambdaQueryWrapper<com.pzhu.mall.modules.behavior.entity.UserBehavior>()
+                                .eq(com.pzhu.mall.modules.behavior.entity.UserBehavior::getUserId, id)
+                                .orderByDesc(com.pzhu.mall.modules.behavior.entity.UserBehavior::getCreateTime)
+                                .last("LIMIT 5"));
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("id", user.getId());
+        result.put("username", user.getUsername());
+        result.put("nickname", user.getNickname());
+        result.put("phone", user.getPhone());
+        result.put("email", user.getEmail());
+        result.put("role", user.getRole());
+        result.put("status", user.getStatus());
+        result.put("points", user.getPoints());
+        result.put("createTime", user.getCreateTime());
+        result.put("orderCount", orderCount == null ? 0 : orderCount);
+        result.put("totalSpend", totalSpend);
+        result.put("recentBehaviors", behaviors);
+        return Result.success(result);
     }
 
     public static class RoleDTO {

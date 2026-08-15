@@ -119,10 +119,43 @@ public class ShopService {
             shop.setDescription(dto.getDescription());
         }
         if (dto.getDecorationConfig() != null) {
+            // B-5：装修 JSON 校验（合法 JSON + 关键字段类型/长度）
+            validateDecorationConfig(dto.getDecorationConfig());
             shop.setDecorationConfig(dto.getDecorationConfig());
         }
         shop.setUpdateTime(LocalDateTime.now());
         shopMapper.updateById(shop);
+    }
+
+    /**
+     * B-5 店铺装修增强：校验 decoration_config JSON（合法 JSON + 字段约束）。
+     * <p>结构：{bannerImage, themeColor(#RRGGBB), announcement(≤200), intro(≤500)}</p>
+     */
+    private void validateDecorationConfig(String json) {
+        try {
+            com.fasterxml.jackson.databind.JsonNode node =
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+            if (!node.isObject()) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "装修配置必须是 JSON 对象");
+            }
+            if (node.hasNonNull("bannerImage") && node.get("bannerImage").asText().length() > 500) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "Banner 图片URL最长500字符");
+            }
+            if (node.hasNonNull("themeColor")) {
+                String color = node.get("themeColor").asText();
+                if (!color.matches("^#[0-9a-fA-F]{6}$")) {
+                    throw new BusinessException(ErrorCode.PARAM_ERROR, "主题色格式须为 #RRGGBB");
+                }
+            }
+            if (node.hasNonNull("announcement") && node.get("announcement").asText().length() > 200) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "店铺公告最长200字符");
+            }
+            if (node.hasNonNull("intro") && node.get("intro").asText().length() > 500) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "店铺简介最长500字符");
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "装修配置必须是合法 JSON");
+        }
     }
 
     /**

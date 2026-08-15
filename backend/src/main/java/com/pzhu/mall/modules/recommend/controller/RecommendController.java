@@ -41,6 +41,19 @@ public class RecommendController {
         return Result.success(recommendService.similar(productId, num));
     }
 
+    @Operation(summary = "浏览历史推荐（需登录，A-1）")
+    @GetMapping("/history")
+    public Result<List<RecommendVO>> history(@RequestParam(defaultValue = "10") Integer num) {
+        // R-08 修复：num 钳制到 [1,50]
+        num = clampNum(num);
+        Long userId = LoginUserContext.getCurrentUserId();
+        if (userId == null) {
+            // 双保险：拦截器理论上已拦未登录；此处兜底返回空
+            return Result.success(List.of());
+        }
+        return Result.success(recommendService.historyBased(userId, num));
+    }
+
     /** R-08 修复：推荐数量参数钳制，非法/超限回退默认值 10 */
     private static int clampNum(Integer num) {
         if (num == null || num <= 0 || num > 50) {

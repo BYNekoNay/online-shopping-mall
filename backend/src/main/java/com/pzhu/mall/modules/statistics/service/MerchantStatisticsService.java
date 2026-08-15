@@ -31,6 +31,10 @@ public class MerchantStatisticsService {
     @Resource
     private OrderItemMapper orderItemMapper;
 
+    // B-3 审核修正：好评率需查评价表，补注入（此前未注入）
+    @Resource
+    private com.pzhu.mall.modules.product.mapper.ReviewMapper reviewMapper;
+
     /**
      * 销售统计（按日/周/月聚合）。
      *
@@ -153,6 +157,29 @@ public class MerchantStatisticsService {
             nameByProduct.putIfAbsent(pid, item.getProductNameSnapshot());
         }
 
+        // B-3：批量加载 TOP10 商品的评价，计算好评率（评分≥4 占比；无评价 → null）
+        List<Long> topProductIds = salesByProduct.entrySet().stream()
+                .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+                .limit(10)
+                .map(Map.Entry::getKey)
+                .collect(java.util.stream.Collectors.toList());
+        Map<Long, double[]> reviewStat = reviewMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                                com.pzhu.mall.modules.product.entity.Review>()
+                                .in(com.pzhu.mall.modules.product.entity.Review::getProductId, topProductIds))
+                .stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        com.pzhu.mall.modules.product.entity.Review::getProductId,
+                        java.util.stream.Collectors.collectingAndThen(
+                                java.util.stream.Collectors.toList(),
+                                list -> {
+                                    long total = list.size();
+                                    long good = list.stream()
+                                            .filter(r -> r.getRating() != null && r.getRating() >= 4)
+                                            .count();
+                                    return new double[]{total, good};
+                                })));
+
         return salesByProduct.entrySet().stream()
                 .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
                 .limit(10)
@@ -162,6 +189,11 @@ public class MerchantStatisticsService {
                     m.put("name", nameByProduct.getOrDefault(e.getKey(), ""));
                     m.put("sales", qtyByProduct.getOrDefault(e.getKey(), 0));
                     m.put("amount", e.getValue());
+                    // B-3：好评率（无评价返回 null，前端显示 "-"）
+                    double[] stat = reviewStat.get(e.getKey());
+                    m.put("positiveRate", stat != null && stat[0] > 0
+                            ? Math.round(stat[1] * 100.0 / stat[0]) + "%"
+                            : null);
                     return m;
                 })
                 .toList();

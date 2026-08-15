@@ -228,7 +228,15 @@ public class PromotionService {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "促销类型仅支持 1=限时折扣/2=满减/3=满赠/4=组合套餐");
         }
         if (p.getScope() == null || p.getScope().isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销范围 scope 不能为空（PRODUCT/CATEGORY/SHOP）");
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销范围 scope 不能为空");
+        }
+        // A-2 收紧：计算逻辑（listActiveByShop）仅支持 SHOP 匹配，放开 PRODUCT/CATEGORY 会造成"建了不生效"
+        if (!"SHOP".equals(p.getScope())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR,
+                    "当前版本促销范围仅支持 SHOP（店铺级）；PRODUCT/CATEGORY 级为后续扩展");
+        }
+        if (p.getScopeId() == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "促销范围 scopeId（店铺ID）不能为空");
         }
         if (p.getStartTime() != null && p.getEndTime() != null
                 && !p.getEndTime().isAfter(p.getStartTime())) {

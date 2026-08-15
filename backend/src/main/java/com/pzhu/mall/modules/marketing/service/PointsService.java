@@ -106,6 +106,8 @@ public class PointsService {
         record.setChangeAmount(points);
         record.setType(1); // 下单获取
         record.setRelatedOrderId(orderId);
+        // C-2：下单获取积分 365 天有效期（简化 FIFO：过期时按"获取量总和"近似扣减）
+        record.setExpireTime(LocalDateTime.now().plusDays(365));
         record.setCreateTime(LocalDateTime.now());
         pointsRecordMapper.insert(record);
         log.info("[积分] 用户={} 订单={} 获得积分={}", userId, orderId, points);
@@ -207,5 +209,75 @@ public class PointsService {
         qw.eq(PointsRecord::getUserId, userId)
           .orderByDesc(PointsRecord::getCreateTime);
         return pointsRecordMapper.selectPage(page, qw);
+    }
+
+    // ==================== C-2 积分有效期 ====================
+
+    /** 积分有效期（天）：下单获取的积分 365 天后过期。 */
+    public static final int POINTS_VALID_DAYS = 365;
+
+    /**
+     * 获取即将过期积分（30 天内到期，type=1 获取记录之和），供前端"即将过期"提示。
+     */
+    public int getExpiringPoints(Long userId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<PointsRecord> records = pointsRecordMapper.selectList(
+                new LambdaQueryWrapper<PointsRecord>()
+                        .eq(PointsRecord::getUserId, userId)
+                        .eq(PointsRecord::getType, 1)
+                        .isNotNull(PointsRecord::getExpireTime)
+                        .le(PointsRecord::getExpireTime, now.plusDays(30))
+                        .ge(PointsRecord::getExpireTime, now));
+        return records.stream()
+                .mapToInt(r -> r.getChangeAmount() != null ? Math.max(r.getChangeAmount(), 0) : 0)
+                .sum();
+    }
+
+    /**
+     * C-2 定时任务：清理过期积分（每日 03:00）。
+     *
+     * <p>简化 FIFO：将"已过期获取记录"（expired=0 且 expire_time<now）按用户汇总，
+     * 从用户积分中扣减（GREATEST 不低于 0），随后将记录标记 expired=1（幂等，防重复扣减清掉新积分）。
+     * 真实 FIFO 需记录"消耗映射"，毕设场景采用近似实现并文档声明。</p>
+     */
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 3 * * ?")
+    public void expirePoints() {
+        LocalDateTime now = LocalDateTime.now();
+        // 查所有已过期且未清理的获取记录
+        List<PointsRecord> expired = pointsRecordMapper.selectList(
+                new LambdaQueryWrapper<PointsRecord>()
+                        .eq(PointsRecord::getType, 1)
+                        .eq(PointsRecord::getExpired, 0)
+                        .isNotNull(PointsRecord::getExpireTime)
+                        .lt(PointsRecord::getExpireTime, now));
+        if (expired.isEmpty()) {
+            return;
+        }
+        // 按用户汇总过期量
+        java.util.Map<Long, Integer> expiredByUser = new java.util.HashMap<>();
+        java.util.List<Long> expiredIds = new java.util.ArrayList<>();
+        for (PointsRecord r : expired) {
+            int amount = r.getChangeAmount() != null ? Math.max(r.getChangeAmount(), 0) : 0;
+            expiredByUser.merge(r.getUserId(), amount, Integer::sum);
+            expiredIds.add(r.getId());
+        }
+        int cleared = 0;
+        for (java.util.Map.Entry<Long, Integer> e : expiredByUser.entrySet()) {
+            int updated = userMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<User>()
+                            .setSql("points = GREATEST(points - " + e.getValue() + ", 0)")
+                            .eq(User::getId, e.getKey()));
+            if (updated > 0) {
+                cleared += e.getValue();
+            }
+        }
+        // 标记已清理（幂等：再次运行不再匹配 expired=0）
+        if (!expiredIds.isEmpty()) {
+            pointsRecordMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<PointsRecord>()
+                            .set(PointsRecord::getExpired, 1)
+                            .in(PointsRecord::getId, expiredIds));
+        }
+        log.info("[积分-过期] 清理 {} 个用户过期积分，累计 {} 分", expiredByUser.size(), cleared);
     }
 }

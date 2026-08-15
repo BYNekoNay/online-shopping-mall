@@ -42,3 +42,17 @@ INSERT INTO `promotion` (`name`, `type`, `rule_json`, `scope`, `scope_id`, `star
 VALUES
     ('限时8折', 1, '{"discountPercent":0.8}', 'SHOP', 1, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY), 1, NOW()),
     ('满100减15', 2, '{"threshold":100,"reduce":15}', 'SHOP', 1, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY), 1, NOW());
+
+-- C-4 物流公司字典种子数据
+INSERT INTO `logistics_company` (`name`, `code`, `sort`, `status`) VALUES
+    ('顺丰速运', 'SF', 1, 1),
+    ('圆通速递', 'YTO', 2, 1),
+    ('中通快递', 'ZTO', 3, 1),
+    ('韵达快递', 'YD', 4, 1),
+    ('邮政EMS', 'EMS', 5, 1);
+
+-- C-1 积分商城商品种子数据
+INSERT INTO `points_goods` (`name`, `image`, `points_cost`, `stock`, `description`, `status`) VALUES
+    ('定制帆布袋', NULL, 500, 100, '环保帆布袋，限量定制', 1),
+    ('商城纪念徽章', NULL, 300, 200, '平台周年纪念徽章', 1),
+    ('20元无门槛券', NULL, 2000, 50, '全平台通用优惠券（下单抵扣）', 1);

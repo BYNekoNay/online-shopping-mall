@@ -350,6 +350,8 @@ public class OrderService {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
                 .eq(Order::getUserId, userId)
+                // B-1 审核修正：过滤已删除订单（deleteOrder 软删后不显示）
+                .eq(Order::getIsDeleted, 0)
                 .orderByDesc(Order::getCreateTime);
         List<Order> orders;
         if (pageNum != null && pageSize != null && pageSize > 0) {
@@ -464,6 +466,39 @@ public class OrderService {
             return;
         }
         doCancel(order);
+    }
+
+    /**
+     * B-1 删除订单（软删除，任务书"订单管理-删除订单"）。
+     *
+     * <p>仅已取消(5)/已退款(7) 可删；软删 is_deleted=1 保留流水供对账；
+     * 不释放库存/券/积分（已完成或已取消订单资产已结算）。</p>
+     * <p>IDOR 防护：仅订单本人可删；原子 UPDATE（WHERE is_deleted=0）防重复删除。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteOrder(Long userId, Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || Integer.valueOf(1).equals(order.getIsDeleted())) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在");
+        }
+        if (!order.getUserId().equals(userId)) {
+            // IDOR 防护：非本人订单
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作该订单");
+        }
+        if (order.getStatus() != 5 && order.getStatus() != 7) {
+            // 审核修正：ErrorCode 无 ORDER_STATUS_ERROR，统一 PARAM_ERROR
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "仅已取消或已退款的订单可删除");
+        }
+        boolean updated = orderMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
+                        .set(Order::getIsDeleted, 1)
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getIsDeleted, 0)
+        ) > 0;
+        if (!updated) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "订单状态已变化，请刷新后重试");
+        }
+        log.info("[订单] 用户={} 删除订单={}", userId, orderId);
     }
 
     /**
