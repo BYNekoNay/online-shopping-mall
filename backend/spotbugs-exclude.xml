@@ -41,4 +41,26 @@
   <Match>
     <Bug pattern="DM_CONVERT_CASE" />
   </Match>
+
+  <!-- ============ SB-02~05 豁免（2026-08-14 检查方案执行，均已防御，静态误报） ============ -->
+  <!-- SB-02：StockService.deductWithLock —— Redis execute()/hasKey() 返回已做 null 防御（remaining==null 即失败），
+       SpotBugs 无法识别 Spring Data Redis 的 @Nullable 语义，属已知误报 -->
+  <Match>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    <Class name="~com\.pzhu\.mall\.modules\.order\.component\.StockService" />
+    <Method name="deductWithLock" />
+  </Match>
+  <!-- SB-03：RecommendCalculateService.computeHotRank —— 销量归一化已显式 intValue() 拆箱，
+       三元运算结果在取 max 前已收敛为 double，无装箱强转风险 -->
+  <Match>
+    <Bug pattern="BX_UNBOXED_AND_COERCED_FOR_TERNARY_OPERATOR" />
+    <Class name="~com\.pzhu\.mall\.modules\.recommend\.service\.RecommendCalculateService" />
+  </Match>
+  <!-- SB-04/SB-05：RecommendService.readFromRedis / readSimilarFromRedis —— TypedTuple.getScore() 已
+       用三元（!=null ? : 0.0）防御；value 解析已 catch NumberFormatException，空列表有 isEmpty 兜底 -->
+  <Match>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    <Class name="~com\.pzhu\.mall\.modules\.recommend\.service\.RecommendService" />
+    <Method name="~read(FromRedis|SimilarFromRedis)" />
+  </Match>
 </FindBugsFilter>

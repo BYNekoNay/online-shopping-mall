@@ -18,13 +18,11 @@ public class UserService {
     private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
 
     private final UserMapper userMapper;
-    private final AddressService addressService;
     private final JwtUtil jwtUtil;
     private final LoginAttemptService loginAttemptService;
 
-    public UserService(UserMapper userMapper, AddressService addressService, JwtUtil jwtUtil, LoginAttemptService loginAttemptService) {
+    public UserService(UserMapper userMapper, JwtUtil jwtUtil, LoginAttemptService loginAttemptService) {
         this.userMapper = userMapper;
-        this.addressService = addressService;
         this.jwtUtil = jwtUtil;
         this.loginAttemptService = loginAttemptService;
     }

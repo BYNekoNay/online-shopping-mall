@@ -35,7 +35,6 @@ import com.pzhu.mall.modules.user.entity.Address;
 import com.pzhu.mall.modules.user.entity.User;
 import com.pzhu.mall.modules.user.mapper.AddressMapper;
 import com.pzhu.mall.modules.user.mapper.UserMapper;
-import com.pzhu.mall.modules.user.service.AddressService;
 import com.pzhu.mall.modules.user.service.LoginAttemptService;
 import com.pzhu.mall.modules.user.service.UserService;
 import com.pzhu.mall.security.JwtUtil;
@@ -133,7 +132,7 @@ class MainChainIntegrationTest {
         jwtUtil.init();
 
         LoginAttemptService loginAttemptService = mock(LoginAttemptService.class);
-        userService = new UserService(userMapper, mock(AddressService.class), jwtUtil, loginAttemptService);
+        userService = new UserService(userMapper, jwtUtil, loginAttemptService);
 
         cartService = new CartService();
         inject(cartService, "cartMapper", cartMapper);

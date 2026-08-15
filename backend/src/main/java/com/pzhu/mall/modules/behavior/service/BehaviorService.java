@@ -92,7 +92,8 @@ public class BehaviorService {
         // L2-01 修复：购买行为后准实时刷新该用户推荐（创新点④"准实时"接线）。
         // 异步执行 + Redis 节流（同用户 10 分钟内最多触发一次），避免高频重算；
         // 失败不影响主流程（best-effort），行为已落库，定时任务仍会兜底。
-        if (behaviorType != null && behaviorType == 3 && userId != null) {
+        // SB-01 修复：behaviorType 已在上方 null 兜底（=1），此处去掉冗余空检
+        if (behaviorType == 3 && userId != null) {
             triggerAsyncRecommendRefresh(userId);
         }
     }
