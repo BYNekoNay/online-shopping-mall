@@ -156,7 +156,9 @@ function buildOrderGroups() {
   const groups = {}
   items.forEach(item => {
     if (!groups[item.shopId]) {
-      groups[item.shopId] = { shopId: item.shopId, shopName: item.shopName || '店铺', items: [], goodsAmount: 0 }
+      // B4-FR-01 修复：orderGroups 需含 freightAmount 兜底（模板 group-total 直接 toFixed，
+      // 缺失会导致确认页渲染崩溃）；真实值由估价接口回填
+      groups[item.shopId] = { shopId: item.shopId, shopName: item.shopName || '店铺', items: [], goodsAmount: 0, freightAmount: 0 }
     }
     groups[item.shopId].items.push(item)
     groups[item.shopId].goodsAmount += item.price * item.quantity
