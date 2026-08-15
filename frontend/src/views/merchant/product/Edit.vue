@@ -27,7 +27,11 @@
           <el-input v-model="form.images" placeholder="多张图片用逗号分隔" />
         </el-form-item>
         <el-form-item label="商品详情">
-          <el-input v-model="form.detail" type="textarea" :rows="4" placeholder="请输入商品详情" />
+          <!-- C-3：富文本编辑器替换 textarea -->
+          <div style="width: 100%;">
+            <Toolbar class="editor-toolbar" :editor="editorRef" :default-config="toolbarConfig" mode="default" style="border: 1px solid #dcdfe6; border-radius: 4px 4px 0 0;" />
+            <Editor v-model="form.detail" :default-config="editorConfig" mode="default" style="height: 300px; overflow-y: hidden; border: 1px solid #dcdfe6; border-top: none; border-radius: 0 0 4px 4px;" @on-created="handleCreated" />
+          </div>
         </el-form-item>
 
         <!-- SKU 列表 -->
@@ -52,16 +56,36 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/merchant'
+// C-3 富文本：wangEditor 5 + Vue3 适配组件
+import '@wangeditor/editor/dist/css/style.css'
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 
 const route = useRoute()
 const router = useRouter()
 const isEdit = ref(false)
 const submitting = ref(false)
 const categories = ref([])
+
+// C-3 富文本编辑器实例
+const editorRef = shallowRef()
+const toolbarConfig = {}
+const editorConfig = {
+  placeholder: '请输入商品详情…（支持图文混排）',
+  MENU_CONF: {},
+}
+const handleCreated = (editor) => {
+  editorRef.value = editor
+}
+onBeforeUnmount(() => {
+  if (editorRef.value) {
+    editorRef.value.destroy()
+    editorRef.value = null
+  }
+})
 
 const form = ref({
   name: '',

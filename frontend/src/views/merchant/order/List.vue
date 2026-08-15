@@ -25,7 +25,10 @@
       <el-dialog v-model="shipDialogVisible" title="发货" width="500px">
         <el-form :model="shipForm" label-width="100px">
           <el-form-item label="物流公司" required>
-            <el-input v-model="shipForm.logisticsCompany" placeholder="请输入物流公司" />
+            <!-- C-4：物流公司下拉（替代自由输入） -->
+            <el-select v-model="shipForm.logisticsCompany" placeholder="请选择物流公司" style="width: 100%;">
+              <el-option v-for="c in logisticsCompanies" :key="c.id" :label="c.name" :value="c.name" />
+            </el-select>
           </el-form-item>
           <el-form-item label="物流单号" required>
             <el-input v-model="shipForm.trackingNo" placeholder="请输入物流单号" />
@@ -103,9 +106,13 @@ const shipForm = ref({ logisticsCompany: '', trackingNo: '' })
 const orderDetailDialogVisible = ref(false)
 const selectedOrderDetail = ref(null)
 const currentDetailOrderId = ref(null)
+// C-4：物流公司下拉选项
+const logisticsCompanies = ref([])
 
 onMounted(async () => {
   try { orders.value = await request.getMerchantOrders() } catch {}
+  // C-4：加载启用中的物流公司（下拉选项）
+  try { logisticsCompanies.value = await request.getLogisticsCompanies() || [] } catch {}
 })
 
 function openShipDialog(order) {

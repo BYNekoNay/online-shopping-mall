@@ -37,6 +37,7 @@
                   <router-link to="/user/favorites"><el-dropdown-item>我的收藏</el-dropdown-item></router-link>
                   <router-link to="/user/coupons"><el-dropdown-item>我的优惠券</el-dropdown-item></router-link>
                   <router-link to="/user/points"><el-dropdown-item>我的积分</el-dropdown-item></router-link>
+                  <router-link to="/user/points-mall"><el-dropdown-item>积分商城</el-dropdown-item></router-link>
                   <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>

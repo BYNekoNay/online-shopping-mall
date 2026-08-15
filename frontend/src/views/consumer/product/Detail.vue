@@ -45,6 +45,13 @@
             </div>
           </div>
         </div>
+        <!-- C-3 商品详情（富文本，DOMPurify 白名单过滤） -->
+        <div v-if="safeDetail" class="product-description">
+          <h3>商品详情</h3>
+          <!-- eslint-disable-next-line vue/no-v-html -- C-3 已用 DOMPurify 白名单过滤（safeDetail），非直接渲染用户输入 -->
+          <div class="description-body" v-html="safeDetail"></div>
+        </div>
+
         <div class="similar-section">
           <h3>相似商品推荐</h3>
           <RecommendList mode="similar" :product-id="productId" />
@@ -84,6 +91,8 @@ import request from '@/api/product'
 import { addToCart as addToCartApi } from '@/api/cart'
 import { useCartStore } from '@/store/cart'
 import RecommendList from '@/components/RecommendList.vue'
+// C-3：富文本详情 XSS 白名单过滤
+import DOMPurify from 'dompurify'
 
 const route = useRoute()
 const cartStore = useCartStore()
@@ -93,6 +102,17 @@ const product = ref({})
 const selectedSkuId = ref(null)
 const reviews = ref([])
 const rating = ref(null)
+
+// C-3：商品详情经 DOMPurify 白名单过滤后再 v-html 渲染（防 XSS）
+const safeDetail = computed(() => {
+  const detail = product.value.detail
+  if (!detail) return ''
+  return DOMPurify.sanitize(detail, {
+    ALLOWED_TAGS: ['p', 'br', 'img', 'strong', 'em', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'blockquote', 'a', 'span', 'div', 'table', 'tr', 'td', 'th'],
+    ALLOWED_ATTR: ['src', 'alt', 'href', 'title', 'style', 'width', 'height'],
+    ALLOWED_STYLE_PROPERTIES: ['color', 'font-size', 'font-weight', 'text-align', 'background-color'],
+  })
+})
 
 const selectedSku = computed(() => {
   if (!product.value.skuList || !selectedSkuId.value) return null
@@ -228,6 +248,23 @@ onMounted(async () => {
 }
 .similar-section h3 {
   margin-bottom: 15px;
+}
+/* C-3 商品详情展示区 */
+.product-description {
+  margin-top: 30px;
+}
+.product-description h3 {
+  margin-bottom: 15px;
+}
+.description-body {
+  line-height: 1.8;
+  font-size: 14px;
+  color: #333;
+  word-break: break-word;
+}
+.description-body img {
+  max-width: 100%;
+  height: auto;
 }
 /* 评价区域 */
 .reviews-section {

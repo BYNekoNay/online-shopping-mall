@@ -54,17 +54,33 @@
       </div>
       <RecommendList mode="guess" />
     </section>
+
+    <!-- A-1 浏览历史推荐（仅登录用户显示） -->
+    <section v-if="isLogin" class="recommend-section">
+      <div class="section-header">
+        <div class="header-accent ai-accent"></div>
+        <h3 class="ai-title">
+          <span class="ai-badge" style="margin-right:10px;">AI 推荐</span>
+          浏览历史推荐
+        </h3>
+      </div>
+      <RecommendList mode="history" />
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/api/product'
 import { getActivePromotions } from '@/api/promotion'
 import RecommendList from '@/components/RecommendList.vue'
+import { useUserStore } from '@/store/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+// A-1：登录态判断（token 存在即视为已登录），控制"浏览历史推荐"区块显示
+const isLogin = computed(() => !!userStore.token)
 const categories = ref([])
 const promotions = ref([])
 const typeMap = { 1: '折扣', 2: '满减', 3: '满赠', 4: '套餐' }

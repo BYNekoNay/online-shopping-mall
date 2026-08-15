@@ -48,6 +48,11 @@ export function shipOrder(id, data) {
   return request.put(`/merchant/orders/${id}/ship`, data)
 }
 
+// C-4 物流公司下拉（仅启用）
+export function getLogisticsCompanies() {
+  return request.get('/merchant/logistics-companies')
+}
+
 export function getRefunds() {
   return request.get('/merchant/refunds')
 }
@@ -98,4 +103,4 @@ export function calculateFreight(params) {
   return request.get('/merchant/freight-templates/calculate', { params })
 }
 
-export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getRefunds, auditRefund, getSalesStatistics, getTopProducts, getCategoriesTree, getProductDetail, getMerchantOrderDetail, calculateFreight }
+export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getLogisticsCompanies, getRefunds, auditRefund, getSalesStatistics, getTopProducts, getCategoriesTree, getProductDetail, getMerchantOrderDetail, calculateFreight }

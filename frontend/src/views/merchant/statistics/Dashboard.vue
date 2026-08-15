@@ -36,6 +36,10 @@
         <el-table-column prop="amount" label="销售额" width="150">
           <template #default="{ row }">¥ {{ row.amount }}</template>
         </el-table-column>
+        <!-- B-3 好评率（无评价显示 "-"） -->
+        <el-table-column prop="positiveRate" label="好评率" width="110">
+          <template #default="{ row }">{{ row.positiveRate || '-' }}</template>
+        </el-table-column>
       </el-table>
       <el-empty v-if="topProducts.length === 0" description="暂无数据" />
     </el-card>

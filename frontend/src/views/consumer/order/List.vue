@@ -35,6 +35,13 @@
           <el-button v-if="order.status === 0" @click="cancelOrder(order.orderId)">取消订单</el-button>
           <el-button v-if="order.status === 2" @click="confirmOrder(order.orderId)">确认收货</el-button>
           <el-button type="default" @click="$router.push(`/orders/${order.orderId}`)">查看详情</el-button>
+          <!-- B-1：删除订单（仅已取消5/已退款7 显示） -->
+          <el-button
+            v-if="order.status === 5 || order.status === 7"
+            type="danger"
+            plain
+            @click="handleDeleteOrder(order.orderId)"
+          >删除</el-button>
         </div>
       </div>
     </el-card>
@@ -43,7 +50,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/order'
 
 const activeStatus = ref('')
@@ -81,6 +88,20 @@ async function confirmOrder(id) {
     loadOrders()
   } catch {
     ElMessage.error('确认收货失败')
+  }
+}
+
+// B-1 删除订单（二次确认 + 失败提示）
+async function handleDeleteOrder(id) {
+  try {
+    await ElMessageBox.confirm('删除后该订单将从列表移除（保留对账记录），确认删除？', '删除订单', { type: 'warning' })
+    await request.deleteOrder(id)
+    ElMessage.success('已删除')
+    loadOrders()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error('删除失败，仅已取消/已退款的订单可删除')
+    }
   }
 }
 

@@ -12,6 +12,45 @@ export function updateUserRole(id, data) {
   return request.put(`/admin/users/${id}/role`, data)
 }
 
+// B-2 用户详情（订单数/累计消费/最近行为）
+export function getUserDetail(id) {
+  return request.get(`/admin/users/${id}`)
+}
+
+// C-4 物流公司字典
+export function getLogisticsCompanies() {
+  return request.get('/admin/logistics-companies')
+}
+
+export function createLogisticsCompany(data) {
+  return request.post('/admin/logistics-companies', data)
+}
+
+export function updateLogisticsCompany(id, data) {
+  return request.put(`/admin/logistics-companies/${id}`, data)
+}
+
+export function deleteLogisticsCompany(id) {
+  return request.delete(`/admin/logistics-companies/${id}`)
+}
+
+// C-1 积分商城商品管理
+export function getPointsGoodsList(pageNum = 1, pageSize = 10) {
+  return request.get('/admin/points-goods', { params: { pageNum, pageSize } })
+}
+
+export function createPointsGoods(data) {
+  return request.post('/admin/points-goods', data)
+}
+
+export function updatePointsGoods(id, data) {
+  return request.put(`/admin/points-goods/${id}`, data)
+}
+
+export function deletePointsGoods(id) {
+  return request.delete(`/admin/points-goods/${id}`)
+}
+
 export function getProducts(params) {
   return request.get('/admin/products', { params })
 }
@@ -132,4 +171,4 @@ export function recommendRefresh() {
   return request.post('/admin/recommend/refresh')
 }
 
-export default { getUsers, updateUserStatus, getProducts, auditProduct, offlineProduct, getCategories, createCategory, updateCategory, getShops, auditShop, updateShopLevel, getDashboard, getStatisticsDetail, getLogs, getDicts, createDict, updateDict, deleteDict, getConfig, listConfig, updateConfig, getCoupons, createCoupon, updateCoupon, offlineCoupon, deleteCoupon, getPromotions, createPromotion, updatePromotion, offlinePromotion, deletePromotion, recommendRefresh }
+export default { getUsers, updateUserStatus, updateUserRole, getUserDetail, getLogisticsCompanies, createLogisticsCompany, updateLogisticsCompany, deleteLogisticsCompany, getPointsGoodsList, createPointsGoods, updatePointsGoods, deletePointsGoods, getProducts, auditProduct, offlineProduct, getCategories, createCategory, updateCategory, getShops, auditShop, updateShopLevel, getDashboard, getStatisticsDetail, getLogs, getDicts, createDict, updateDict, deleteDict, getConfig, listConfig, updateConfig, getCoupons, createCoupon, updateCoupon, offlineCoupon, deleteCoupon, getPromotions, createPromotion, updatePromotion, offlinePromotion, deletePromotion, recommendRefresh }

@@ -16,7 +16,10 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-vue": "^5.1.12",
     "axios": "^1.6.8",
+    "dompurify": "^3.2.4",
     "echarts": "^5.5.0",
     "element-plus": "^2.7.0",
     "lodash-es": "^4.17.21",

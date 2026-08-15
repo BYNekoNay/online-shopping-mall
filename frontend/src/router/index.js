@@ -37,6 +37,7 @@ const routes = [
       { path: 'user/history', name: 'UserHistory', component: () => import('@/views/consumer/user/History.vue'), meta: { requiresAuth: true } },
       { path: 'user/coupons', name: 'UserCoupons', component: () => import('@/views/consumer/user/Coupons.vue'), meta: { requiresAuth: true } },
       { path: 'user/points', name: 'UserPoints', component: () => import('@/views/consumer/user/Points.vue'), meta: { requiresAuth: true } },
+      { path: 'user/points-mall', name: 'UserPointsMall', component: () => import('@/views/consumer/user/PointsMall.vue'), meta: { requiresAuth: true } },
     ],
   },
   {
@@ -74,6 +75,8 @@ const routes = [
       { path: 'categories', name: 'AdminCategories', component: () => import('@/views/admin/product/Categories.vue') },
       { path: 'coupons', name: 'AdminCoupons', component: () => import('@/views/admin/marketing/Coupons.vue') },
       { path: 'promotions', name: 'AdminPromotions', component: () => import('@/views/admin/marketing/Promotions.vue') },
+      { path: 'points-goods', name: 'AdminPointsGoods', component: () => import('@/views/admin/marketing/PointsGoods.vue') },
+      { path: 'logistics-companies', name: 'AdminLogisticsCompanies', component: () => import('@/views/admin/logistics/Companies.vue') },
       { path: 'logs', name: 'AdminLogs', component: () => import('@/views/admin/system/Logs.vue') },
       { path: 'dicts', name: 'AdminDicts', component: () => import('@/views/admin/system/Dicts.vue') },
       { path: 'config', name: 'AdminConfig', component: () => import('@/views/admin/system/Config.vue') },

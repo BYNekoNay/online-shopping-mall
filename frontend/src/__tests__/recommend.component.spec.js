@@ -9,11 +9,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 // vi.mock factory 会被提升，mock 函数必须用 vi.hoisted 声明（避免 TDZ）
-const { pushMock, getRecommendationsMock, getSimilarProductsMock, recommendExposureMock, recommendClickMock } =
+const { pushMock, getRecommendationsMock, getSimilarProductsMock, getHistoryRecommendationsMock, recommendExposureMock, recommendClickMock } =
   vi.hoisted(() => ({
     pushMock: vi.fn(),
     getRecommendationsMock: vi.fn(),
     getSimilarProductsMock: vi.fn(),
+    getHistoryRecommendationsMock: vi.fn(),
     recommendExposureMock: vi.fn(),
     recommendClickMock: vi.fn(),
   }))
@@ -25,6 +26,7 @@ vi.mock('vue-router', () => ({
 vi.mock('@/api/recommend', () => ({
   getRecommendations: getRecommendationsMock,
   getSimilarProducts: getSimilarProductsMock,
+  getHistoryRecommendations: getHistoryRecommendationsMock,
 }))
 
 vi.mock('@/api/behavior', () => ({
@@ -107,6 +109,21 @@ describe('RecommendList 埋点（F-T11~12）', () => {
     expect(pushMock).toHaveBeenCalledWith({
       path: '/product/20',
       query: { from: 'recommend' },
+    })
+    wrapper.unmount()
+  })
+
+  it('A-1 history 模式加载后上报曝光：source=home-history（浏览历史推荐归因）', async () => {
+    getHistoryRecommendationsMock.mockResolvedValue([
+      { productId: 40, name: '历史相似A', price: 66, mainImage: '/d.jpg' },
+    ])
+    const wrapper = mountList({ mode: 'history' })
+    await flushPromises()
+
+    expect(getHistoryRecommendationsMock).toHaveBeenCalledTimes(1)
+    expect(recommendExposureMock).toHaveBeenCalledWith({
+      source: 'home-history',
+      productIds: [40],
     })
     wrapper.unmount()
   })

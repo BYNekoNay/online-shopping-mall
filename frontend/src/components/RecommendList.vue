@@ -20,7 +20,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getRecommendations, getSimilarProducts } from '@/api/recommend'
+import { getRecommendations, getSimilarProducts, getHistoryRecommendations } from '@/api/recommend'
 import { recommendExposure, recommendClick } from '@/api/behavior'
 
 const props = defineProps({
@@ -32,20 +32,22 @@ const router = useRouter()
 const list = ref([])
 const exposed = ref(false)
 
+// A-1 扩展：source 语义映射（guess=首页猜你喜欢 / similar=商品详情相似 / history=浏览历史推荐）
+const SOURCE_MAP = { guess: 'home-guess', similar: 'product-similar', history: 'home-history' }
+const source = () => SOURCE_MAP[props.mode] || 'home-guess'
+
 /** 上报推荐位曝光（仅一次）。 */
 function reportExposure() {
   if (exposed.value || !list.value || list.value.length === 0) return
   exposed.value = true
-  const source = props.mode === 'similar' ? 'product-similar' : 'home-guess'
   const productIds = list.value.map(i => i.productId)
-  recommendExposure({ source, productIds }).catch(() => {})
+  recommendExposure({ source: source(), productIds }).catch(() => {})
 }
 
 /** 上报推荐位点击（记为浏览行为）。 */
 async function handleClick(item, index) {
-  const source = props.mode === 'similar' ? 'product-similar' : 'home-guess'
   recommendClick({
-    source,
+    source: source(),
     productId: item.productId,
     position: index + 1, // 1-based
   }).catch(() => {})
@@ -58,6 +60,8 @@ onMounted(async () => {
   try {
     if (props.mode === 'similar' && props.productId) {
       list.value = await getSimilarProducts(props.productId)
+    } else if (props.mode === 'history') {
+      list.value = await getHistoryRecommendations()
     } else {
       list.value = await getRecommendations()
     }

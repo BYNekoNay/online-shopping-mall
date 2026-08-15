@@ -8,4 +8,9 @@ export function getSimilarProducts(productId, num = 10) {
   return request.get(`/recommend/similar/${productId}`, { params: { num } })
 }
 
-export default { getRecommendations, getSimilarProducts }
+// A-1 浏览历史推荐（需登录）
+export function getHistoryRecommendations(num = 10) {
+  return request.get('/recommend/history', { params: { num } })
+}
+
+export default { getRecommendations, getSimilarProducts, getHistoryRecommendations }

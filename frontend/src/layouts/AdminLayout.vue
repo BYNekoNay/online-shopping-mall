@@ -27,6 +27,12 @@
         <el-menu-item index="/admin/promotions">
           <el-icon><Promotion /></el-icon><span>促销管理</span>
         </el-menu-item>
+        <el-menu-item index="/admin/points-goods">
+          <el-icon><Star /></el-icon><span>积分商城</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/logistics-companies">
+          <el-icon><Van /></el-icon><span>物流公司</span>
+        </el-menu-item>
         <el-menu-item index="/admin/logs">
           <el-icon><Document /></el-icon><span>操作日志</span>
         </el-menu-item>
@@ -63,7 +69,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { DataAnalysis, User, Goods, Menu, Shop, Ticket, Promotion, Document, List, Setting } from '@element-plus/icons-vue'
+import { DataAnalysis, User, Goods, Menu, Shop, Ticket, Promotion, Star, Van, Document, List, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

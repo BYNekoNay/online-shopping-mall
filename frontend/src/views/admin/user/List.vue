@@ -42,11 +42,46 @@
             <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
               {{ row.status === 1 ? '禁用' : '启用' }}
             </el-button>
+            <el-button size="small" type="primary" plain @click="showDetail(row.id)">详情</el-button>
           </template>
         </el-table-column>
       </el-table>
       <el-pagination v-model:current-page="pageNum" :page-size="pageSize" :total="total" layout="total, prev, pager, next" style="margin-top: 20px; justify-content: flex-end;" @current-change="load" />
     </el-card>
+
+    <!-- B-2 用户详情 Dialog -->
+    <el-dialog v-model="detailVisible" title="用户详情" width="560px">
+      <template v-if="detail">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="用户名">{{ detail.username }}</el-descriptions-item>
+          <el-descriptions-item label="昵称">{{ detail.nickname }}</el-descriptions-item>
+          <el-descriptions-item label="角色">{{ roleMap[detail.role] }}</el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :type="detail.status === 1 ? 'success' : 'danger'" size="small">
+              {{ detail.status === 1 ? '正常' : '禁用' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="手机号">{{ detail.phone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="邮箱">{{ detail.email || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="积分">{{ detail.points }}</el-descriptions-item>
+          <el-descriptions-item label="注册时间">{{ detail.createTime }}</el-descriptions-item>
+          <el-descriptions-item label="订单数">{{ detail.orderCount }}</el-descriptions-item>
+          <el-descriptions-item label="累计消费">¥{{ detail.totalSpend }}</el-descriptions-item>
+        </el-descriptions>
+        <div style="margin-top: 16px;">
+          <p style="font-weight: 500; margin: 0 0 8px;">最近行为</p>
+          <el-table :data="detail.recentBehaviors || []" size="small" empty-text="暂无行为记录">
+            <el-table-column label="行为类型" width="100">
+              <template #default="{ row }">
+                {{ behaviorMap[row.behaviorType] || '未知' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="productId" label="商品ID" width="100" />
+            <el-table-column prop="createTime" label="时间" />
+          </el-table>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -92,6 +127,20 @@ async function changeRole(row, role) {
     ElMessage.success('角色修改成功，该用户需重新登录后生效')
   } catch {
     row.role = original // 取消或失败时回滚下拉选择
+  }
+}
+
+// B-2 用户详情
+const detailVisible = ref(false)
+const detail = ref(null)
+const behaviorMap = { 1: '浏览', 2: '收藏', 3: '购买', 4: '评价' }
+
+async function showDetail(id) {
+  try {
+    detail.value = await request.getUserDetail(id)
+    detailVisible.value = true
+  } catch {
+    ElMessage.error('加载用户详情失败')
   }
 }
 

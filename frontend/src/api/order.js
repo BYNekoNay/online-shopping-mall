@@ -29,6 +29,11 @@ export function confirmOrder(id) {
   return request.put(`/orders/${id}/confirm`)
 }
 
+// B-1 删除订单（仅已取消/已退款）
+export function deleteOrder(id) {
+  return request.delete(`/orders/${id}`)
+}
+
 export function reviewOrder(orderItemId, data) {
   return request.post(`/orders/${orderItemId}/review`, data)
 }
@@ -37,4 +42,4 @@ export function refundOrder(orderId, data) {
   return request.post(`/orders/${orderId}/refund`, data)
 }
 
-export default { getOrders, getOrderDetail, createOrder, payOrder, cancelOrder, confirmOrder, reviewOrder, refundOrder, getPoints, getPointsRecords }
+export default { getOrders, getOrderDetail, createOrder, payOrder, cancelOrder, confirmOrder, deleteOrder, reviewOrder, refundOrder, getPoints, getPointsRecords }
