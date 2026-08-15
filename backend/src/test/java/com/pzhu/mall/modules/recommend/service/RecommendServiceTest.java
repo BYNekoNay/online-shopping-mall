@@ -422,6 +422,114 @@ class RecommendServiceTest {
         assertEquals(1, result.size());
     }
 
+    // ==================== E-1 链路覆盖补测 ====================
+
+    @Test
+    void guessYouLike_redisMiss_dbBackfill_writesRedis() {
+        // GUESS-DB：Redis 空 → DB 回源 → writeToRedis 被调用
+        ZSetOperations<String, String> zsetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zsetOps);
+        // Redis 无缓存（返回空）
+        when(zsetOps.reverseRangeWithScores(eq("mall:recommend:100"), eq(0L), anyLong()))
+                .thenReturn(Collections.emptySet());
+        // DB recommend_result 有数据
+        Page<RecommendResult> page = new Page<>(1, 10);
+        RecommendResult rr = new RecommendResult();
+        rr.setProductId(10L);
+        rr.setScore(new java.math.BigDecimal("0.9"));
+        rr.setAlgorithmType(1);
+        page.setRecords(Collections.singletonList(rr));
+        page.setTotal(1);
+        when(recommendResultMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
+                .thenAnswer(inv -> {
+                    Page<RecommendResult> p = inv.getArgument(0);
+                    p.setRecords(page.getRecords());
+                    p.setTotal(1);
+                    return p;
+                });
+        Product p = product(10L, "回源商品", 1);
+        when(productMapper.selectBatchIds(any())).thenReturn(Collections.singletonList(p));
+
+        List<RecommendVO> result = service.guessYouLike(100L, 10);
+
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).getProductId());
+        // 回源后写 Redis（opsForZSet().add 被调用）
+        verify(zsetOps, atLeastOnce()).add(eq("mall:recommend:100"), eq("10"), anyDouble());
+    }
+
+    @Test
+    void similar_redisHit_returnsCached() {
+        // SIM-REDIS：相似商品 Redis 命中 → 直接返回
+        ZSetOperations<String, String> zsetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zsetOps);
+        ZSetOperations.TypedTuple<String> tuple = mock(ZSetOperations.TypedTuple.class);
+        when(tuple.getValue()).thenReturn("20");
+        when(tuple.getScore()).thenReturn(0.8);
+        when(zsetOps.reverseRangeWithScores(eq("mall:recommend:similar:10"), eq(0L), anyLong()))
+                .thenReturn(Collections.singleton(tuple));
+
+        Product p20 = product(20L, "相似缓存", 1);
+        when(productMapper.selectBatchIds(any())).thenReturn(Collections.singletonList(p20));
+
+        List<RecommendVO> result = service.similar(10L, 5);
+
+        assertEquals(1, result.size());
+        assertEquals(20L, result.get(0).getProductId());
+        verify(recommendCalculateService, never()).computeSimilarProducts(anyLong(), anyInt());
+    }
+
+    @Test
+    void similar_noSimilar_usesCategoryHotFallback() {
+        // SIM-FALLBACK：ItemCF 无相似 → 同分类热门兜底
+        // 先让 readSimilarFromRedis 返回空（redis 无缓存）
+        ZSetOperations<String, String> zsetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zsetOps);
+        when(zsetOps.reverseRangeWithScores(eq("mall:recommend:similar:10"), eq(0L), anyLong()))
+                .thenReturn(Collections.emptySet());
+
+        when(recommendCalculateService.computeSimilarProducts(10L, 5))
+                .thenReturn(Collections.emptyMap());
+        Product current = product(10L, "当前商品", 1);
+        current.setCategoryId(7L);
+        when(productMapper.selectById(10L)).thenReturn(current);
+
+        Product categoryHot = product(20L, "同分类热门", 50);
+        when(productMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
+                .thenAnswer(inv -> {
+                    Page<Product> p = inv.getArgument(0);
+                    p.setRecords(Collections.singletonList(categoryHot));
+                    return p;
+                });
+
+        List<RecommendVO> result = service.similar(10L, 5);
+
+        assertEquals(1, result.size());
+        assertEquals(20L, result.get(0).getProductId());
+        assertEquals(4, result.get(0).getAlgorithmType());
+    }
+
+    @Test
+    void cacheHotProducts_writesZsetWithExpire() {
+        // HOT-CACHE：热门缓存写入 + 24h TTL
+        ZSetOperations<String, String> zsetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zsetOps);
+        Product p1 = product(1L, "热1", 100);
+        Product p2 = product(2L, "热2", 90);
+        when(productMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class)))
+                .thenAnswer(inv -> {
+                    Page<Product> p = inv.getArgument(0);
+                    p.setRecords(List.of(p1, p2));
+                    return p;
+                });
+
+        service.cacheHotProducts();
+
+        verify(stringRedisTemplate).delete("mall:recommend:hot:products");
+        verify(zsetOps, times(2)).add(eq("mall:recommend:hot:products"), anyString(), anyDouble());
+        verify(stringRedisTemplate).expire(eq("mall:recommend:hot:products"), any());
+    }
+
     // ==================== helpers ====================
 
     private static Product product(Long id, String name, int sales) {

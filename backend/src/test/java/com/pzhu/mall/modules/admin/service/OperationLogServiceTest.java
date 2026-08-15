@@ -1,21 +1,30 @@
 package com.pzhu.mall.modules.admin.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.pzhu.mall.modules.admin.entity.OperationLog;
 import com.pzhu.mall.modules.admin.mapper.OperationLogMapper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * OperationLogService 单元测试（AD-06 角色参数化）。
+ * OperationLogService 单元测试（E-1 覆盖率补测：admin.service 29% → ≥80%）。
  */
 class OperationLogServiceTest {
 
     private OperationLogMapper operationLogMapper;
     private OperationLogService service;
+
+    @BeforeAll
+    static void initTableInfo() {
+        var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, OperationLog.class);
+    }
 
     @BeforeEach
     void setUp() {
@@ -26,35 +35,32 @@ class OperationLogServiceTest {
 
     @Test
     void record_defaultRole_isAdmin() {
-        // 默认重载：operatorRole=3（管理员）
-        service.record(100L, "操作", "目标");
-
-        var captor = org.mockito.ArgumentCaptor.forClass(OperationLog.class);
+        // OL-01：默认角色=3（管理员），字段完整
+        service.record(100L, "禁用用户", "用户#5");
+        org.mockito.ArgumentCaptor<OperationLog> captor =
+                org.mockito.ArgumentCaptor.forClass(OperationLog.class);
         verify(operationLogMapper).insert(captor.capture());
-        assertEquals(100L, captor.getValue().getOperatorId());
-        assertEquals(Integer.valueOf(3), captor.getValue().getOperatorRole());
-        assertEquals("操作", captor.getValue().getOperation());
-        assertEquals("目标", captor.getValue().getTarget());
-        assertNotNull(captor.getValue().getCreateTime());
+        OperationLog log = captor.getValue();
+        assertEquals(100L, log.getOperatorId());
+        assertEquals(3, log.getOperatorRole());
+        assertEquals("禁用用户", log.getOperation());
+        assertEquals("用户#5", log.getTarget());
+        assertNotNull(log.getCreateTime());
     }
 
     @Test
-    void record_withMerchantRole_usesGivenRole() {
-        // AD-06 修复验证：商家操作日志角色=2
-        service.record(200L, 2, "上架商品", "商品#5");
-
-        var captor = org.mockito.ArgumentCaptor.forClass(OperationLog.class);
-        verify(operationLogMapper).insert(captor.capture());
-        assertEquals(Integer.valueOf(2), captor.getValue().getOperatorRole());
+    void record_merchantRole_usesProvidedRole() {
+        // OL-02：商家角色（2）参数化
+        service.record(200L, 2, "发货", "订单#1");
+        verify(operationLogMapper).insert(argThat(l ->
+                l.getOperatorRole() == 2 && l.getOperatorId() == 200L && "发货".equals(l.getOperation())));
     }
 
     @Test
-    void record_nullRole_fallsBackToAdmin() {
-        service.record(300L, null, "操作", "目标");
-
-        var captor = org.mockito.ArgumentCaptor.forClass(OperationLog.class);
-        verify(operationLogMapper).insert(captor.capture());
-        assertEquals(Integer.valueOf(3), captor.getValue().getOperatorRole());
+    void record_nullRole_defaultsToAdmin() {
+        // OL-03：operatorRole=null → 回退 3
+        service.record(100L, null, "操作", "目标");
+        verify(operationLogMapper).insert(argThat(l -> l.getOperatorRole() == 3));
     }
 
     private static void inject(Object target, String fieldName, Object value) {

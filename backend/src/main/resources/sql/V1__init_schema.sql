@@ -348,7 +348,8 @@ CREATE TABLE `user_behavior` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_user_product_type` (`user_id`,`product_id`,`behavior_type`),
-  KEY `idx_product_id` (`product_id`)
+  KEY `idx_product_id` (`product_id`),
+  KEY `idx_user_type_time` (`user_id`,`behavior_type`,`create_time`) COMMENT 'E-4 行为推荐/浏览历史按行为类型+时间排序'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户行为表';
 
 CREATE TABLE `user_score` (

@@ -61,6 +61,7 @@ class OrderServiceTest {
     private BehaviorService behaviorService;
     private com.pzhu.mall.modules.order.mapper.PaymentMapper paymentMapper;
     private com.pzhu.mall.modules.product.service.ReviewService reviewService;
+    private com.pzhu.mall.modules.logistics.mapper.LogisticsMapper logisticsMapper;
     private OrderService service;
 
     @BeforeAll
@@ -86,6 +87,7 @@ class OrderServiceTest {
         behaviorService = mock(BehaviorService.class);
         paymentMapper = mock(com.pzhu.mall.modules.order.mapper.PaymentMapper.class);
         reviewService = mock(com.pzhu.mall.modules.product.service.ReviewService.class);
+        logisticsMapper = mock(com.pzhu.mall.modules.logistics.mapper.LogisticsMapper.class);
 
         service = new OrderService();
         inject(service, "orderMapper", orderMapper);
@@ -99,6 +101,7 @@ class OrderServiceTest {
         inject(service, "behaviorService", behaviorService);
         inject(service, "paymentMapper", paymentMapper);
         inject(service, "reviewService", reviewService);
+        inject(service, "logisticsMapper", logisticsMapper);
 
         // pay() 内部注册事务提交后回调，需要激活事务同步（单元测试无真实事务）
         TransactionSynchronizationManager.initSynchronization();
@@ -589,6 +592,67 @@ class OrderServiceTest {
         // 无分页参数走 selectList 分支（避免 selectPage 返回 null 的 NPE）
         service.listByUser();
         verify(orderMapper).selectList(any());
+    }
+
+    // ==================== ship（E-1 补测：发货链路） ====================
+
+    private static Order shippedReadyOrder(Long id, Long shopId) {
+        Order order = new Order();
+        order.setId(id);
+        order.setShopId(shopId);
+        order.setStatus(1); // 待发货
+        order.setIsDeleted(0);
+        return order;
+    }
+
+    @Test
+    void ship_success_writesLogistics() {
+        // SHIP-01：发货成功 → 状态2 + 物流记录
+        LoginUserContext.set(100L, 1);
+        Order order = shippedReadyOrder(1L, 1L);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        service.ship(1L, "顺丰速运", "SF123456", 1L);
+
+        verify(orderMapper).update(isNull(), any());
+        verify(logisticsMapper).insert(any());
+    }
+
+    @Test
+    void ship_otherShop_throwsNotFound() {
+        // SHIP-02：非本店订单 → 40005
+        Order order = shippedReadyOrder(1L, 99L);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class,
+                () -> service.ship(1L, "顺丰", "SF123", 1L));
+        verify(logisticsMapper, never()).insert(any());
+    }
+
+    @Test
+    void ship_wrongStatus_throwsStatusInvalid() {
+        // SHIP-03：非待发货状态（status=2）→ 40004
+        LoginUserContext.set(100L, 1);
+        Order order = shippedReadyOrder(1L, 1L);
+        order.setStatus(2);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class,
+                () -> service.ship(1L, "顺丰", "SF123", 1L));
+    }
+
+    @Test
+    void ship_concurrentUpdate_throwsStatusInvalid() {
+        // SHIP-04：并发（update=0）→ 40004
+        LoginUserContext.set(100L, 1);
+        Order order = shippedReadyOrder(1L, 1L);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+        when(orderMapper.update(isNull(), any())).thenReturn(0);
+
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class,
+                () -> service.ship(1L, "顺丰", "SF123", 1L));
+        verify(logisticsMapper, never()).insert(any());
     }
 
     // ==================== helpers ====================
