@@ -31,6 +31,7 @@ class MerchantStatisticsServiceTest {
 
     private OrderMapper orderMapper;
     private OrderItemMapper orderItemMapper;
+    private com.pzhu.mall.modules.product.mapper.ReviewMapper reviewMapper;
     private MerchantStatisticsService service;
 
     @BeforeAll
@@ -38,15 +39,18 @@ class MerchantStatisticsServiceTest {
         var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
         TableInfoHelper.initTableInfo(assistant, Order.class);
         TableInfoHelper.initTableInfo(assistant, OrderItem.class);
+        TableInfoHelper.initTableInfo(assistant, com.pzhu.mall.modules.product.entity.Review.class);
     }
 
     @BeforeEach
     void setUp() {
         orderMapper = mock(OrderMapper.class);
         orderItemMapper = mock(OrderItemMapper.class);
+        reviewMapper = mock(com.pzhu.mall.modules.product.mapper.ReviewMapper.class);
         service = new MerchantStatisticsService();
         inject(service, "orderMapper", orderMapper);
         inject(service, "orderItemMapper", orderItemMapper);
+        inject(service, "reviewMapper", reviewMapper);
     }
 
     @Test
@@ -87,6 +91,95 @@ class MerchantStatisticsServiceTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    // ==================== B-3 好评率 ====================
+
+    private void stubTopProductsContext() {
+        Order order = new Order();
+        order.setId(1L);
+        order.setShopId(1L);
+        order.setStatus(1);
+        when(orderMapper.selectList(any())).thenReturn(Collections.singletonList(order));
+
+        OrderItem real = new OrderItem();
+        real.setOrderId(1L);
+        real.setProductId(10L);
+        real.setPrice(new BigDecimal("100"));
+        real.setQuantity(1);
+        real.setIsGift(0);
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.singletonList(real));
+    }
+
+    @Test
+    void getTopProducts_positiveRate_80Percent() {
+        // M-01：10 条评价 8 条 ≥4 分 → positiveRate="80%"
+        stubTopProductsContext();
+        java.util.List<com.pzhu.mall.modules.product.entity.Review> reviews = new java.util.ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            com.pzhu.mall.modules.product.entity.Review r = new com.pzhu.mall.modules.product.entity.Review();
+            r.setProductId(10L);
+            r.setRating(i < 8 ? 5 : 3);
+            reviews.add(r);
+        }
+        when(reviewMapper.selectList(any())).thenReturn(reviews);
+
+        List<Map<String, Object>> top = service.getTopProducts(1L);
+
+        assertEquals(1, top.size());
+        assertEquals("80%", top.get(0).get("positiveRate"));
+    }
+
+    @Test
+    void getTopProducts_noReviews_returnsNull() {
+        // M-02：无评价 → positiveRate=null（前端显示 "-"）
+        stubTopProductsContext();
+        when(reviewMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        List<Map<String, Object>> top = service.getTopProducts(1L);
+
+        assertEquals(1, top.size());
+        assertNull(top.get(0).get("positiveRate"));
+    }
+
+    @Test
+    void getTopProducts_mixedProducts_independentRate() {
+        // M-03：多商品独立计算（商品A 50% / 商品B 无评价 null）
+        Order order = new Order();
+        order.setId(1L);
+        order.setShopId(1L);
+        order.setStatus(1);
+        when(orderMapper.selectList(any())).thenReturn(Collections.singletonList(order));
+
+        OrderItem itemA = new OrderItem();
+        itemA.setOrderId(1L);
+        itemA.setProductId(10L);
+        itemA.setPrice(new BigDecimal("100"));
+        itemA.setQuantity(1);
+        itemA.setIsGift(0);
+        OrderItem itemB = new OrderItem();
+        itemB.setOrderId(1L);
+        itemB.setProductId(20L);
+        itemB.setPrice(new BigDecimal("200"));
+        itemB.setQuantity(1);
+        itemB.setIsGift(0);
+        when(orderItemMapper.selectList(any())).thenReturn(java.util.Arrays.asList(itemA, itemB));
+
+        com.pzhu.mall.modules.product.entity.Review r1 = new com.pzhu.mall.modules.product.entity.Review();
+        r1.setProductId(10L);
+        r1.setRating(5);
+        com.pzhu.mall.modules.product.entity.Review r2 = new com.pzhu.mall.modules.product.entity.Review();
+        r2.setProductId(10L);
+        r2.setRating(1);
+        when(reviewMapper.selectList(any())).thenReturn(java.util.Arrays.asList(r1, r2));
+
+        List<Map<String, Object>> top = service.getTopProducts(1L);
+
+        assertEquals(2, top.size());
+        Map<Object, Map<String, Object>> byProduct = top.stream()
+                .collect(java.util.stream.Collectors.toMap(m -> m.get("productId"), m -> m));
+        assertEquals("50%", byProduct.get(10L).get("positiveRate"));
+        assertNull(byProduct.get(20L).get("positiveRate"));
     }
 
     @Test

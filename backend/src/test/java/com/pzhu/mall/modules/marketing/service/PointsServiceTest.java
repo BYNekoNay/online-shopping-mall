@@ -227,6 +227,62 @@ class PointsServiceTest {
         verify(pointsRecordMapper, never()).insert(any(PointsRecord.class));
     }
 
+    // ==================== C-2 积分有效期 ====================
+
+    @Test
+    void settleEarn_setsExpireTime() {
+        // F-00：下单获取积分带 365 天 expire_time
+        when(userMapper.update(isNull(), any())).thenReturn(1);
+        service.settleEarn(1L, 100L, new java.math.BigDecimal("100"));
+        org.mockito.ArgumentCaptor<PointsRecord> captor =
+                org.mockito.ArgumentCaptor.forClass(PointsRecord.class);
+        verify(pointsRecordMapper).insert(captor.capture());
+        assertNotNull(captor.getValue().getExpireTime());
+    }
+
+    @Test
+    void getExpiringPoints_sumsExpiringRecords() {
+        // F-01：30 天内过期积分汇总正确
+        PointsRecord r1 = new PointsRecord();
+        r1.setChangeAmount(50);
+        r1.setExpireTime(java.time.LocalDateTime.now().plusDays(10));
+        PointsRecord r2 = new PointsRecord();
+        r2.setChangeAmount(30);
+        r2.setExpireTime(java.time.LocalDateTime.now().plusDays(20));
+        when(pointsRecordMapper.selectList(any())).thenReturn(java.util.Arrays.asList(r1, r2));
+
+        int expiring = service.getExpiringPoints(1L);
+
+        assertEquals(80, expiring);
+    }
+
+    @Test
+    void expirePoints_marksRecordsAndClears() {
+        // F-02：清理过期积分 + 标记 expired=1（幂等）
+        PointsRecord expired = new PointsRecord();
+        expired.setId(9L);
+        expired.setUserId(1L);
+        expired.setChangeAmount(100);
+        expired.setType(1);
+        expired.setExpireTime(java.time.LocalDateTime.now().minusDays(1));
+        when(pointsRecordMapper.selectList(any())).thenReturn(java.util.Collections.singletonList(expired));
+        when(userMapper.update(isNull(), any())).thenReturn(1);
+
+        service.expirePoints();
+
+        verify(userMapper).update(isNull(), any());
+        // 标记已清理（第二次 update 调用 on pointsRecordMapper）
+        verify(pointsRecordMapper).update(isNull(), any());
+    }
+
+    @Test
+    void expirePoints_noExpiredRecords_noop() {
+        // F-03：无过期记录 → 无操作
+        when(pointsRecordMapper.selectList(any())).thenReturn(java.util.Collections.emptyList());
+        service.expirePoints();
+        verify(userMapper, never()).update(isNull(), any());
+    }
+
     // ==================== helpers ====================
 
     private static User user(int points) {

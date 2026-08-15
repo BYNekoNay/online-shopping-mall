@@ -3,6 +3,7 @@ package com.pzhu.mall.modules.shop.service;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.pzhu.mall.common.exception.BusinessException;
 import com.pzhu.mall.modules.shop.entity.Shop;
 import com.pzhu.mall.modules.shop.mapper.ShopMapper;
 import com.pzhu.mall.modules.user.entity.User;
@@ -159,5 +160,66 @@ class ShopServiceTest {
 
         org.junit.jupiter.api.Assertions.assertNotNull(vo);
         org.junit.jupiter.api.Assertions.assertNull(vo.getStatus());
+    }
+
+    // ==================== B-5 店铺装修校验 ====================
+
+    @Test
+    void updateInfo_validDecoration_succeeds() {
+        // D-01：合法 4 字段 → 保存成功
+        Shop shop = new Shop();
+        shop.setId(1L);
+        shop.setMerchantUserId(100L);
+        shop.setStatus(1);
+        when(shopMapper.selectOne(any())).thenReturn(shop);
+
+        var dto = new com.pzhu.mall.modules.shop.dto.ShopUpdateDTO();
+        dto.setDecorationConfig("{\"bannerImage\":\"http://a/b.jpg\",\"themeColor\":\"#FF6B35\",\"announcement\":\"满199包邮\",\"intro\":\"正品保障\"}");
+        service.updateInfo(100L, dto);
+
+        org.mockito.Mockito.verify(shopMapper).updateById(shop);
+    }
+
+    @Test
+    void updateInfo_invalidThemeColor_throws() {
+        // D-02：themeColor 非法 → 抛 10001
+        Shop shop = new Shop();
+        shop.setId(1L);
+        shop.setMerchantUserId(100L);
+        shop.setStatus(1);
+        when(shopMapper.selectOne(any())).thenReturn(shop);
+
+        var dto = new com.pzhu.mall.modules.shop.dto.ShopUpdateDTO();
+        dto.setDecorationConfig("{\"themeColor\":\"red\"}");
+        org.junit.jupiter.api.Assertions.assertThrows(BusinessException.class, () -> service.updateInfo(100L, dto));
+    }
+
+    @Test
+    void updateInfo_announcementTooLong_throws() {
+        // D-03：announcement 超长 → 抛 10001
+        Shop shop = new Shop();
+        shop.setId(1L);
+        shop.setMerchantUserId(100L);
+        shop.setStatus(1);
+        when(shopMapper.selectOne(any())).thenReturn(shop);
+
+        String longAnn = "a".repeat(201);
+        var dto = new com.pzhu.mall.modules.shop.dto.ShopUpdateDTO();
+        dto.setDecorationConfig("{\"announcement\":\"" + longAnn + "\"}");
+        org.junit.jupiter.api.Assertions.assertThrows(BusinessException.class, () -> service.updateInfo(100L, dto));
+    }
+
+    @Test
+    void updateInfo_invalidJson_throws() {
+        // D-05：非法 JSON → 抛 10001
+        Shop shop = new Shop();
+        shop.setId(1L);
+        shop.setMerchantUserId(100L);
+        shop.setStatus(1);
+        when(shopMapper.selectOne(any())).thenReturn(shop);
+
+        var dto = new com.pzhu.mall.modules.shop.dto.ShopUpdateDTO();
+        dto.setDecorationConfig("not-json");
+        org.junit.jupiter.api.Assertions.assertThrows(BusinessException.class, () -> service.updateInfo(100L, dto));
     }
 }

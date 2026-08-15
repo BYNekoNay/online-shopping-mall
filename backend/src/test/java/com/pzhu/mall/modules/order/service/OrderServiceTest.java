@@ -502,6 +502,95 @@ class OrderServiceTest {
         verify(behaviorService, never()).record(anyLong(), anyLong(), eq(4));
     }
 
+    // ==================== deleteOrder（B-1 删除订单） ====================
+
+    private static Order cancelledOrder(Long id, Long userId) {
+        Order order = new Order();
+        order.setId(id);
+        order.setUserId(userId);
+        order.setStatus(5); // 已取消
+        order.setIsDeleted(0);
+        return order;
+    }
+
+    @Test
+    void deleteOrder_cancelledStatus_success() {
+        // O-01：状态=5 本人删除 → 成功，is_deleted=1
+        LoginUserContext.set(100L, 1);
+        Order order = cancelledOrder(1L, 100L);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        service.deleteOrder(100L, 1L);
+        // 原子 UPDATE 携带 is_deleted=1 条件
+        org.mockito.ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper> captor =
+                org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper.class);
+        verify(orderMapper).update(isNull(), captor.capture());
+        assertNotNull(captor.getValue());
+    }
+
+    @Test
+    void deleteOrder_pendingStatus_rejected() {
+        // O-02：状态=0（待付款）→ 抛 10001
+        LoginUserContext.set(100L, 1);
+        Order order = pendingOrder(1L, 100L);
+        order.setIsDeleted(0);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+
+        com.pzhu.mall.common.exception.BusinessException ex =
+                assertThrows(com.pzhu.mall.common.exception.BusinessException.class,
+                        () -> service.deleteOrder(100L, 1L));
+        assertTrue(ex.getMessage().contains("仅已取消或已退款"));
+    }
+
+    @Test
+    void deleteOrder_otherUserOrder_forbidden() {
+        // O-03：他人订单 → 抛 10003（IDOR）
+        LoginUserContext.set(100L, 1);
+        Order order = cancelledOrder(1L, 200L);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class,
+                () -> service.deleteOrder(100L, 1L));
+    }
+
+    @Test
+    void deleteOrder_alreadyDeleted_notFound() {
+        // O-04：已删除订单再删 → 抛 40005
+        LoginUserContext.set(100L, 1);
+        Order order = cancelledOrder(1L, 100L);
+        order.setIsDeleted(1);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class,
+                () -> service.deleteOrder(100L, 1L));
+    }
+
+    @Test
+    void deleteOrder_concurrentUpdate_rejected() {
+        // O-05：并发删除（update 返回 0）→ 抛"状态已变化"
+        LoginUserContext.set(100L, 1);
+        Order order = cancelledOrder(1L, 100L);
+        when(orderMapper.selectById(1L)).thenReturn(order);
+        when(orderMapper.update(isNull(), any())).thenReturn(0);
+
+        com.pzhu.mall.common.exception.BusinessException ex =
+                assertThrows(com.pzhu.mall.common.exception.BusinessException.class,
+                        () -> service.deleteOrder(100L, 1L));
+        assertTrue(ex.getMessage().contains("状态已变化"));
+    }
+
+    @Test
+    void listByUser_filtersDeletedOrders() {
+        // O-06：listByUser 过滤 is_deleted=1（审核修正验证）
+        LoginUserContext.set(100L, 1);
+        when(orderMapper.selectList(any())).thenReturn(java.util.Collections.emptyList());
+
+        // 无分页参数走 selectList 分支（避免 selectPage 返回 null 的 NPE）
+        service.listByUser();
+        verify(orderMapper).selectList(any());
+    }
+
     // ==================== helpers ====================
 
     private static Order pendingOrder(Long id, Long userId) {

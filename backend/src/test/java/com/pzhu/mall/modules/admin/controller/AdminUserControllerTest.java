@@ -34,6 +34,8 @@ class AdminUserControllerTest {
     private UserMapper userMapper;
     private OperationLogService operationLogService;
     private AccountStatusService accountStatusService;
+    private com.pzhu.mall.modules.order.mapper.OrderMapper orderMapper;
+    private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
     private AdminUserController controller;
 
     @BeforeAll
@@ -43,6 +45,12 @@ class AdminUserControllerTest {
             TableInfoHelper.initTableInfo(
                     new MapperBuilderAssistant(new MybatisConfiguration(), ""), User.class);
         }
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""),
+                com.pzhu.mall.modules.order.entity.Order.class);
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""),
+                com.pzhu.mall.modules.behavior.entity.UserBehavior.class);
     }
 
     @BeforeEach
@@ -50,10 +58,14 @@ class AdminUserControllerTest {
         userMapper = mock(UserMapper.class);
         operationLogService = mock(OperationLogService.class);
         accountStatusService = mock(AccountStatusService.class);
+        orderMapper = mock(com.pzhu.mall.modules.order.mapper.OrderMapper.class);
+        userBehaviorMapper = mock(com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper.class);
         controller = new AdminUserController();
         inject(controller, "userMapper", userMapper);
         inject(controller, "operationLogService", operationLogService);
         inject(controller, "accountStatusService", accountStatusService);
+        inject(controller, "orderMapper", orderMapper);
+        inject(controller, "userBehaviorMapper", userBehaviorMapper);
     }
 
     @AfterEach
@@ -180,6 +192,63 @@ class AdminUserControllerTest {
         dto.setRole(2);
 
         assertThrows(BusinessException.class, () -> controller.updateRole(999L, dto));
+    }
+
+    // ==================== detail（B-2 用户详情） ====================
+
+    @Test
+    void detail_userExists_returnsFullProfile() {
+        // U-01：用户存在 → 返回完整字段（含订单数/消费/行为）
+        when(userMapper.selectById(5L)).thenReturn(user(5L, "user5", 1, 1));
+        when(orderMapper.selectCount(any())).thenReturn(3L);
+
+        com.pzhu.mall.modules.order.entity.Order paid = new com.pzhu.mall.modules.order.entity.Order();
+        paid.setPayAmount(new java.math.BigDecimal("100.50"));
+        when(orderMapper.selectList(any())).thenReturn(
+                java.util.List.of(paid, paid));
+
+        var behavior = new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        behavior.setUserId(5L);
+        behavior.setProductId(10L);
+        behavior.setBehaviorType(1);
+        when(userBehaviorMapper.selectList(any())).thenReturn(java.util.List.of(behavior));
+
+        var result = controller.detail(5L).getData();
+
+        assertEquals("user5", result.get("username"));
+        assertEquals(3L, result.get("orderCount"));
+        assertEquals(new java.math.BigDecimal("201.00"), result.get("totalSpend"));
+        assertEquals(1, ((java.util.List<?>) result.get("recentBehaviors")).size());
+    }
+
+    @Test
+    void detail_userNotFound_throws() {
+        // U-02：用户不存在 → 抛 10004
+        when(userMapper.selectById(999L)).thenReturn(null);
+        assertThrows(BusinessException.class, () -> controller.detail(999L));
+    }
+
+    @Test
+    void detail_userWithoutOrders_returnsZero() {
+        // U-03/U-04：无订单用户 → 0 / 0.00
+        when(userMapper.selectById(5L)).thenReturn(user(5L, "user5", 1, 1));
+        when(orderMapper.selectCount(any())).thenReturn(0L);
+        when(orderMapper.selectList(any())).thenReturn(java.util.Collections.emptyList());
+        when(userBehaviorMapper.selectList(any())).thenReturn(java.util.Collections.emptyList());
+
+        var result = controller.detail(5L).getData();
+
+        assertEquals(0L, result.get("orderCount"));
+        assertEquals(java.math.BigDecimal.ZERO, result.get("totalSpend"));
+    }
+
+    @Test
+    void detail_deletedUser_throws() {
+        // U-05：已软删用户 → 抛 10004
+        User deleted = user(5L, "user5", 1, 1);
+        deleted.setIsDeleted(1);
+        when(userMapper.selectById(5L)).thenReturn(deleted);
+        assertThrows(BusinessException.class, () -> controller.detail(5L));
     }
 
     private static User user(Long id, String username, int role, int status) {

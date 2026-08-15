@@ -36,6 +36,7 @@ class RecommendServiceTest {
     private ProductMapper productMapper;
     private StringRedisTemplate stringRedisTemplate;
     private RecommendCalculateService recommendCalculateService;
+    private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
     private RecommendService service;
 
     @BeforeAll
@@ -52,11 +53,13 @@ class RecommendServiceTest {
         productMapper = mock(ProductMapper.class);
         stringRedisTemplate = mock(StringRedisTemplate.class);
         recommendCalculateService = mock(RecommendCalculateService.class);
+        userBehaviorMapper = mock(com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper.class);
         service = new RecommendService();
         inject(service, "recommendResultMapper", recommendResultMapper);
         inject(service, "productMapper", productMapper);
         inject(service, "stringRedisTemplate", stringRedisTemplate);
         inject(service, "recommendCalculateService", recommendCalculateService);
+        inject(service, "userBehaviorMapper", userBehaviorMapper);
     }
 
     // ==================== guessYouLike（猜你喜欢） ====================
@@ -264,6 +267,101 @@ class RecommendServiceTest {
         List<RecommendVO> result = service.similar(1L, 5);
 
         assertTrue(result.isEmpty());
+    }
+
+    // ==================== historyBased（浏览历史推荐，A-1） ====================
+
+    @Test
+    void historyBased_withViewedProducts_returnsSimilar() {
+        // H-01：有浏览记录 + 相似商品 → 返回非空、algoType=2、不含已浏览商品
+        var viewed = new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        viewed.setUserId(1L);
+        viewed.setProductId(10L);
+        viewed.setBehaviorType(1);
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.singletonList(viewed));
+
+        // 商品 10 的 ItemCF 相似：20（0.9 分）、30（0.5 分）
+        Map<Long, Double> sim10 = new HashMap<>();
+        sim10.put(20L, 0.9);
+        sim10.put(30L, 0.5);
+        when(recommendCalculateService.computeSimilarProducts(10L, 5)).thenReturn(sim10);
+
+        // 批量加载相似商品
+        Product p20 = product(20L, "相似商品A", 50);
+        Product p30 = product(30L, "相似商品B", 30);
+        when(productMapper.selectBatchIds(any())).thenReturn(List.of(p20, p30));
+
+        List<RecommendVO> result = service.historyBased(1L, 10);
+
+        assertEquals(2, result.size());
+        // 平均分排序：20(0.9) 在前
+        assertEquals(20L, result.get(0).getProductId());
+        assertEquals(2, result.get(0).getAlgorithmType());
+        // 不含已浏览商品 10
+        assertTrue(result.stream().noneMatch(v -> v.getProductId() == 10L));
+    }
+
+    @Test
+    void historyBased_noViewedProducts_returnsEmpty() {
+        // H-02：无浏览记录 → 空列表
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.emptyList());
+        assertTrue(service.historyBased(1L, 10).isEmpty());
+    }
+
+    @Test
+    void historyBased_similarProductsAllOffline_returnsEmpty() {
+        // H-03：相似商品全部下架 → 被过滤为空
+        var viewed = new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        viewed.setUserId(1L);
+        viewed.setProductId(10L);
+        viewed.setBehaviorType(1);
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.singletonList(viewed));
+
+        Map<Long, Double> sim10 = new HashMap<>();
+        sim10.put(20L, 0.9);
+        when(recommendCalculateService.computeSimilarProducts(10L, 5)).thenReturn(sim10);
+
+        // 相似商品已下架（status=2）
+        Product offline = product(20L, "下架商品", 50);
+        offline.setStatus(2);
+        when(productMapper.selectBatchIds(any())).thenReturn(List.of(offline));
+
+        List<RecommendVO> result = service.historyBased(1L, 10);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void historyBased_numLimitRespected() {
+        // H-04：num=1 → 最多返回 1 条
+        var viewed = new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        viewed.setUserId(1L);
+        viewed.setProductId(10L);
+        viewed.setBehaviorType(1);
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.singletonList(viewed));
+
+        Map<Long, Double> sim10 = new HashMap<>();
+        sim10.put(20L, 0.9);
+        sim10.put(30L, 0.5);
+        when(recommendCalculateService.computeSimilarProducts(10L, 5)).thenReturn(sim10);
+        when(productMapper.selectBatchIds(any())).thenReturn(List.of(product(20L, "A", 1), product(30L, "B", 1)));
+
+        List<RecommendVO> result = service.historyBased(1L, 1);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void historyBased_numOutOfRange_clamped() {
+        // H-05：num 越界（0）→ 钳制为默认 10（服务端 Math.max 兜底，不抛错）
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.emptyList());
+        // 不抛异常即可（无浏览记录 → 空列表，num=0 已被 Math.max(0,1) 归一）
+        assertTrue(service.historyBased(1L, 0).isEmpty());
     }
 
     // ==================== helpers ====================

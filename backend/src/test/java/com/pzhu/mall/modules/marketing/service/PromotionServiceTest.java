@@ -128,4 +128,78 @@ class PromotionServiceTest {
         PromotionService s = svcWithActive(List.of(p));
         assertNull(s.matchGift(1L, new BigDecimal("200")));
     }
+
+    // ==================== A-2 促销范围收紧（validatePromotion 经 create 触发） ====================
+
+    private Promotion validShopPromotion() {
+        Promotion p = new Promotion();
+        p.setName("测试促销");
+        p.setType(1);
+        p.setScope("SHOP");
+        p.setScopeId(1L);
+        p.setStartTime(LocalDateTime.now().minusDays(1));
+        p.setEndTime(LocalDateTime.now().plusDays(1));
+        p.setRuleJson("{\"discountPercent\":0.8}");
+        return p;
+    }
+
+    @Test
+    void create_scopeShop_valid() {
+        // P-01：scope=SHOP + scopeId 正常 → 创建成功（promotionMapper.insert 被调用）
+        PromotionMapper mapper = mock(PromotionMapper.class);
+        PromotionService s = new PromotionService();
+        ReflectionTestUtils.setField(s, "promotionMapper", mapper);
+        Promotion p = validShopPromotion();
+        s.create(p);
+        org.mockito.Mockito.verify(mapper).insert(p);
+    }
+
+    @Test
+    void create_scopeProduct_rejected() {
+        // P-02：scope=PRODUCT → 抛 40001
+        PromotionService s = new PromotionService();
+        Promotion p = validShopPromotion();
+        p.setScope("PRODUCT");
+        com.pzhu.mall.common.exception.BusinessException ex =
+                assertThrows(com.pzhu.mall.common.exception.BusinessException.class, () -> s.create(p));
+        assertTrue(ex.getMessage().contains("仅支持 SHOP"));
+    }
+
+    @Test
+    void create_scopeCategory_rejected() {
+        // P-03：scope=CATEGORY → 抛 40001
+        PromotionService s = new PromotionService();
+        Promotion p = validShopPromotion();
+        p.setScope("CATEGORY");
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class, () -> s.create(p));
+    }
+
+    @Test
+    void create_scopeNull_rejected() {
+        // P-04：scope 为空 → 抛 40001
+        PromotionService s = new PromotionService();
+        Promotion p = validShopPromotion();
+        p.setScope(null);
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class, () -> s.create(p));
+    }
+
+    @Test
+    void create_scopeIdNull_rejected() {
+        // P-05：scopeId 为空 → 抛 40001（A-2 新增校验）
+        PromotionService s = new PromotionService();
+        Promotion p = validShopPromotion();
+        p.setScopeId(null);
+        com.pzhu.mall.common.exception.BusinessException ex =
+                assertThrows(com.pzhu.mall.common.exception.BusinessException.class, () -> s.create(p));
+        assertTrue(ex.getMessage().contains("scopeId"));
+    }
+
+    @Test
+    void update_scopeProduct_rejected() {
+        // P-06：update 同校验 → scope=PRODUCT 抛 40001
+        PromotionService s = new PromotionService();
+        Promotion p = validShopPromotion();
+        p.setScope("PRODUCT");
+        assertThrows(com.pzhu.mall.common.exception.BusinessException.class, () -> s.update(p));
+    }
 }
