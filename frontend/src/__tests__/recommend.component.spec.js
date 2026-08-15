@@ -9,12 +9,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 // vi.mock factory 会被提升，mock 函数必须用 vi.hoisted 声明（避免 TDZ）
-const { pushMock, getRecommendationsMock, getSimilarProductsMock, getHistoryRecommendationsMock, recommendExposureMock, recommendClickMock } =
+const { pushMock, getRecommendationsMock, getSimilarProductsMock, getHistoryRecommendationsMock, getPurchaseRecommendationsMock, recommendExposureMock, recommendClickMock } =
   vi.hoisted(() => ({
     pushMock: vi.fn(),
     getRecommendationsMock: vi.fn(),
     getSimilarProductsMock: vi.fn(),
     getHistoryRecommendationsMock: vi.fn(),
+    getPurchaseRecommendationsMock: vi.fn(),
     recommendExposureMock: vi.fn(),
     recommendClickMock: vi.fn(),
   }))
@@ -27,6 +28,7 @@ vi.mock('@/api/recommend', () => ({
   getRecommendations: getRecommendationsMock,
   getSimilarProducts: getSimilarProductsMock,
   getHistoryRecommendations: getHistoryRecommendationsMock,
+  getPurchaseRecommendations: getPurchaseRecommendationsMock,
 }))
 
 vi.mock('@/api/behavior', () => ({
@@ -124,6 +126,21 @@ describe('RecommendList 埋点（F-T11~12）', () => {
     expect(recommendExposureMock).toHaveBeenCalledWith({
       source: 'home-history',
       productIds: [40],
+    })
+    wrapper.unmount()
+  })
+
+  it('D-5 purchase 模式加载后上报曝光：source=home-purchase（购买推荐归因）', async () => {
+    getPurchaseRecommendationsMock.mockResolvedValue([
+      { productId: 50, name: '购买同类A', price: 88, mainImage: '/e.jpg' },
+    ])
+    const wrapper = mountList({ mode: 'purchase' })
+    await flushPromises()
+
+    expect(getPurchaseRecommendationsMock).toHaveBeenCalledTimes(1)
+    expect(recommendExposureMock).toHaveBeenCalledWith({
+      source: 'home-purchase',
+      productIds: [50],
     })
     wrapper.unmount()
   })

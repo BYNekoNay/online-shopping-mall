@@ -20,7 +20,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getRecommendations, getSimilarProducts, getHistoryRecommendations } from '@/api/recommend'
+import { getRecommendations, getSimilarProducts, getHistoryRecommendations, getPurchaseRecommendations } from '@/api/recommend'
 import { recommendExposure, recommendClick } from '@/api/behavior'
 
 const props = defineProps({
@@ -32,8 +32,8 @@ const router = useRouter()
 const list = ref([])
 const exposed = ref(false)
 
-// A-1 扩展：source 语义映射（guess=首页猜你喜欢 / similar=商品详情相似 / history=浏览历史推荐）
-const SOURCE_MAP = { guess: 'home-guess', similar: 'product-similar', history: 'home-history' }
+// A-1/D-5 扩展：source 语义映射（guess=首页猜你喜欢 / similar=商品详情相似 / history=浏览历史推荐 / purchase=购买推荐）
+const SOURCE_MAP = { guess: 'home-guess', similar: 'product-similar', history: 'home-history', purchase: 'home-purchase' }
 const source = () => SOURCE_MAP[props.mode] || 'home-guess'
 
 /** 上报推荐位曝光（仅一次）。 */
@@ -62,6 +62,8 @@ onMounted(async () => {
       list.value = await getSimilarProducts(props.productId)
     } else if (props.mode === 'history') {
       list.value = await getHistoryRecommendations()
+    } else if (props.mode === 'purchase') {
+      list.value = await getPurchaseRecommendations()
     } else {
       list.value = await getRecommendations()
     }

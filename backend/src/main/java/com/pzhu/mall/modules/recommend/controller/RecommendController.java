@@ -54,6 +54,17 @@ public class RecommendController {
         return Result.success(recommendService.historyBased(userId, num));
     }
 
+    @Operation(summary = "购买推荐（需登录，D-5）")
+    @GetMapping("/purchase")
+    public Result<List<RecommendVO>> purchase(@RequestParam(defaultValue = "10") Integer num) {
+        num = clampNum(num);
+        Long userId = LoginUserContext.getCurrentUserId();
+        if (userId == null) {
+            return Result.success(List.of());
+        }
+        return Result.success(recommendService.purchaseBased(userId, num));
+    }
+
     /** R-08 修复：推荐数量参数钳制，非法/超限回退默认值 10 */
     private static int clampNum(Integer num) {
         if (num == null || num <= 0 || num > 50) {

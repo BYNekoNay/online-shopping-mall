@@ -50,4 +50,17 @@ public class CartController {
         cartService.delete(id);
         return Result.success();
     }
+
+    @Operation(summary = "全选/取消全选（D-4）")
+    @PutMapping("/select-all")
+    public Result<Void> selectAll(@RequestBody SelectAllDTO dto) {
+        cartService.selectAll(dto.getSelected());
+        return Result.success();
+    }
+
+    public static class SelectAllDTO {
+        private Integer selected;
+        public Integer getSelected() { return selected; }
+        public void setSelected(Integer selected) { this.selected = selected; }
+    }
 }

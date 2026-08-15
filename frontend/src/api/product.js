@@ -26,4 +26,13 @@ export function getProductRating(id) {
   return request.get(`/products/${id}/rating`)
 }
 
-export default { getProducts, getProduct, searchProducts, getCategories, getProductReviews, getProductRating }
+// D-3 搜索历史
+export function getSearchHistory(limit = 10) {
+  return request.get('/products/search/history', { params: { limit } })
+}
+
+export function clearSearchHistory() {
+  return request.delete('/products/search/history')
+}
+
+export default { getProducts, getProduct, searchProducts, getCategories, getProductReviews, getProductRating, getSearchHistory, clearSearchHistory }

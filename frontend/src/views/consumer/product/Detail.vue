@@ -10,7 +10,13 @@
       <template #default>
         <div class="detail-content">
           <div class="image-section">
-            <el-image :src="product.mainImage" fit="contain" style="width: 400px; height: 400px;" />
+            <!-- D-1 多图轮播：images 逗号分隔多图 → el-carousel；单图/无多图用主图 -->
+            <el-carousel v-if="galleryImages.length > 1" height="400px" indicator-position="outside" arrow="always">
+              <el-carousel-item v-for="(img, idx) in galleryImages" :key="idx">
+                <el-image :src="img" fit="contain" style="width: 100%; height: 100%;" />
+              </el-carousel-item>
+            </el-carousel>
+            <el-image v-else :src="product.mainImage" fit="contain" style="width: 400px; height: 400px;" />
           </div>
           <div class="info-section">
             <h1>{{ product.name }}</h1>
@@ -112,6 +118,14 @@ const safeDetail = computed(() => {
     ALLOWED_ATTR: ['src', 'alt', 'href', 'title', 'style', 'width', 'height'],
     ALLOWED_STYLE_PROPERTIES: ['color', 'font-size', 'font-weight', 'text-align', 'background-color'],
   })
+})
+
+// D-1 多图轮播：images 逗号分隔 → 数组；空则回退主图
+const galleryImages = computed(() => {
+  const raw = product.value.images
+  if (!raw) return [product.value.mainImage].filter(Boolean)
+  const list = raw.split(',').map(s => s.trim()).filter(Boolean)
+  return list.length > 0 ? list : [product.value.mainImage].filter(Boolean)
 })
 
 const selectedSku = computed(() => {

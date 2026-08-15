@@ -50,6 +50,21 @@ public class ProductController {
         return list(query);
     }
 
+    @Operation(summary = "我的搜索历史（D-3，需登录，去重前10条）")
+    @GetMapping("/search/history")
+    public Result<List<String>> searchHistory(@RequestParam(defaultValue = "10") Integer limit) {
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        return Result.success(productService.listSearchHistory(userId, limit));
+    }
+
+    @Operation(summary = "清空我的搜索历史（D-3，需登录）")
+    @DeleteMapping("/search/history")
+    public Result<Void> clearSearchHistory() {
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        productService.clearSearchHistory(userId);
+        return Result.success();
+    }
+
     @Operation(summary = "商品详情")
     @GetMapping("/{id}")
     public Result<ProductVO> detail(@PathVariable Long id) {

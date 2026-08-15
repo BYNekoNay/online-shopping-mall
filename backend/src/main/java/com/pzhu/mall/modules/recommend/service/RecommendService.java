@@ -183,13 +183,30 @@ public class RecommendService {
      * 准实时数据不做 Redis 缓存（每商品仅 TOP5 相似，计算成本低）。
      */
     public List<RecommendVO> historyBased(Long userId, Integer num) {
+        return behaviorBased(userId, num, 1, "浏览历史");
+    }
+
+    /**
+     * 购买推荐（D-5，任务书"购买推荐"）。
+     *
+     * <p>与 historyBased 完全同构，仅行为类型不同：基于用户最近购买
+     * （user_behavior type=3）的商品，用 ItemCF 召回"购买过的同类商品"。</p>
+     */
+    public List<RecommendVO> purchaseBased(Long userId, Integer num) {
+        return behaviorBased(userId, num, 3, "购买推荐");
+    }
+
+    /**
+     * 行为推荐通用实现：基于指定行为类型（浏览 type=1 / 购买 type=3）的种子商品做 ItemCF 相似召回。
+     */
+    private List<RecommendVO> behaviorBased(Long userId, Integer num, int behaviorType, String tag) {
         int limit = num != null ? Math.min(Math.max(num, 1), 50) : DEFAULT_RECOMMEND_NUM;
 
-        // 1. 取最近浏览的商品（去重，最多 10 个作为种子）
+        // 1. 取最近行为商品（去重，最多 10 个作为种子）
         List<UserBehavior> recent = userBehaviorMapper.selectList(
                 new LambdaQueryWrapper<UserBehavior>()
                         .eq(UserBehavior::getUserId, userId)
-                        .eq(UserBehavior::getBehaviorType, 1)
+                        .eq(UserBehavior::getBehaviorType, behaviorType)
                         .orderByDesc(UserBehavior::getCreateTime)
                         .last("LIMIT 50"));
         if (recent.isEmpty()) {
@@ -204,14 +221,14 @@ public class RecommendService {
             return List.of();
         }
 
-        // 2. 对每个浏览过的商品计算 ItemCF 相似，按"平均相似分"聚合排序
+        // 2. 对每个种子商品计算 ItemCF 相似，按"平均相似分"聚合排序
         Map<Long, Double> scoreAgg = new HashMap<>();
         Map<Long, Integer> countAgg = new HashMap<>();
         for (Long pid : viewedIds) {
             Map<Long, Double> sim = recommendCalculateService.computeSimilarProducts(pid, 5);
             for (Map.Entry<Long, Double> e : sim.entrySet()) {
                 if (viewedIds.contains(e.getKey())) {
-                    continue; // 排除已浏览商品自身
+                    continue; // 排除种子商品自身
                 }
                 scoreAgg.merge(e.getKey(), e.getValue(), Double::sum);
                 countAgg.merge(e.getKey(), 1, Integer::sum);
@@ -241,7 +258,7 @@ public class RecommendService {
                 vos.add(RecommendVO.from(p, e.getValue() / countAgg.get(e.getKey()), 2));
             }
         }
-        log.info("[推荐-浏览历史] 用户={} 种子商品={} 返回{}条", userId, viewedIds.size(), vos.size());
+        log.info("[推荐-{}] 用户={} 种子商品={} 返回{}条", tag, userId, viewedIds.size(), vos.size());
         return vos;
     }
 

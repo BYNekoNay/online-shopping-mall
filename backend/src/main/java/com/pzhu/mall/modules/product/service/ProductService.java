@@ -296,4 +296,37 @@ public class ProductService {
             log.warn("记录搜索历史失败, keyword={}", keyword, e);
         }
     }
+
+    // ==================== D-3 搜索历史 ====================
+
+    /**
+     * 查询当前用户最近搜索关键词（去重，最多 limit 条）。
+     * 未登录返回空列表。
+     */
+    public List<String> listSearchHistory(Long userId, int limit) {
+        if (userId == null) {
+            return List.of();
+        }
+        List<com.pzhu.mall.modules.statistics.entity.SearchHistory> list = searchHistoryMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.statistics.entity.SearchHistory>()
+                        .eq(com.pzhu.mall.modules.statistics.entity.SearchHistory::getUserId, userId)
+                        .orderByDesc(com.pzhu.mall.modules.statistics.entity.SearchHistory::getCreateTime)
+                        .last("LIMIT " + Math.min(Math.max(limit, 1), 50)));
+        return list.stream()
+                .map(com.pzhu.mall.modules.statistics.entity.SearchHistory::getKeyword)
+                .filter(k -> k != null && !k.isBlank())
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * 清空当前用户搜索历史。
+     */
+    public void clearSearchHistory(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        searchHistoryMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.statistics.entity.SearchHistory>()
+                .eq(com.pzhu.mall.modules.statistics.entity.SearchHistory::getUserId, userId));
+    }
 }

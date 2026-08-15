@@ -383,6 +383,48 @@ class CartServiceTest {
         assertTrue(v2.getStockEnough());
     }
 
+    // ==================== selectAll（D-4 全选/反选） ====================
+
+    @Test
+    void selectAll_selectedOne_updatesAll() {
+        // SA-01：selected=1 → 批量置 1，按当前用户过滤
+        when(cartMapper.update(isNull(), any())).thenReturn(1);
+
+        service.selectAll(1);
+
+        verify(cartMapper).update(isNull(), any());
+    }
+
+    @Test
+    void selectAll_unselectedZero_updatesAll() {
+        // SA-02：selected=0 → 批量置 0
+        when(cartMapper.update(isNull(), any())).thenReturn(1);
+
+        service.selectAll(0);
+
+        verify(cartMapper).update(isNull(), any());
+    }
+
+    @Test
+    void selectAll_invalidValue_treatedAsZero() {
+        // SA-03：selected=5（非法）→ 按 0 处理（幂等）
+        when(cartMapper.update(isNull(), any())).thenReturn(1);
+
+        service.selectAll(5);
+
+        verify(cartMapper).update(isNull(), any());
+    }
+
+    @Test
+    void selectAll_nullValue_treatedAsZero() {
+        // SA-04：selected=null → 按 0 处理
+        when(cartMapper.update(isNull(), any())).thenReturn(1);
+
+        service.selectAll(null);
+
+        verify(cartMapper).update(isNull(), any());
+    }
+
     // ==================== helpers ====================
 
     private static Product onlineProduct(Long id, int stock) {

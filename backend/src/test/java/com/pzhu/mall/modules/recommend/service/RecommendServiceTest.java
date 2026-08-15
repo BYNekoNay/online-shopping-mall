@@ -364,6 +364,64 @@ class RecommendServiceTest {
         assertTrue(service.historyBased(1L, 0).isEmpty());
     }
 
+    // ==================== purchaseBased（购买推荐，D-5） ====================
+
+    @Test
+    void purchaseBased_withPurchasedProducts_returnsSimilar() {
+        // PUR-01：有购买记录（type=3）+ 相似商品 → 返回非空、algoType=2、不含已购
+        var purchased = new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        purchased.setUserId(1L);
+        purchased.setProductId(10L);
+        purchased.setBehaviorType(3);
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.singletonList(purchased));
+
+        Map<Long, Double> sim10 = new HashMap<>();
+        sim10.put(20L, 0.9);
+        sim10.put(30L, 0.5);
+        when(recommendCalculateService.computeSimilarProducts(10L, 5)).thenReturn(sim10);
+
+        Product p20 = product(20L, "同类商品A", 50);
+        Product p30 = product(30L, "同类商品B", 30);
+        when(productMapper.selectBatchIds(any())).thenReturn(List.of(p20, p30));
+
+        List<RecommendVO> result = service.purchaseBased(1L, 10);
+
+        assertEquals(2, result.size());
+        assertEquals(20L, result.get(0).getProductId());
+        assertEquals(2, result.get(0).getAlgorithmType());
+        assertTrue(result.stream().noneMatch(v -> v.getProductId() == 10L));
+    }
+
+    @Test
+    void purchaseBased_noPurchaseRecord_returnsEmpty() {
+        // PUR-02：无购买记录 → 空列表
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.emptyList());
+        assertTrue(service.purchaseBased(1L, 10).isEmpty());
+    }
+
+    @Test
+    void purchaseBased_numLimitRespected() {
+        // PUR-03：num=1 → 最多 1 条
+        var purchased = new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        purchased.setUserId(1L);
+        purchased.setProductId(10L);
+        purchased.setBehaviorType(3);
+        when(userBehaviorMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(java.util.Collections.singletonList(purchased));
+
+        Map<Long, Double> sim10 = new HashMap<>();
+        sim10.put(20L, 0.9);
+        sim10.put(30L, 0.5);
+        when(recommendCalculateService.computeSimilarProducts(10L, 5)).thenReturn(sim10);
+        when(productMapper.selectBatchIds(any())).thenReturn(List.of(product(20L, "A", 1), product(30L, "B", 1)));
+
+        List<RecommendVO> result = service.purchaseBased(1L, 1);
+
+        assertEquals(1, result.size());
+    }
+
     // ==================== helpers ====================
 
     private static Product product(Long id, String name, int sales) {

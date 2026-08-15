@@ -66,6 +66,18 @@
       </div>
       <RecommendList mode="history" />
     </section>
+
+    <!-- D-5 购买推荐（仅登录用户显示，无购买记录时后端返回空） -->
+    <section v-if="isLogin" class="recommend-section">
+      <div class="section-header">
+        <div class="header-accent ai-accent"></div>
+        <h3 class="ai-title">
+          <span class="ai-badge" style="margin-right:10px;">AI 推荐</span>
+          购买过同类
+        </h3>
+      </div>
+      <RecommendList mode="purchase" />
+    </section>
   </div>
 </template>
 

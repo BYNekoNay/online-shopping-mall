@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 @Service
 public class CartService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CartService.class);
+
     @Resource
     private CartMapper cartMapper;
 
@@ -240,5 +242,19 @@ public class CartService {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         cartMapper.deleteById(id);
+    }
+
+    /**
+     * D-4 全选/取消全选：批量更新当前用户购物车所有项的选中状态。
+     * 校验 selected ∈ {0,1}，非法值按 0 处理（幂等）。
+     */
+    public void selectAll(Integer selected) {
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        int val = (selected != null && selected == 1) ? 1 : 0;
+        cartMapper.update(null,
+                new LambdaUpdateWrapper<Cart>()
+                        .set(Cart::getSelected, val)
+                        .eq(Cart::getUserId, userId));
+        log.info("[购物车] 用户={} 全选/取消={}", userId, val);
     }
 }

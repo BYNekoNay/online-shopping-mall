@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -266,6 +267,40 @@ class ProductServiceTest {
         assertNull(vos.get(1).getCategoryName());
         // 批量加载了 SKU（toVOList 与 toVO 内部各查一次）
         verify(skuMapper, atLeastOnce()).selectList(any());
+    }
+
+    // ==================== D-3 搜索历史 ====================
+
+    @Test
+    void listSearchHistory_deduplicatesKeywords() {
+        // SH-01：去重 + 按时间倒序
+        var h1 = new com.pzhu.mall.modules.statistics.entity.SearchHistory();
+        h1.setUserId(100L); h1.setKeyword("手机");
+        var h2 = new com.pzhu.mall.modules.statistics.entity.SearchHistory();
+        h2.setUserId(100L); h2.setKeyword("手机");
+        var h3 = new com.pzhu.mall.modules.statistics.entity.SearchHistory();
+        h3.setUserId(100L); h3.setKeyword("耳机");
+        when(searchHistoryMapper.selectList(any())).thenReturn(List.of(h1, h2, h3));
+
+        List<String> result = service.listSearchHistory(100L, 10);
+
+        assertEquals(2, result.size());
+        assertTrue(result.contains("手机"));
+        assertTrue(result.contains("耳机"));
+    }
+
+    @Test
+    void listSearchHistory_anonymous_returnsEmpty() {
+        // SH-02：未登录（userId=null）→ 空列表
+        assertTrue(service.listSearchHistory(null, 10).isEmpty());
+        verify(searchHistoryMapper, never()).selectList(any());
+    }
+
+    @Test
+    void clearSearchHistory_deletesByUser() {
+        // SH-03：清空按用户删除
+        service.clearSearchHistory(100L);
+        verify(searchHistoryMapper).delete(any());
     }
 
     // ==================== helpers ====================

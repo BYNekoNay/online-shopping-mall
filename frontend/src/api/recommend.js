@@ -13,4 +13,9 @@ export function getHistoryRecommendations(num = 10) {
   return request.get('/recommend/history', { params: { num } })
 }
 
-export default { getRecommendations, getSimilarProducts, getHistoryRecommendations }
+// D-5 购买推荐（需登录）
+export function getPurchaseRecommendations(num = 10) {
+  return request.get('/recommend/purchase', { params: { num } })
+}
+
+export default { getRecommendations, getSimilarProducts, getHistoryRecommendations, getPurchaseRecommendations }

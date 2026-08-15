@@ -10,7 +10,13 @@
         <template #header>
           <div class="cart-header">
             <span>购物车 ({{ items.length }})</span>
-            <el-button type="text" @click="handleClear">清空购物车</el-button>
+            <div>
+              <!-- D-4 全选/反选 -->
+              <el-checkbox :model-value="allSelected" :indeterminate="partialSelected" style="margin-right: 16px;" @change="toggleAll">
+                全选
+              </el-checkbox>
+              <el-button type="text" @click="handleClear">清空购物车</el-button>
+            </div>
           </div>
         </template>
         <div v-for="item in items" :key="item.id" class="cart-item">
@@ -53,6 +59,21 @@ const cartStore = useCartStore()
 const items = computed(() => cartStore.items)
 const selectedCount = computed(() => items.value.filter(i => i.selected).length)
 const selectedTotal = computed(() => cartStore.getSelectedTotal())
+// D-4 全选状态
+const allSelected = computed(() => items.value.length > 0 && items.value.every(i => i.selected))
+const partialSelected = computed(() => items.value.some(i => i.selected) && !allSelected.value)
+
+// D-4 全选/取消全选（批量接口）
+async function toggleAll(val) {
+  const selected = val ? 1 : 0
+  try {
+    await request.selectAllCart(selected)
+    items.value.forEach(i => cartStore.updateItem(i.id, { selected }))
+    ElMessage.success(selected ? '已全选' : '已取消全选')
+  } catch {
+    ElMessage.error('操作失败')
+  }
+}
 
 async function toggleSelect(item, val) {
   // H-18 修复：val 为变更后的值；原实现读 item.selected 旧值，导致提交状态恒反转

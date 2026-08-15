@@ -16,4 +16,9 @@ export function deleteCartItem(id) {
   return request.delete(`/cart/${id}`)
 }
 
-export default { getCart, addToCart, updateCartItem, deleteCartItem }
+// D-4 全选/取消全选
+export function selectAllCart(selected) {
+  return request.put('/cart/select-all', { selected })
+}
+
+export default { getCart, addToCart, updateCartItem, deleteCartItem, selectAllCart }
