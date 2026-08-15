@@ -99,6 +99,51 @@ class OrderTimeoutTaskTest {
         verify(orderService, never()).cancelOrderBySystem(anyLong());
     }
 
+    @Test
+    void cancelTimeoutOrders_noTimeoutOrders_exitsImmediately() {
+        // O-13 边界：无超时订单 → 不触发任何取消，直接退出
+        when(orderMapper.selectTimeoutUnpaidOrders(any())).thenReturn(Collections.emptyList());
+
+        task.cancelTimeoutOrders();
+
+        verify(orderService, never()).cancelOrderBySystem(anyLong());
+        verify(valueOperations, never()).setIfAbsent(anyString(), anyString(), anyLong(), any(TimeUnit.class));
+    }
+
+    @Test
+    void cancelTimeoutOrders_cancelThrows_continuesNextOrder() {
+        // 单条取消异常不中断后续订单（catch + log，继续处理）
+        Order o1 = new Order();
+        o1.setId(1L);
+        Order o2 = new Order();
+        o2.setId(2L);
+        when(orderMapper.selectTimeoutUnpaidOrders(any())).thenReturn(Arrays.asList(o1, o2));
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any(TimeUnit.class)))
+                .thenReturn(true);
+        doThrow(new RuntimeException("cancel failed")).when(orderService).cancelOrderBySystem(1L);
+
+        assertDoesNotThrow(() -> task.cancelTimeoutOrders());
+
+        verify(orderService).cancelOrderBySystem(2L);
+    }
+
+    @Test
+    void cancelTimeoutOrders_setsCancelLockWithTtl() {
+        Order o1 = new Order();
+        o1.setId(1L);
+        when(orderMapper.selectTimeoutUnpaidOrders(any())).thenReturn(Collections.singletonList(o1));
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any(TimeUnit.class)))
+                .thenReturn(true);
+
+        task.cancelTimeoutOrders();
+
+        // 取消锁 key 使用订单维度 + 120s TTL 防重复
+        verify(valueOperations).setIfAbsent(
+                org.mockito.ArgumentMatchers.contains("cancel:lock:"),
+                eq("1"), eq(120L), eq(TimeUnit.SECONDS));
+        verify(orderService).cancelOrderBySystem(1L);
+    }
+
     private static void inject(Object target, String fieldName, Object value) {
         try {
             var field = target.getClass().getDeclaredField(fieldName);

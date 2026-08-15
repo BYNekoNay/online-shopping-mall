@@ -60,6 +60,7 @@ class OrderServiceTest {
     private StringRedisTemplate stringRedisTemplate;
     private BehaviorService behaviorService;
     private com.pzhu.mall.modules.order.mapper.PaymentMapper paymentMapper;
+    private com.pzhu.mall.modules.product.service.ReviewService reviewService;
     private OrderService service;
 
     @BeforeAll
@@ -84,6 +85,7 @@ class OrderServiceTest {
         stringRedisTemplate = mock(StringRedisTemplate.class);
         behaviorService = mock(BehaviorService.class);
         paymentMapper = mock(com.pzhu.mall.modules.order.mapper.PaymentMapper.class);
+        reviewService = mock(com.pzhu.mall.modules.product.service.ReviewService.class);
 
         service = new OrderService();
         inject(service, "orderMapper", orderMapper);
@@ -96,6 +98,7 @@ class OrderServiceTest {
         inject(service, "stringRedisTemplate", stringRedisTemplate);
         inject(service, "behaviorService", behaviorService);
         inject(service, "paymentMapper", paymentMapper);
+        inject(service, "reviewService", reviewService);
 
         // pay() 内部注册事务提交后回调，需要激活事务同步（单元测试无真实事务）
         TransactionSynchronizationManager.initSynchronization();
@@ -449,6 +452,54 @@ class OrderServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> service.createOrder(dto));
         assertEquals(ErrorCode.SKU_PRODUCT_MISMATCH.getCode(), ex.getCode());
         verify(stockService, never()).deduct(anyLong(), anyInt());
+    }
+
+    // ==================== review（M-01 赠品拦截 + 评价行为） ====================
+
+    @Test
+    void review_giftItem_throwsParamError() {
+        // M-01 修复验证：赠品行不可单独评价（后端兜底拦截）
+        OrderItem gift = item(50L, 10L, null, 1);
+        gift.setIsGift(1);
+        when(orderItemMapper.selectById(50L)).thenReturn(gift);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.review(50L, 5, "好评"));
+        assertEquals(ErrorCode.PARAM_ERROR.getCode(), ex.getCode());
+        verify(reviewService, never()).submit(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void review_itemNotFound_throws() {
+        when(orderItemMapper.selectById(999L)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> service.review(999L, 5, "x"));
+    }
+
+    @Test
+    void review_highRating_recordsBehavior() {
+        // 好评（>=4）计入评价行为 behaviorType=4
+        OrderItem item = item(51L, 10L, null, 1);
+        item.setIsGift(0);
+        when(orderItemMapper.selectById(51L)).thenReturn(item);
+
+        service.review(51L, 5, "很好");
+
+        verify(reviewService).submit(eq(51L), eq(100L), eq(5), eq("很好"), isNull());
+        verify(behaviorService).record(100L, 10L, 4);
+    }
+
+    @Test
+    void review_lowRating_noBehavior() {
+        // 差评（<4）不计入推荐行为矩阵
+        OrderItem item = item(52L, 11L, null, 1);
+        item.setIsGift(0);
+        when(orderItemMapper.selectById(52L)).thenReturn(item);
+
+        service.review(52L, 2, "差评");
+
+        verify(reviewService).submit(eq(52L), eq(100L), eq(2), eq("差评"), isNull());
+        verify(behaviorService, never()).record(anyLong(), anyLong(), eq(4));
     }
 
     // ==================== helpers ====================

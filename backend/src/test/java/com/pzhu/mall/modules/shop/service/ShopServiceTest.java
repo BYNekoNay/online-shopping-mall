@@ -82,4 +82,82 @@ class ShopServiceTest {
                 com.pzhu.mall.common.exception.BusinessException.class,
                 () -> service.audit(3L, true, null));
     }
+
+    // ==================== apply（入驻申请） ====================
+
+    @Test
+    void apply_nullDto_throws() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.pzhu.mall.common.exception.BusinessException.class,
+                () -> service.apply(100L, null));
+    }
+
+    @Test
+    void apply_firstApplication_insertsNewShop() {
+        when(shopMapper.selectOne(any())).thenReturn(null);
+
+        com.pzhu.mall.modules.shop.dto.ShopApplyDTO dto = new com.pzhu.mall.modules.shop.dto.ShopApplyDTO();
+        dto.setName("测试店铺");
+        dto.setContactName("张三");
+        dto.setContactPhone("13800000000");
+        dto.setLicenseNo("LIC001");
+        var vo = service.apply(100L, dto);
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, vo.getStatus());
+        var captor = org.mockito.ArgumentCaptor.forClass(Shop.class);
+        verify(shopMapper).insert(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(100L, captor.getValue().getMerchantUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("测试店铺", captor.getValue().getName());
+    }
+
+    @Test
+    void apply_existingPending_throws() {
+        // 已有待审核记录，不允许重复申请
+        Shop exist = new Shop();
+        exist.setId(1L);
+        exist.setMerchantUserId(100L);
+        exist.setStatus(0);
+        when(shopMapper.selectOne(any())).thenReturn(exist);
+
+        com.pzhu.mall.modules.shop.dto.ShopApplyDTO dto = new com.pzhu.mall.modules.shop.dto.ShopApplyDTO();
+        dto.setName("重复申请");
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.pzhu.mall.common.exception.BusinessException.class,
+                () -> service.apply(100L, dto));
+    }
+
+    @Test
+    void apply_rejected_ressubmitReusesRecord() {
+        // SH-03 修复验证：拒绝(status=2)后可重新提交，复用同一条记录并重置状态
+        Shop exist = new Shop();
+        exist.setId(1L);
+        exist.setMerchantUserId(100L);
+        exist.setStatus(2);
+        exist.setRejectReason("资料不全");
+        when(shopMapper.selectOne(any())).thenReturn(exist);
+
+        com.pzhu.mall.modules.shop.dto.ShopApplyDTO dto = new com.pzhu.mall.modules.shop.dto.ShopApplyDTO();
+        dto.setName("重新申请");
+        dto.setContactName("张三");
+        dto.setContactPhone("13800000000");
+        dto.setLicenseNo("LIC002");
+
+        var vo = service.apply(100L, dto);
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, vo.getStatus());
+        org.junit.jupiter.api.Assertions.assertNull(exist.getRejectReason());
+        verify(shopMapper, never()).insert(any());
+        verify(shopMapper).updateById(exist);
+    }
+
+    @Test
+    void applyStatus_noRecord_returnsEmptyVO() {
+        when(shopMapper.selectOne(any())).thenReturn(null);
+
+        var vo = service.applyStatus(100L);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(vo);
+        org.junit.jupiter.api.Assertions.assertNull(vo.getStatus());
+    }
 }

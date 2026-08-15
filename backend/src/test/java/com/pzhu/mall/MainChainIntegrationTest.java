@@ -2,6 +2,7 @@ package com.pzhu.mall;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.pzhu.mall.common.enums.ErrorCode;
 import com.pzhu.mall.modules.behavior.service.BehaviorService;
 import com.pzhu.mall.modules.cart.entity.Cart;
 import com.pzhu.mall.modules.cart.service.CartService;
@@ -52,6 +53,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,6 +101,7 @@ class MainChainIntegrationTest {
     private ReviewService reviewService;
     private PointsService pointsService;
     private JwtUtil jwtUtil;
+    private StockService stockService;
 
     /** 模拟数据库中的订单行（跨步骤共享状态） */
     private Order dbOrder;
@@ -170,7 +178,7 @@ class MainChainIntegrationTest {
         inject(orderService, "orderNoGenerator", new OrderNoGenerator());
         // H-4 修复适配：链测商品为单规格商品（skuId=null），预扣减走 deductProduct，
         // 未 stub 的 mock 默认返回 false 会被判"库存不足"，故预置扣减成功
-        StockService stockService = mock(StockService.class);
+        stockService = mock(StockService.class);
         when(stockService.deduct(anyLong(), anyInt())).thenReturn(true);
         when(stockService.deductProduct(anyLong(), anyInt())).thenReturn(true);
         inject(orderService, "stockService", stockService);
@@ -321,6 +329,138 @@ class MainChainIntegrationTest {
         verify(reviewMapper).insert(reviewCaptor.capture());
         assertEquals(100L, reviewCaptor.getValue().getUserId());
         assertEquals(5, reviewCaptor.getValue().getRating());
+    }
+
+    // ==================== IT-T01 跨店铺拆单 ====================
+
+    @Test
+    void splitOrder_twoShops_createsTwoOrders() {
+        // 两店铺商品混合下单 → 按 shopId 拆成 2 个订单、各自独立落库
+        LoginUserContext.set(100L, 1);
+
+        Product shop2Product = product();
+        shop2Product.setId(20L);
+        shop2Product.setShopId(9L);
+        shop2Product.setName("第二店铺商品");
+        when(productMapper.selectById(10L)).thenReturn(product());
+        when(productMapper.selectById(20L)).thenReturn(shop2Product);
+        when(addressMapper.selectById(1L)).thenReturn(address());
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+
+        AtomicLong orderIdSeq = new AtomicLong(55L);
+        when(orderMapper.insert(any(Order.class))).thenAnswer(inv -> {
+            Order o = inv.getArgument(0, Order.class);
+            o.setId(orderIdSeq.getAndIncrement());
+            return 1;
+        });
+        when(orderItemMapper.insert(any(OrderItem.class))).thenReturn(1);
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        CreateOrderDTO dto = new CreateOrderDTO();
+        dto.setRequestId("split-req-001");
+        dto.setAddressId(1L);
+        ProductItemDTO p1 = new ProductItemDTO();
+        p1.setProductId(10L);
+        p1.setQuantity(1);
+        ProductItemDTO p2 = new ProductItemDTO();
+        p2.setProductId(20L);
+        p2.setQuantity(1);
+        dto.setProductItems(java.util.Arrays.asList(p1, p2));
+        dto.setUsePoints(false);
+
+        List<OrderVO> orders = orderService.createOrder(dto);
+
+        assertEquals(2, orders.size(), "两店铺商品必须拆成 2 个订单");
+        // 两个订单 ID 不同（55、56），说明 order 表插入了 2 行
+        assertNotEquals(orders.get(0).getOrderId(), orders.get(1).getOrderId());
+        verify(orderMapper, times(2)).insert(any(Order.class));
+    }
+
+    // ==================== IT-T05 并发下单防超卖（DV-01 回归） ====================
+
+    @Test
+    void createOrder_concurrent50_stock10_noOversell() throws Exception {
+        // 库存 10，50 线程并发下单同一商品 → 恰好 10 单成功、40 单失败（STOCK_NOT_ENOUGH）
+        AtomicInteger stock = new AtomicInteger(10);
+        LoginUserContext.set(100L, 1);
+
+        when(productMapper.selectById(10L)).thenReturn(product());
+        when(addressMapper.selectById(1L)).thenReturn(address());
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+
+        // 覆盖 setup 中的恒 true stub：并发扣减由 AtomicInteger 模拟 Lua 原子语义
+        // （先比较，不足返回 false 且不修改库存——等价 Lua "if stock < qty then return -1"）
+        when(stockService.deductProduct(anyLong(), anyInt())).thenAnswer(inv -> {
+            synchronized (stock) {
+                int cur = stock.get();
+                if (cur < inv.getArgument(1, Integer.class)) {
+                    return false;
+                }
+                stock.set(cur - inv.getArgument(1, Integer.class));
+                return true;
+            }
+        });
+
+        AtomicLong orderIdSeq = new AtomicLong(600L);
+        AtomicInteger inserted = new AtomicInteger(0);
+        when(orderMapper.insert(any(Order.class))).thenAnswer(inv -> {
+            inv.getArgument(0, Order.class).setId(orderIdSeq.getAndIncrement());
+            inserted.incrementAndGet();
+            return 1;
+        });
+        when(orderItemMapper.insert(any(OrderItem.class))).thenReturn(1);
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        int threads = 50;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
+        AtomicInteger success = new AtomicInteger(0);
+        AtomicInteger failStock = new AtomicInteger(0);
+
+        for (int i = 0; i < threads; i++) {
+            final int idx = i;
+            pool.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();
+                    // LoginUserContext 是 ThreadLocal：子线程必须独立设置登录上下文
+                    LoginUserContext.set(100L, 1);
+                    CreateOrderDTO dto = new CreateOrderDTO();
+                    dto.setRequestId("conc-" + idx);
+                    dto.setAddressId(1L);
+                    ProductItemDTO pi = new ProductItemDTO();
+                    pi.setProductId(10L);
+                    pi.setQuantity(1);
+                    dto.setProductItems(Collections.singletonList(pi));
+                    dto.setUsePoints(false);
+                    List<OrderVO> orders = orderService.createOrder(dto);
+                    if (!orders.isEmpty()) {
+                        success.incrementAndGet();
+                    }
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                } catch (com.pzhu.mall.common.exception.BusinessException e) {
+                    if (e.getCode() == ErrorCode.STOCK_NOT_ENOUGH.getCode()) {
+                        failStock.incrementAndGet();
+                    }
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        ready.await();
+        start.countDown();
+        done.await(60, TimeUnit.SECONDS);
+        pool.shutdown();
+
+        // 零超卖：恰好 10 单成功、40 单库存不足失败、DB 只插入 10 行
+        assertEquals(10, success.get(), "库存 10 只能成功 10 单（零超卖）");
+        assertEquals(40, failStock.get(), "其余 40 单必须报库存不足");
+        assertEquals(10, inserted.get(), "order 表必须只插入 10 行");
+        assertEquals(0, stock.get(), "库存必须恰好扣完");
     }
 
     // ==================== fixtures ====================
