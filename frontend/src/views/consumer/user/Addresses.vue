@@ -6,17 +6,17 @@
         <el-button type="primary" @click="showForm = true; editingId = null; form = { receiver: '', phone: '', province: '', city: '', district: '', detail: '', isDefault: false }">新增地址</el-button>
       </div>
       <el-dialog v-model="showForm" :title="editingId ? '编辑地址' : '新增地址'">
-        <el-form :model="form" label-width="100px">
-          <el-form-item label="收货人"><el-input v-model="form.receiver" /></el-form-item>
-          <el-form-item label="手机号"><el-input v-model="form.phone" /></el-form-item>
-          <el-form-item label="省份">
+        <el-form :model="form" :rules="rules" ref="addressFormRef" label-width="100px">
+          <el-form-item label="收货人" prop="receiver"><el-input v-model="form.receiver" /></el-form-item>
+          <el-form-item label="手机号" prop="phone"><el-input v-model="form.phone" /></el-form-item>
+          <el-form-item label="省份" prop="province">
             <el-select v-model="form.province" placeholder="请选择省份">
               <el-option v-for="p in provinces" :key="p" :label="p" :value="p" />
             </el-select>
           </el-form-item>
           <el-form-item label="城市"><el-input v-model="form.city" /></el-form-item>
           <el-form-item label="区县"><el-input v-model="form.district" /></el-form-item>
-          <el-form-item label="详细地址"><el-input v-model="form.detail" /></el-form-item>
+          <el-form-item label="详细地址" prop="detail"><el-input v-model="form.detail" /></el-form-item>
           <el-form-item label="设为默认"><el-switch v-model="form.isDefault" /></el-form-item>
         </el-form>
         <template #footer>
@@ -49,12 +49,21 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { rules as formRules, validateForm } from '@/utils/useFormValidate'
 import request from '@/api/user'
 
 const addresses = ref([])
 const showForm = ref(false)
 const editingId = ref(null)
+const addressFormRef = ref(null)
 const form = ref({ receiver: '', phone: '', province: '', city: '', district: '', detail: '', isDefault: false })
+// F-3：统一校验规则
+const rules = {
+  receiver: [formRules.required('请输入收货人')],
+  phone: [formRules.required('请输入手机号'), formRules.phone()],
+  province: [formRules.requiredSelect('请选择省份')],
+  detail: [formRules.required('请输入详细地址')],
+}
 
 const provinces = [
   '北京市','天津市','河北省','山西省','内蒙古自治区',
@@ -76,6 +85,8 @@ onMounted(async () => {
 })
 
 async function saveAddress() {
+  // F-3：统一校验
+  if (!(await validateForm(addressFormRef.value))) return
   try {
     if (editingId.value) {
       await request.updateAddress(editingId.value, form.value)

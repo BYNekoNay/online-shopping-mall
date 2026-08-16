@@ -31,23 +31,25 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { rules as formRules, validateForm } from '@/utils/useFormValidate'
 import request from '@/utils/request'
 
 const router = useRouter()
 const formRef = ref(null)
 const loading = ref(false)
 const form = ref({ username: '', nickname: '', password: '', confirmPassword: '' })
+// F-3：统一校验规则
 const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }, { min: 3, message: '用户名至少3个字符', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }, { min: 8, message: '密码至少8个字符', trigger: 'blur' }],
+  username: [formRules.required('请输入用户名'), formRules.username()],
+  password: [formRules.required('请输入密码'), formRules.length(8, 20, '密码需为 8~20 个字符')],
   confirmPassword: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
-    { validator: (rule, value, callback) => { if (value !== form.value.password) callback(new Error('两次密码不一致')); else callback() }, trigger: 'blur' }
+    formRules.required('请确认密码'),
+    formRules.confirmPassword(() => form.value.password),
   ],
 }
 
 async function handleRegister() {
-  await formRef.value.validate()
+  if (!(await validateForm(formRef.value))) return
   loading.value = true
   try {
     await request.post('/auth/register', { username: form.value.username, nickname: form.value.nickname, password: form.value.password })

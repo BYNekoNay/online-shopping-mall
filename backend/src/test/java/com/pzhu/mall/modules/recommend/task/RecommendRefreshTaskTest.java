@@ -21,6 +21,7 @@ class RecommendRefreshTaskTest {
     private RecommendCalculateService recommendCalculateService;
     private RecommendService recommendService;
     private StringRedisTemplate stringRedisTemplate;
+    private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
     private RecommendRefreshTask task;
 
     @BeforeEach
@@ -28,7 +29,8 @@ class RecommendRefreshTaskTest {
         recommendCalculateService = mock(RecommendCalculateService.class);
         recommendService = mock(RecommendService.class);
         stringRedisTemplate = mock(StringRedisTemplate.class);
-        task = new RecommendRefreshTask(recommendCalculateService, recommendService, stringRedisTemplate);
+        userBehaviorMapper = mock(com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper.class);
+        task = new RecommendRefreshTask(recommendCalculateService, recommendService, stringRedisTemplate, userBehaviorMapper);
     }
 
     @Test
@@ -80,5 +82,49 @@ class RecommendRefreshTaskTest {
 
         // 主链路已完成
         verify(recommendCalculateService).calculateForAll();
+    }
+
+    // ==================== F-4 增量刷新 ====================
+
+    private static com.pzhu.mall.modules.behavior.entity.UserBehavior behavior(Long userId) {
+        com.pzhu.mall.modules.behavior.entity.UserBehavior b =
+                new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        b.setUserId(userId);
+        b.setBehaviorType(1);
+        return b;
+    }
+
+    @Test
+    void refreshIncremental_activeUsers_recalculated() {
+        // RI-01：24h 内活跃用户 → 逐个增量重算（去重）
+        when(userBehaviorMapper.selectList(any()))
+                .thenReturn(List.of(behavior(1L), behavior(1L), behavior(2L)));
+
+        task.refreshIncremental();
+
+        verify(recommendCalculateService).calculateForUser(1L);
+        verify(recommendCalculateService).calculateForUser(2L);
+    }
+
+    @Test
+    void refreshIncremental_noUsers_skips() {
+        // RI-02：无活跃用户 → 跳过
+        when(userBehaviorMapper.selectList(any())).thenReturn(java.util.Collections.emptyList());
+
+        task.refreshIncremental();
+
+        verify(recommendCalculateService, never()).calculateForUser(anyLong());
+    }
+
+    @Test
+    void refreshIncremental_userError_continuesBatch() {
+        // RI-03：单用户失败不阻断批量（R-7 全量兜底）
+        when(userBehaviorMapper.selectList(any()))
+                .thenReturn(List.of(behavior(1L), behavior(2L)));
+        doThrow(new RuntimeException("calc boom")).when(recommendCalculateService).calculateForUser(1L);
+
+        task.refreshIncremental();
+
+        verify(recommendCalculateService).calculateForUser(2L); // 后续用户仍计算
     }
 }

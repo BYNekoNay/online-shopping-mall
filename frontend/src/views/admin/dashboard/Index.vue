@@ -11,7 +11,8 @@
       <el-col :span="12">
         <el-card>
           <h4>转化漏斗</h4>
-          <div ref="funnelChart" style="width: 100%; height: 300px;"></div>
+          <!-- F-1 统一图表封装（按需引入） -->
+          <BaseChart v-if="funnelOption.series.length" :option="funnelOption" height="300px" />
         </el-card>
       </el-col>
       <el-col :span="12">
@@ -30,14 +31,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import * as echarts from 'echarts'
+import { ref, computed, onMounted } from 'vue'
+import BaseChart from '@/components/BaseChart.vue'
 import request from '@/api/admin'
 
 const dashboard = ref({ gmv: '0', orderCount: 0, newUserCount: 0, recommendCtr: '0%' })
 const detail = ref({ pv: 0, uv: 0, bounceRate: 0, avgStayDuration: 0, funnel: {} })
-const funnelChart = ref(null)
-let chartInstance = null
+
+// F-1：漏斗图 option（computed 响应 detail 变化）
+const funnelOption = computed(() => {
+  const f = detail.value.funnel || {}
+  return {
+    tooltip: { trigger: 'item' },
+    series: [{
+      type: 'funnel',
+      left: '10%', top: 20, bottom: 20, width: '80%',
+      data: [
+        { value: f.view || 0, name: '浏览' },
+        { value: f.cart || 0, name: '加购' },
+        { value: f.order || 0, name: '下单' },
+        { value: f.pay || 0, name: '支付' },
+      ],
+    }],
+  }
+})
 
 async function loadDashboard() {
   try {
@@ -51,41 +68,15 @@ async function loadDetail() {
   try {
     const data = await request.getStatisticsDetail()
     detail.value = data || { pv: 0, uv: 0, bounceRate: 0, avgStayDuration: 0, funnel: {} }
-    renderFunnel()
   } catch {
     detail.value = { pv: 0, uv: 0, bounceRate: 0, avgStayDuration: 0, funnel: {} }
   }
 }
 
-function renderFunnel() {
-  if (!funnelChart.value) return
-  if (!chartInstance) chartInstance = echarts.init(funnelChart.value)
-  const f = detail.value.funnel || {}
-  chartInstance.setOption({
-    tooltip: { trigger: 'item' },
-    series: [{
-      type: 'funnel',
-      left: '10%', top: 20, bottom: 20, width: '80%',
-      data: [
-        { value: f.view || 0, name: '浏览' },
-        { value: f.cart || 0, name: '加购' },
-        { value: f.order || 0, name: '下单' },
-        { value: f.pay || 0, name: '支付' },
-      ],
-    }],
-  })
-}
-
 onMounted(() => {
   loadDashboard()
   loadDetail()
-  window.addEventListener('resize', handleResize)
 })
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (chartInstance) chartInstance.dispose()
-})
-function handleResize() { if (chartInstance) chartInstance.resize() }
 </script>
 
 <style scoped>

@@ -25,7 +25,8 @@
         </el-col>
       </el-row>
 
-      <div ref="trendChart" style="width: 100%; height: 350px; margin-top: 30px;"></div>
+      <!-- F-1 统一图表封装（按需引入 + resize 自适应） -->
+      <BaseChart :option="trendOption" height="350px" style="margin-top: 30px;" />
 
       <h3 style="margin-top: 40px;">热销商品 TOP10</h3>
       <el-table :data="topProducts" style="width: 100%; margin-top: 15px;">
@@ -47,15 +48,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import * as echarts from 'echarts'
+import { ref, computed, onMounted } from 'vue'
+import BaseChart from '@/components/BaseChart.vue'
 import request from '@/api/merchant'
 
 const granularity = ref('day')
 const stats = ref({ totalAmount: '0.00', totalOrders: 0, trend: [] })
 const topProducts = ref([])
-const trendChart = ref(null)
-let chartInstance = null
+
+// F-1：销售趋势折线图 option（computed 响应 stats 变化）
+const trendOption = computed(() => {
+  const trend = stats.value.trend || []
+  return {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: trend.map(t => t.date) },
+    yAxis: { type: 'value' },
+    series: [{
+      name: '销售额',
+      type: 'line',
+      data: trend.map(t => t.amount),
+      smooth: true,
+      areaStyle: { opacity: 0.3 },
+    }],
+  }
+})
 
 function buildDateRange(g) {
   const end = new Date()
@@ -72,7 +88,6 @@ async function load() {
     const { start, end } = buildDateRange(granularity.value)
     const data = await request.getSalesStatistics({ startDate: start, endDate: end, granularity: granularity.value })
     stats.value = data || { totalAmount: '0.00', totalOrders: 0, trend: [] }
-    renderTrend()
     const top = await request.getTopProducts()
     topProducts.value = top || []
   } catch {
@@ -81,33 +96,9 @@ async function load() {
   }
 }
 
-function renderTrend() {
-  if (!trendChart.value) return
-  if (!chartInstance) chartInstance = echarts.init(trendChart.value)
-  const trend = stats.value.trend || []
-  chartInstance.setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: trend.map(t => t.date) },
-    yAxis: { type: 'value' },
-    series: [{
-      name: '销售额',
-      type: 'line',
-      data: trend.map(t => t.amount),
-      smooth: true,
-      areaStyle: { opacity: 0.3 },
-    }],
-  })
-}
-
 onMounted(() => {
   load()
-  window.addEventListener('resize', handleResize)
 })
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (chartInstance) chartInstance.dispose()
-})
-function handleResize() { if (chartInstance) chartInstance.resize() }
 </script>
 
 <style scoped>

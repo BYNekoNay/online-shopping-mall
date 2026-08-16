@@ -1,8 +1,12 @@
 <template>
-  <router-view />
+  <!-- F-2 全局错误边界：页面级 JS 错误不白屏 -->
+  <ErrorBoundary>
+    <router-view />
+  </ErrorBoundary>
 </template>
 
 <script setup>
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
 </script>
 
 <style>

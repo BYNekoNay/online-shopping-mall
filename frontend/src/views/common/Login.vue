@@ -26,6 +26,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
+import { rules as formRules, validateForm } from '@/utils/useFormValidate'
 import request from '@/utils/request'
 
 const router = useRouter()
@@ -34,13 +35,14 @@ const userStore = useUserStore()
 const formRef = ref(null)
 const loading = ref(false)
 const form = ref({ username: '', password: '' })
+// F-3：统一校验规则
 const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  username: [formRules.required('请输入用户名'), formRules.username()],
+  password: [formRules.required('请输入密码')],
 }
 
 async function handleLogin() {
-  await formRef.value.validate()
+  if (!(await validateForm(formRef.value))) return
   loading.value = true
   try {
     const data = await request.post('/auth/login', form.value)
