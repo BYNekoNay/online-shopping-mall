@@ -5,26 +5,18 @@
         <h3>物流公司管理</h3>
         <el-button type="primary" @click="openCreate">新增公司</el-button>
       </div>
-      <el-table :data="companies" style="width: 100%; margin-top: 15px">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="公司名称" />
-        <el-table-column prop="code" label="公司编码" width="140" />
-        <el-table-column prop="sort" label="排序" width="80" />
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180">
-          <template #default="{ row }">
-            <el-button size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" plain @click="remove(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <AppTable :columns="companyColumns" :data="companies">
+        <template #status="{ row }">
+          <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
+        </template>
+        <template #action="{ row }">
+          <el-button size="small" @click="openEdit(row)">编辑</el-button>
+          <el-button size="small" type="danger" plain @click="remove(row)">删除</el-button>
+        </template>
+      </AppTable>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑物流公司' : '新增物流公司'" width="420px">
+    <AppDialog v-model="dialogVisible" :title="isEdit ? '编辑物流公司' : '新增物流公司'" width="420px" @confirm="save">
       <el-form :model="form" label-width="90px">
         <el-form-item label="公司名称" required>
           <el-input v-model="form.name" maxlength="50" placeholder="如：顺丰速运" />
@@ -45,17 +37,15 @@
           />
         </el-form-item>
       </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="save">保存</el-button>
-      </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AppTable from '@/components/common/AppTable.vue'
+import AppDialog from '@/components/common/AppDialog.vue'
 import {
   getLogisticsCompanies,
   createLogisticsCompany,
@@ -67,6 +57,15 @@ const companies = ref([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const form = ref({ id: null, name: '', code: '', sort: 0, status: 1 })
+
+const companyColumns = [
+  { prop: 'id', label: 'ID', width: 80 },
+  { prop: 'name', label: '公司名称' },
+  { prop: 'code', label: '公司编码', width: 140 },
+  { prop: 'sort', label: '排序', width: 80 },
+  { label: '状态', slot: 'status', width: 100 },
+  { label: '操作', slot: 'action', width: 180 }
+]
 
 async function load() {
   try {
