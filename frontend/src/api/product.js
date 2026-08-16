@@ -35,4 +35,9 @@ export function clearSearchHistory() {
   return request.delete('/products/search/history')
 }
 
-export default { getProducts, getProduct, searchProducts, getCategories, getProductReviews, getProductRating, getSearchHistory, clearSearchHistory }
+// R-3 商品浏览历史（需登录，去重）
+export function getBrowseHistory(limit = 20) {
+  return request.get('/products/browse-history', { params: { limit } })
+}
+
+export default { getProducts, getProduct, searchProducts, getCategories, getProductReviews, getProductRating, getSearchHistory, clearSearchHistory, getBrowseHistory }

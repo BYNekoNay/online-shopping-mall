@@ -40,6 +40,7 @@ class ProductServiceTest {
     private CategoryMapper categoryMapper;
     private SkuMapper skuMapper;
     private SearchHistoryMapper searchHistoryMapper;
+    private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
     private BehaviorService behaviorService;
     private PromotionService promotionService;
     private ProductService service;
@@ -50,6 +51,7 @@ class ProductServiceTest {
         categoryMapper = mock(CategoryMapper.class);
         skuMapper = mock(SkuMapper.class);
         searchHistoryMapper = mock(SearchHistoryMapper.class);
+        userBehaviorMapper = mock(com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper.class);
         behaviorService = mock(BehaviorService.class);
         promotionService = mock(PromotionService.class);
         service = new ProductService();
@@ -57,6 +59,7 @@ class ProductServiceTest {
         inject(service, "categoryMapper", categoryMapper);
         inject(service, "skuMapper", skuMapper);
         inject(service, "searchHistoryMapper", searchHistoryMapper);
+        inject(service, "userBehaviorMapper", userBehaviorMapper);
         inject(service, "behaviorService", behaviorService);
         inject(service, "promotionService", promotionService);
         when(promotionService.matchActive(any())).thenReturn(Collections.emptyList());
@@ -301,6 +304,61 @@ class ProductServiceTest {
         // SH-03：清空按用户删除
         service.clearSearchHistory(100L);
         verify(searchHistoryMapper).delete(any());
+    }
+
+    // ==================== R-3 商品浏览历史 ====================
+
+    private static com.pzhu.mall.modules.behavior.entity.UserBehavior behavior(Long userId, Long productId) {
+        var b = new com.pzhu.mall.modules.behavior.entity.UserBehavior();
+        b.setUserId(userId);
+        b.setProductId(productId);
+        b.setBehaviorType(1);
+        return b;
+    }
+
+    @Test
+    void listBrowseHistory_deduplicatesAndKeepsOrder() {
+        // BH-01：浏览历史去重 + 保持最近浏览顺序 + 过滤下架
+        when(userBehaviorMapper.selectList(any()))
+                .thenReturn(List.of(behavior(100L, 10L), behavior(100L, 10L), behavior(100L, 20L)));
+        Product p10 = product(10L, 1);
+        Product p20 = product(20L, 1);
+        when(productMapper.selectBatchIds(any())).thenReturn(List.of(p10, p20));
+
+        var result = service.listBrowseHistory(100L, 10);
+
+        assertEquals(2, result.size());
+        assertEquals(10L, result.get(0).getId());
+        assertEquals(20L, result.get(1).getId());
+    }
+
+    @Test
+    void listBrowseHistory_filtersOfflineProducts() {
+        // BH-02：下架商品被过滤
+        when(userBehaviorMapper.selectList(any()))
+                .thenReturn(List.of(behavior(100L, 10L), behavior(100L, 30L)));
+        Product p10 = product(10L, 1);
+        Product p30 = product(30L, 0); // 下架
+        when(productMapper.selectBatchIds(any())).thenReturn(List.of(p10, p30));
+
+        var result = service.listBrowseHistory(100L, 10);
+
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).getId());
+    }
+
+    @Test
+    void listBrowseHistory_anonymous_returnsEmpty() {
+        // BH-03：未登录 → 空
+        assertTrue(service.listBrowseHistory(null, 10).isEmpty());
+        verify(userBehaviorMapper, never()).selectList(any());
+    }
+
+    @Test
+    void listBrowseHistory_noRecords_returnsEmpty() {
+        // BH-04：无浏览记录 → 空
+        when(userBehaviorMapper.selectList(any())).thenReturn(java.util.Collections.emptyList());
+        assertTrue(service.listBrowseHistory(100L, 10).isEmpty());
     }
 
     // ==================== helpers ====================

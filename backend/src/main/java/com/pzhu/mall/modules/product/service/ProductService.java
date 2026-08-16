@@ -45,6 +45,9 @@ public class ProductService {
     private SearchHistoryMapper searchHistoryMapper;
 
     @Resource
+    private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
+
+    @Resource
     private BehaviorService behaviorService;
 
     @Resource
@@ -328,5 +331,48 @@ public class ProductService {
         }
         searchHistoryMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.statistics.entity.SearchHistory>()
                 .eq(com.pzhu.mall.modules.statistics.entity.SearchHistory::getUserId, userId));
+    }
+
+    // ==================== R-3 商品浏览历史 ====================
+
+    /**
+     * 查询当前用户最近浏览的商品（去重，最多 limit 条）。
+     * <p>数据源 user_behavior type=1；过滤下架/已删；按浏览时间倒序。
+     * 未登录返回空列表。</p>
+     */
+    public List<ProductVO> listBrowseHistory(Long userId, int limit) {
+        if (userId == null) {
+            return List.of();
+        }
+        int safeLimit = Math.min(Math.max(limit, 1), 50);
+        List<com.pzhu.mall.modules.behavior.entity.UserBehavior> recent = userBehaviorMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.behavior.entity.UserBehavior>()
+                        .eq(com.pzhu.mall.modules.behavior.entity.UserBehavior::getUserId, userId)
+                        .eq(com.pzhu.mall.modules.behavior.entity.UserBehavior::getBehaviorType, 1)
+                        .orderByDesc(com.pzhu.mall.modules.behavior.entity.UserBehavior::getCreateTime)
+                        .last("LIMIT " + Math.min(safeLimit * 5, 100)));
+        if (recent.isEmpty()) {
+            return List.of();
+        }
+        // 按商品去重（保留最近浏览顺序）
+        LinkedHashSet<Long> productIds = new LinkedHashSet<>();
+        for (var b : recent) {
+            if (b.getProductId() != null) {
+                productIds.add(b.getProductId());
+                if (productIds.size() >= safeLimit) {
+                    break;
+                }
+            }
+        }
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        List<Product> products = productMapper.selectBatchIds(productIds);
+        // 过滤下架/已删，保持浏览顺序
+        Map<Long, Product> onlineMap = products.stream()
+                .filter(p -> Integer.valueOf(1).equals(p.getStatus()) && Integer.valueOf(0).equals(p.getIsDeleted()))
+                .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+        List<Product> ordered = productIds.stream().map(onlineMap::get).filter(java.util.Objects::nonNull).toList();
+        return toVOList(ordered);
     }
 }

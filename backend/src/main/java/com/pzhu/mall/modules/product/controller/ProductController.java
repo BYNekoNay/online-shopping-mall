@@ -65,6 +65,13 @@ public class ProductController {
         return Result.success();
     }
 
+    @Operation(summary = "我的商品浏览历史（R-3，需登录，去重）")
+    @GetMapping("/browse-history")
+    public Result<List<ProductVO>> browseHistory(@RequestParam(defaultValue = "20") Integer limit) {
+        Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
+        return Result.success(productService.listBrowseHistory(userId, limit));
+    }
+
     @Operation(summary = "商品详情")
     @GetMapping("/{id}")
     public Result<ProductVO> detail(@PathVariable Long id) {

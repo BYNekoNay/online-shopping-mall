@@ -31,6 +31,13 @@ dump.rdb
 
 # Maven
 backend/target/
+backend/target_*/
+backend/.build-bak/
+
+# 前端构建产物（含验证目录）
+frontend/dist/
+frontend/dist-*/
+frontend/vite.config.js.timestamp-*.mjs
 
 # Temp files
 # H-11 修复：忽略根目录下所有 _* 前缀的调试残留文件（含密码哈希、管理员 JWT、
