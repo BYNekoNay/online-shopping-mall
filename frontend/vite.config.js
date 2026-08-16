@@ -30,6 +30,20 @@ export default defineConfig(async ({ mode }) => {
         '@': '/src',
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // F-07 构建分包：框架/HTTP 库独立 vendor chunk，利于浏览器缓存
+          // 注意：Element Plus 不塞入 manualChunks（F-05 按需引入后整包会反向放大体积）
+          manualChunks: {
+            'vue-vendor': ['vue', 'vue-router', 'pinia'],
+            'http-vendor': ['axios', 'lodash-es'],
+            // F-06 富文本：wangeditor 独立 chunk（Edit 页已路由懒加载，仅改善缓存命中）
+            editor: ['@wangeditor/editor', '@wangeditor/editor-for-vue'],
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       proxy: {
