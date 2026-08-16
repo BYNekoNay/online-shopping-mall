@@ -142,6 +142,7 @@ function handleSearch(values) {
 
 function handleReset() {
   filters.value = { role: null, status: null, keyword: '' }
+  pageNum.value = 1 // 重置后从第 1 页重新加载（与搜索行为一致）
   load()
 }
 
