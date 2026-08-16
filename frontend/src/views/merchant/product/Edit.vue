@@ -2,12 +2,12 @@
   <div class="merchant-product-edit">
     <el-card>
       <h3>{{ isEdit ? '编辑商品' : '发布商品' }}</h3>
-      <el-form :model="form" label-width="120px" style="max-width: 800px; margin-top: 20px;">
+      <el-form :model="form" label-width="120px" style="max-width: 800px; margin-top: 20px">
         <el-form-item label="商品名称" required>
           <el-input v-model="form.name" placeholder="请输入商品名称" />
         </el-form-item>
         <el-form-item label="分类" required>
-          <el-select v-model="form.categoryId" placeholder="请选择分类" style="width: 100%;">
+          <el-select v-model="form.categoryId" placeholder="请选择分类" style="width: 100%">
             <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
@@ -28,19 +28,37 @@
         </el-form-item>
         <el-form-item label="商品详情">
           <!-- C-3：富文本编辑器替换 textarea -->
-          <div style="width: 100%;">
-            <Toolbar class="editor-toolbar" :editor="editorRef" :default-config="toolbarConfig" mode="default" style="border: 1px solid #dcdfe6; border-radius: 4px 4px 0 0;" />
-            <Editor v-model="form.detail" :default-config="editorConfig" mode="default" style="height: 300px; overflow-y: hidden; border: 1px solid #dcdfe6; border-top: none; border-radius: 0 0 4px 4px;" @on-created="handleCreated" />
+          <div style="width: 100%">
+            <Toolbar
+              class="editor-toolbar"
+              :editor="editorRef"
+              :default-config="toolbarConfig"
+              mode="default"
+              style="border: 1px solid #dcdfe6; border-radius: 4px 4px 0 0"
+            />
+            <Editor
+              v-model="form.detail"
+              :default-config="editorConfig"
+              mode="default"
+              style="
+                height: 300px;
+                overflow-y: hidden;
+                border: 1px solid #dcdfe6;
+                border-top: none;
+                border-radius: 0 0 4px 4px;
+              "
+              @on-created="handleCreated"
+            />
           </div>
         </el-form-item>
 
         <!-- SKU 列表 -->
         <el-form-item label="规格 SKU">
           <div v-for="(sku, idx) in form.skus" :key="idx" class="sku-row">
-            <el-input v-model="sku.specJson" placeholder="规格描述，如：颜色:红色;尺码:M" style="width: 220px;" />
+            <el-input v-model="sku.specJson" placeholder="规格描述，如：颜色:红色;尺码:M" style="width: 220px" />
             <el-input-number v-model="sku.price" :min="0" :step="0.01" :precision="2" placeholder="价格" />
             <el-input-number v-model="sku.stock" :min="0" placeholder="库存" />
-            <el-input v-model="sku.image" placeholder="SKU图片URL" style="width: 180px;" />
+            <el-input v-model="sku.image" placeholder="SKU图片URL" style="width: 180px" />
             <el-button type="danger" size="small" @click="removeSku(idx)">删除</el-button>
           </div>
           <el-button type="primary" size="small" @click="addSku">添加规格</el-button>
@@ -75,7 +93,7 @@ const editorRef = shallowRef()
 const toolbarConfig = {}
 const editorConfig = {
   placeholder: '请输入商品详情…（支持图文混排）',
-  MENU_CONF: {},
+  MENU_CONF: {}
 }
 const handleCreated = (editor) => {
   editorRef.value = editor
@@ -121,7 +139,7 @@ onMounted(async () => {
       form.value.mainImage = p.mainImage
       form.value.images = p.images
       form.value.detail = p.detail
-      form.value.skus = (p.skuList || []).map(s => ({
+      form.value.skus = (p.skuList || []).map((s) => ({
         specJson: s.specJson,
         price: s.price,
         stock: s.stock,

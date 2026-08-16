@@ -3,10 +3,15 @@
     <h2>确认订单</h2>
 
     <!-- 收货地址选择 -->
-    <el-card style="margin-bottom: 15px;">
+    <el-card style="margin-bottom: 15px">
       <div class="address-section">
         <span class="address-label">收货地址：</span>
-        <el-select v-model="selectedAddressId" placeholder="请选择收货地址" style="width: 100%;" @change="onAddressChange">
+        <el-select
+          v-model="selectedAddressId"
+          placeholder="请选择收货地址"
+          style="width: 100%"
+          @change="onAddressChange"
+        >
           <el-option
             v-for="addr in addresses"
             :key="addr.id"
@@ -18,13 +23,19 @@
     </el-card>
 
     <!-- 优惠券/积分选择 + 价格明细 -->
-    <el-card style="margin-bottom: 15px;" v-if="orderGroups.length > 0">
+    <el-card style="margin-bottom: 15px" v-if="orderGroups.length > 0">
       <h3>优惠与抵扣</h3>
       <div class="discount-section">
         <div class="coupon-row">
           <span>优惠券：</span>
           <!-- F-01 修复：:value 绑定完整 UserCouponVO 对象，estimate 用 c.couponId（模板ID），createOrder 用 c.id（记录ID） -->
-          <el-select v-model="selectedCoupon" placeholder="选择优惠券" clearable style="width: 260px;" @change="estimateOrder">
+          <el-select
+            v-model="selectedCoupon"
+            placeholder="选择优惠券"
+            clearable
+            style="width: 260px"
+            @change="estimateOrder"
+          >
             <el-option
               v-for="c in availableCoupons"
               :key="c.id"
@@ -43,7 +54,7 @@
     </el-card>
 
     <!-- 价格明细 -->
-    <el-card style="margin-bottom: 15px;" v-if="orderGroups.length > 0">
+    <el-card style="margin-bottom: 15px" v-if="orderGroups.length > 0">
       <h3>订单明细</h3>
       <div v-for="group in orderGroups" :key="group.shopId" class="order-group">
         <div class="shop-name">{{ group.shopName }}</div>
@@ -82,10 +93,10 @@
     </el-card>
 
     <div class="submit-bar" v-if="orderGroups.length > 0">
-      <span>实付金额：<strong>¥{{ totalPayAmount.toFixed(2) }}</strong></span>
-      <el-button type="primary" size="large" :loading="submitting" @click="submitOrder">
-        提交订单
-      </el-button>
+      <span
+        >实付金额：<strong>¥{{ totalPayAmount.toFixed(2) }}</strong></span
+      >
+      <el-button type="primary" size="large" :loading="submitting" @click="submitOrder"> 提交订单 </el-button>
     </div>
   </div>
 </template>
@@ -115,7 +126,9 @@ const estimateResult = ref([])
 // 明细金额
 const totalGoodsAmount = computed(() => estimateResult.value.reduce((s, g) => s + (g.goodsAmount || 0), 0))
 const totalFreightAmount = computed(() => estimateResult.value.reduce((s, g) => s + (g.freightAmount || 0), 0))
-const totalPromotionDiscount = computed(() => estimateResult.value.reduce((s, g) => s + (g.promotionDiscountAmount || 0), 0))
+const totalPromotionDiscount = computed(() =>
+  estimateResult.value.reduce((s, g) => s + (g.promotionDiscountAmount || 0), 0)
+)
 const totalCouponDiscount = computed(() => estimateResult.value.reduce((s, g) => s + (g.couponDiscountAmount || 0), 0))
 const totalPointsDeduct = computed(() => estimateResult.value.reduce((s, g) => s + (g.pointsDeductAmount || 0), 0))
 const totalPayAmount = computed(() => estimateResult.value.reduce((s, g) => s + (g.payAmount || 0), 0))
@@ -125,7 +138,7 @@ onMounted(async () => {
   try {
     const addrRes = await userRequest.getAddresses()
     addresses.value = addrRes.records || addrRes || []
-    const defAddr = addresses.value.find(a => a.isDefault === 1) || addresses.value[0]
+    const defAddr = addresses.value.find((a) => a.isDefault === 1) || addresses.value[0]
     selectedAddressId.value = defAddr ? defAddr.id : null
   } catch {
     addresses.value = []
@@ -152,13 +165,19 @@ onMounted(async () => {
 })
 
 function buildOrderGroups() {
-  const items = cartStore.items.filter(i => i.selected)
+  const items = cartStore.items.filter((i) => i.selected)
   const groups = {}
-  items.forEach(item => {
+  items.forEach((item) => {
     if (!groups[item.shopId]) {
       // B4-FR-01 修复：orderGroups 需含 freightAmount 兜底（模板 group-total 直接 toFixed，
       // 缺失会导致确认页渲染崩溃）；真实值由估价接口回填
-      groups[item.shopId] = { shopId: item.shopId, shopName: item.shopName || '店铺', items: [], goodsAmount: 0, freightAmount: 0 }
+      groups[item.shopId] = {
+        shopId: item.shopId,
+        shopName: item.shopName || '店铺',
+        items: [],
+        goodsAmount: 0,
+        freightAmount: 0
+      }
     }
     groups[item.shopId].items.push(item)
     groups[item.shopId].goodsAmount += item.price * item.quantity
@@ -172,8 +191,8 @@ async function estimateOrder() {
     return
   }
   try {
-    const allItems = orderGroups.value.flatMap(g =>
-      g.items.map(item => ({
+    const allItems = orderGroups.value.flatMap((g) =>
+      g.items.map((item) => ({
         productId: item.productId,
         skuId: item.skuId || null,
         quantity: item.quantity
@@ -200,7 +219,7 @@ async function submitOrder() {
   }
   submitting.value = true
   try {
-    const cartItemIds = cartStore.items.filter(i => i.selected).map(i => i.id)
+    const cartItemIds = cartStore.items.filter((i) => i.selected).map((i) => i.id)
     // F-01 修复：createOrder 传 userCouponId = UserCouponVO.id（UserCoupon 记录 ID），
     // 后端 CreateOrderDTO 字段为 userCouponId，此前误传 couponId 导致券不生效/不核销
     const orders = await request.createOrder({
@@ -233,7 +252,9 @@ function getCouponThreshold(rule) {
   try {
     const obj = JSON.parse(rule)
     return obj.threshold || 0
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
 function getCouponDiscount(rule) {
@@ -241,7 +262,9 @@ function getCouponDiscount(rule) {
   try {
     const obj = JSON.parse(rule)
     return obj.discount || 0
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
 function generateRequestId() {

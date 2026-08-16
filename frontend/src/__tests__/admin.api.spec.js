@@ -11,11 +11,11 @@ const { getMock, putMock, postMock, deleteMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
   putMock: vi.fn(),
   postMock: vi.fn(),
-  deleteMock: vi.fn(),
+  deleteMock: vi.fn()
 }))
 
 vi.mock('@/utils/request', () => ({
-  default: { get: getMock, put: putMock, post: postMock, delete: deleteMock },
+  default: { get: getMock, put: putMock, post: postMock, delete: deleteMock }
 }))
 
 import {
@@ -25,7 +25,7 @@ import {
   auditProduct,
   offlineProduct,
   auditShop,
-  updateShopLevel,
+  updateShopLevel
 } from '@/api/admin'
 
 describe('admin API 契约（F-T09~10）', () => {

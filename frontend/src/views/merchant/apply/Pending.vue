@@ -1,10 +1,9 @@
 <template>
   <div class="apply-pending">
-    <el-result v-if="!rejectReason" icon="info" title="申请审核中" sub-title="请耐心等待管理员审核">
-    </el-result>
+    <el-result v-if="!rejectReason" icon="info" title="申请审核中" sub-title="请耐心等待管理员审核"> </el-result>
     <el-result v-else icon="error" title="审核拒绝" sub-title="您的店铺入驻申请已被拒绝">
       <template #extra>
-        <p style="color: #f56c6c;">拒绝原因：{{ rejectReason }}</p>
+        <p style="color: #f56c6c">拒绝原因：{{ rejectReason }}</p>
         <el-button type="primary" @click="$router.push('/merchant/apply')">重新申请</el-button>
       </template>
     </el-result>

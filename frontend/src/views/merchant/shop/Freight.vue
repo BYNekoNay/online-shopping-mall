@@ -2,7 +2,7 @@
   <div class="merchant-freight">
     <el-card>
       <h3>运费模板</h3>
-      <el-form :model="form" label-width="120px" style="max-width: 600px; margin-top: 20px;">
+      <el-form :model="form" label-width="120px" style="max-width: 600px; margin-top: 20px">
         <el-form-item label="模板名称"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="默认运费">
           <el-input-number v-model="form.defaultFee" :min="0" :step="0.5" />
@@ -17,9 +17,9 @@
     </el-card>
 
     <!-- 运费试算 -->
-    <el-card style="margin-top: 20px;">
+    <el-card style="margin-top: 20px">
       <h3>运费试算</h3>
-      <el-form :model="calcForm" label-width="120px" style="max-width: 600px; margin-top: 20px;">
+      <el-form :model="calcForm" label-width="120px" style="max-width: 600px; margin-top: 20px">
         <el-form-item label="省份">
           <el-input v-model="calcForm.province" placeholder="请输入省份名称，如：广东省" />
         </el-form-item>
@@ -30,7 +30,13 @@
           <el-button type="primary" :loading="calcLoading" @click="doCalculateFreight">试算运费</el-button>
         </el-form-item>
       </el-form>
-      <el-alert v-if="calcResult !== null" :title="'预估运费：¥' + calcResult" type="success" :closable="false" style="max-width: 600px;" />
+      <el-alert
+        v-if="calcResult !== null"
+        :title="'预估运费：¥' + calcResult"
+        type="success"
+        :closable="false"
+        style="max-width: 600px"
+      />
     </el-card>
   </div>
 </template>

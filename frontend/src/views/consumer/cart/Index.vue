@@ -12,7 +12,12 @@
             <span>购物车 ({{ items.length }})</span>
             <div>
               <!-- D-4 全选/反选 -->
-              <el-checkbox :model-value="allSelected" :indeterminate="partialSelected" style="margin-right: 16px;" @change="toggleAll">
+              <el-checkbox
+                :model-value="allSelected"
+                :indeterminate="partialSelected"
+                style="margin-right: 16px"
+                @change="toggleAll"
+              >
                 全选
               </el-checkbox>
               <el-button type="text" @click="handleClear">清空购物车</el-button>
@@ -28,7 +33,13 @@
           </div>
           <div class="cart-item-price">¥{{ item.price }}</div>
           <div class="cart-item-quantity">
-            <el-input-number v-model="item.quantity" :min="1" :max="item.stock || 99" size="small" @change="updateQuantity(item)" />
+            <el-input-number
+              v-model="item.quantity"
+              :min="1"
+              :max="item.stock || 99"
+              size="small"
+              @change="updateQuantity(item)"
+            />
           </div>
           <div class="cart-item-subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
           <div v-if="!item.stockEnough" class="stock-warning">库存不足</div>
@@ -38,9 +49,7 @@
           <div class="cart-total">
             已选 {{ selectedCount }} 件，合计：<span class="total-price">¥{{ selectedTotal.toFixed(2) }}</span>
           </div>
-          <el-button type="primary" size="large" :disabled="selectedCount === 0" @click="goCheckout">
-            结算
-          </el-button>
+          <el-button type="primary" size="large" :disabled="selectedCount === 0" @click="goCheckout"> 结算 </el-button>
         </div>
       </el-card>
     </div>
@@ -57,18 +66,18 @@ import request from '@/api/cart'
 const router = useRouter()
 const cartStore = useCartStore()
 const items = computed(() => cartStore.items)
-const selectedCount = computed(() => items.value.filter(i => i.selected).length)
+const selectedCount = computed(() => items.value.filter((i) => i.selected).length)
 const selectedTotal = computed(() => cartStore.getSelectedTotal())
 // D-4 全选状态
-const allSelected = computed(() => items.value.length > 0 && items.value.every(i => i.selected))
-const partialSelected = computed(() => items.value.some(i => i.selected) && !allSelected.value)
+const allSelected = computed(() => items.value.length > 0 && items.value.every((i) => i.selected))
+const partialSelected = computed(() => items.value.some((i) => i.selected) && !allSelected.value)
 
 // D-4 全选/取消全选（批量接口）
 async function toggleAll(val) {
   const selected = val ? 1 : 0
   try {
     await request.selectAllCart(selected)
-    items.value.forEach(i => cartStore.updateItem(i.id, { selected }))
+    items.value.forEach((i) => cartStore.updateItem(i.id, { selected }))
     ElMessage.success(selected ? '已全选' : '已取消全选')
   } catch {
     ElMessage.error('操作失败')

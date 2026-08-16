@@ -14,7 +14,9 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 const router = useRouter()
 const userStore = useUserStore()
-function goHome() { router.push('/') }
+function goHome() {
+  router.push('/')
+}
 function reLogin() {
   userStore.logout()
   router.push('/login')

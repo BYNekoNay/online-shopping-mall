@@ -2,7 +2,7 @@
   <div class="merchant-refunds">
     <el-card>
       <h3>售后处理</h3>
-      <el-table :data="refunds" style="width: 100%; margin-top: 15px;">
+      <el-table :data="refunds" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="reason" label="原因" />
         <el-table-column prop="amount" label="退款金额" width="120">
@@ -17,8 +17,12 @@
         </el-table-column>
         <el-table-column v-if="hasPending" label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 0" type="success" size="small" @click="openAuditDialog(row, true)">通过</el-button>
-            <el-button v-if="row.status === 0" type="danger" size="small" @click="openAuditDialog(row, false)">拒绝</el-button>
+            <el-button v-if="row.status === 0" type="success" size="small" @click="openAuditDialog(row, true)"
+              >通过</el-button
+            >
+            <el-button v-if="row.status === 0" type="danger" size="small" @click="openAuditDialog(row, false)"
+              >拒绝</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -51,10 +55,12 @@ const currentRefundId = ref(null)
 const auditForm = ref({ approved: true, handleRemark: '' })
 const statusMap = { 0: '待审核', 1: '已通过', 2: '已拒绝', 3: '已退款' }
 
-const hasPending = computed(() => refunds.value.some(r => r.status === 0))
+const hasPending = computed(() => refunds.value.some((r) => r.status === 0))
 
 onMounted(async () => {
-  try { refunds.value = await request.getRefunds() } catch {}
+  try {
+    refunds.value = await request.getRefunds()
+  } catch {}
 })
 
 function openAuditDialog(refund, approved) {
@@ -73,7 +79,7 @@ async function confirmAudit() {
     await request.auditRefund(currentRefundId.value, auditForm.value)
     ElMessage.success(auditForm.value.approved ? '已通过' : '已拒绝')
     auditDialogVisible.value = false
-    const refund = refunds.value.find(r => r.id === currentRefundId.value)
+    const refund = refunds.value.find((r) => r.id === currentRefundId.value)
     if (refund) {
       refund.status = auditForm.value.approved ? 1 : 2
     }

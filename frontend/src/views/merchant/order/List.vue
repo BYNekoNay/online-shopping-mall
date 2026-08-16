@@ -2,7 +2,7 @@
   <div class="merchant-orders">
     <el-card>
       <h3>订单管理</h3>
-      <el-table :data="orders" style="width: 100%; margin-top: 15px;">
+      <el-table :data="orders" style="width: 100%; margin-top: 15px">
         <el-table-column prop="orderNo" label="订单号" />
         <el-table-column label="金额" width="120">
           <template #default="{ row }">¥{{ row.payAmount }}</template>
@@ -26,7 +26,7 @@
         <el-form :model="shipForm" label-width="100px">
           <el-form-item label="物流公司" required>
             <!-- C-4：物流公司下拉（替代自由输入） -->
-            <el-select v-model="shipForm.logisticsCompany" placeholder="请选择物流公司" style="width: 100%;">
+            <el-select v-model="shipForm.logisticsCompany" placeholder="请选择物流公司" style="width: 100%">
               <el-option v-for="c in logisticsCompanies" :key="c.id" :label="c.name" :value="c.name" />
             </el-select>
           </el-form-item>
@@ -51,7 +51,7 @@
             </el-descriptions-item>
           </el-descriptions>
 
-          <h4 style="margin: 20px 0 10px;">商品明细</h4>
+          <h4 style="margin: 20px 0 10px">商品明细</h4>
           <el-table :data="selectedOrderDetail.items || []" size="small" border>
             <el-table-column prop="productName" label="商品名称" />
             <el-table-column prop="skuName" label="SKU" />
@@ -64,25 +64,39 @@
             </el-table-column>
           </el-table>
 
-          <el-descriptions :column="2" border style="margin-top: 20px;">
+          <el-descriptions :column="2" border style="margin-top: 20px">
             <el-descriptions-item label="商品总额">¥{{ selectedOrderDetail.goodsAmount }}</el-descriptions-item>
             <el-descriptions-item label="运费">¥{{ selectedOrderDetail.freightAmount || 0 }}</el-descriptions-item>
-            <el-descriptions-item label="优惠抵扣">-¥{{ selectedOrderDetail.discountAmount || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="优惠抵扣"
+              >-¥{{ selectedOrderDetail.discountAmount || 0 }}</el-descriptions-item
+            >
             <el-descriptions-item label="实付金额">
-              <span style="color: #f56c6c; font-weight: bold;">¥{{ selectedOrderDetail.payAmount }}</span>
+              <span style="color: #f56c6c; font-weight: bold">¥{{ selectedOrderDetail.payAmount }}</span>
             </el-descriptions-item>
           </el-descriptions>
 
-          <el-descriptions :column="2" border style="margin-top: 20px;">
+          <el-descriptions :column="2" border style="margin-top: 20px">
             <el-descriptions-item label="收货人">{{ selectedOrderDetail.consignee || '-' }}</el-descriptions-item>
             <el-descriptions-item label="联系电话">{{ selectedOrderDetail.phone || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="收货地址" span="2">{{ selectedOrderDetail.address || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="物流公司">{{ selectedOrderDetail.logisticsCompany || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="收货地址" span="2">{{
+              selectedOrderDetail.address || '-'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="物流公司">{{
+              selectedOrderDetail.logisticsCompany || '-'
+            }}</el-descriptions-item>
             <el-descriptions-item label="物流单号">{{ selectedOrderDetail.trackingNo || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="创建时间">{{ selectedOrderDetail.createTime?.replace('T', ' ') || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="支付时间">{{ selectedOrderDetail.payTime?.replace('T', ' ') || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="发货时间">{{ selectedOrderDetail.shipTime?.replace('T', ' ') || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="完成时间">{{ selectedOrderDetail.completeTime?.replace('T', ' ') || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{
+              selectedOrderDetail.createTime?.replace('T', ' ') || '-'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="支付时间">{{
+              selectedOrderDetail.payTime?.replace('T', ' ') || '-'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="发货时间">{{
+              selectedOrderDetail.shipTime?.replace('T', ' ') || '-'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="完成时间">{{
+              selectedOrderDetail.completeTime?.replace('T', ' ') || '-'
+            }}</el-descriptions-item>
           </el-descriptions>
         </template>
         <template #footer>
@@ -110,9 +124,13 @@ const currentDetailOrderId = ref(null)
 const logisticsCompanies = ref([])
 
 onMounted(async () => {
-  try { orders.value = await request.getMerchantOrders() } catch {}
+  try {
+    orders.value = await request.getMerchantOrders()
+  } catch {}
   // C-4：加载启用中的物流公司（下拉选项）
-  try { logisticsCompanies.value = await request.getLogisticsCompanies() || [] } catch {}
+  try {
+    logisticsCompanies.value = (await request.getLogisticsCompanies()) || []
+  } catch {}
 })
 
 function openShipDialog(order) {

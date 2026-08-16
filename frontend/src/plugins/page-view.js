@@ -34,15 +34,17 @@ function reportPageEnter(to, requestFn) {
   requestFn({
     sessionId: getOrCreateSessionId(),
     pagePath: to.fullPath,
-    referrerPage: sessionStorage.getItem('last_page_path') || '',
-  }).then((id) => {
-    // 存储当前页面信息，供 leave 使用
-    sessionStorage.setItem('current_page_view_id', String(id))
-    sessionStorage.setItem('current_page_path', to.fullPath)
-    sessionStorage.setItem('current_page_enter_time', enterTime)
-  }).catch(() => {
-    // 进入上报失败不影响业务，静默忽略
+    referrerPage: sessionStorage.getItem('last_page_path') || ''
   })
+    .then((id) => {
+      // 存储当前页面信息，供 leave 使用
+      sessionStorage.setItem('current_page_view_id', String(id))
+      sessionStorage.setItem('current_page_path', to.fullPath)
+      sessionStorage.setItem('current_page_enter_time', enterTime)
+    })
+    .catch(() => {
+      // 进入上报失败不影响业务，静默忽略
+    })
 }
 
 // 页面离开时回填
@@ -79,7 +81,7 @@ function reportPageLeave(_requestFn) {
     method: 'PUT',
     headers,
     body: payload,
-    keepalive: true,
+    keepalive: true
   }).catch(() => {})
 
   // 清理当前页数据，为下次进入做准备

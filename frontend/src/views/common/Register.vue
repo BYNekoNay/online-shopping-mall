@@ -13,7 +13,13 @@
           <el-input v-model="form.password" type="password" placeholder="请输入密码" prefix-icon="Lock" show-password />
         </el-form-item>
         <el-form-item prop="confirmPassword">
-          <el-input v-model="form.confirmPassword" type="password" placeholder="请确认密码" prefix-icon="Lock" show-password />
+          <el-input
+            v-model="form.confirmPassword"
+            type="password"
+            placeholder="请确认密码"
+            prefix-icon="Lock"
+            show-password
+          />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" style="width: 100%" :loading="loading" @click="handleRegister">注册</el-button>
@@ -42,17 +48,18 @@ const form = ref({ username: '', nickname: '', password: '', confirmPassword: ''
 const rules = {
   username: [formRules.required('请输入用户名'), formRules.username()],
   password: [formRules.required('请输入密码'), formRules.length(8, 20, '密码需为 8~20 个字符')],
-  confirmPassword: [
-    formRules.required('请确认密码'),
-    formRules.confirmPassword(() => form.value.password),
-  ],
+  confirmPassword: [formRules.required('请确认密码'), formRules.confirmPassword(() => form.value.password)]
 }
 
 async function handleRegister() {
   if (!(await validateForm(formRef.value))) return
   loading.value = true
   try {
-    await request.post('/auth/register', { username: form.value.username, nickname: form.value.nickname, password: form.value.password })
+    await request.post('/auth/register', {
+      username: form.value.username,
+      nickname: form.value.nickname,
+      password: form.value.password
+    })
     ElMessage.success('注册成功，请登录')
     router.push('/login')
   } catch {
@@ -76,7 +83,7 @@ async function handleRegister() {
   padding: 40px;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 .login-card h2 {
   text-align: center;

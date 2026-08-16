@@ -1,14 +1,39 @@
 <template>
   <div class="admin-dashboard">
     <div class="stat-row">
-      <el-card class="stat-card"><div class="stat"><div class="label">GMV</div><div class="value">{{ dashboard.gmv }}</div></div></el-card>
-      <el-card class="stat-card"><div class="stat"><div class="label">订单数</div><div class="value">{{ dashboard.orderCount }}</div></div></el-card>
-      <el-card class="stat-card"><div class="stat"><div class="label">新增用户</div><div class="value">{{ dashboard.newUserCount }}</div></div></el-card>
-      <el-card class="stat-card"><div class="stat"><div class="label">订单转化率</div><div class="value">{{ formatConversionRate(dashboard.conversionRate) }}</div></div></el-card>
-      <el-card class="stat-card"><div class="stat"><div class="label">推荐点击率</div><div class="value">{{ dashboard.recommendCtr }}</div></div></el-card>
+      <el-card class="stat-card"
+        ><div class="stat">
+          <div class="label">GMV</div>
+          <div class="value">{{ dashboard.gmv }}</div>
+        </div></el-card
+      >
+      <el-card class="stat-card"
+        ><div class="stat">
+          <div class="label">订单数</div>
+          <div class="value">{{ dashboard.orderCount }}</div>
+        </div></el-card
+      >
+      <el-card class="stat-card"
+        ><div class="stat">
+          <div class="label">新增用户</div>
+          <div class="value">{{ dashboard.newUserCount }}</div>
+        </div></el-card
+      >
+      <el-card class="stat-card"
+        ><div class="stat">
+          <div class="label">订单转化率</div>
+          <div class="value">{{ formatConversionRate(dashboard.conversionRate) }}</div>
+        </div></el-card
+      >
+      <el-card class="stat-card"
+        ><div class="stat">
+          <div class="label">推荐点击率</div>
+          <div class="value">{{ dashboard.recommendCtr }}</div>
+        </div></el-card
+      >
     </div>
 
-    <el-row :gutter="20" style="margin-top: 20px;">
+    <el-row :gutter="20" style="margin-top: 20px">
       <el-col :span="12">
         <el-card>
           <h4>转化漏斗</h4>
@@ -19,11 +44,20 @@
       <el-col :span="12">
         <el-card>
           <h4>流量指标</h4>
-          <div style="padding: 20px 0;">
-            <div class="metric-row"><span class="metric-label">PV（页面浏览量）</span><span class="metric-value">{{ detail.pv }}</span></div>
-            <div class="metric-row"><span class="metric-label">UV（独立访客）</span><span class="metric-value">{{ detail.uv }}</span></div>
-            <div class="metric-row"><span class="metric-label">跳出率</span><span class="metric-value">{{ detail.bounceRate }}%</span></div>
-            <div class="metric-row"><span class="metric-label">平均停留时长</span><span class="metric-value">{{ detail.avgStayDuration }} 秒</span></div>
+          <div style="padding: 20px 0">
+            <div class="metric-row">
+              <span class="metric-label">PV（页面浏览量）</span><span class="metric-value">{{ detail.pv }}</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">UV（独立访客）</span><span class="metric-value">{{ detail.uv }}</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">跳出率</span><span class="metric-value">{{ detail.bounceRate }}%</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">平均停留时长</span
+              ><span class="metric-value">{{ detail.avgStayDuration }} 秒</span>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -53,16 +87,21 @@ const funnelOption = computed(() => {
   const f = detail.value.funnel || {}
   return {
     tooltip: { trigger: 'item' },
-    series: [{
-      type: 'funnel',
-      left: '10%', top: 20, bottom: 20, width: '80%',
-      data: [
-        { value: f.view || 0, name: '浏览' },
-        { value: f.cart || 0, name: '加购' },
-        { value: f.order || 0, name: '下单' },
-        { value: f.pay || 0, name: '支付' },
-      ],
-    }],
+    series: [
+      {
+        type: 'funnel',
+        left: '10%',
+        top: 20,
+        bottom: 20,
+        width: '80%',
+        data: [
+          { value: f.view || 0, name: '浏览' },
+          { value: f.cart || 0, name: '加购' },
+          { value: f.order || 0, name: '下单' },
+          { value: f.pay || 0, name: '支付' }
+        ]
+      }
+    ]
   }
 })
 
@@ -90,13 +129,42 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.stat-row { display: flex; gap: 20px; }
-.stat-card { flex: 1; }
-.stat { text-align: center; padding: 20px; }
-.stat .label { color: #999; font-size: 14px; }
-.stat .value { font-size: 28px; font-weight: bold; color: #409eff; margin-top: 10px; }
-.metric-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
-.metric-row:last-child { border-bottom: none; }
-.metric-label { color: #666; }
-.metric-value { font-weight: bold; color: #333; font-size: 18px; }
+.stat-row {
+  display: flex;
+  gap: 20px;
+}
+.stat-card {
+  flex: 1;
+}
+.stat {
+  text-align: center;
+  padding: 20px;
+}
+.stat .label {
+  color: #999;
+  font-size: 14px;
+}
+.stat .value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #409eff;
+  margin-top: 10px;
+}
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.metric-row:last-child {
+  border-bottom: none;
+}
+.metric-label {
+  color: #666;
+}
+.metric-value {
+  font-weight: bold;
+  color: #333;
+  font-size: 18px;
+}
 </style>

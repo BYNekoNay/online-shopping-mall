@@ -38,7 +38,7 @@ const form = ref({ username: '', password: '' })
 // F-3：统一校验规则
 const rules = {
   username: [formRules.required('请输入用户名'), formRules.username()],
-  password: [formRules.required('请输入密码')],
+  password: [formRules.required('请输入密码')]
 }
 
 async function handleLogin() {
@@ -77,7 +77,7 @@ async function handleLogin() {
   padding: 40px;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 .login-card h2 {
   text-align: center;

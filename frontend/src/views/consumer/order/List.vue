@@ -13,7 +13,7 @@
     <div v-if="orders.length === 0" class="empty">
       <el-empty description="暂无订单" />
     </div>
-    <el-card v-for="order in orders" :key="order.orderId" class="order-card" style="margin-bottom: 15px;">
+    <el-card v-for="order in orders" :key="order.orderId" class="order-card" style="margin-bottom: 15px">
       <div class="order-header">
         <span>订单号：{{ order.orderNo }}</span>
         <span class="order-status">{{ formatStatus(order.status) }}</span>
@@ -29,18 +29,19 @@
         </div>
       </div>
       <div class="order-footer">
-        <span>实付：<strong>¥{{ order.payAmount }}</strong></span>
+        <span
+          >实付：<strong>¥{{ order.payAmount }}</strong></span
+        >
         <div>
-          <el-button v-if="order.status === 0" type="primary" @click="$router.push(`/order/pay/${order.orderId}`)">去支付</el-button>
+          <el-button v-if="order.status === 0" type="primary" @click="$router.push(`/order/pay/${order.orderId}`)"
+            >去支付</el-button
+          >
           <el-button v-if="order.status === 0" @click="cancelOrder(order.orderId)">取消订单</el-button>
           <el-button v-if="order.status === 2" @click="confirmOrder(order.orderId)">确认收货</el-button>
           <!-- R-1：申请退款（待发货1/已发货2/已收货3/已完成4，与后端 RefundService 放行口径一致） -->
-          <el-button
-            v-if="order.status >= 1 && order.status <= 4"
-            type="warning"
-            plain
-            @click="openRefundDialog(order)"
-          >申请退款</el-button>
+          <el-button v-if="order.status >= 1 && order.status <= 4" type="warning" plain @click="openRefundDialog(order)"
+            >申请退款</el-button
+          >
           <el-button type="default" @click="$router.push(`/orders/${order.orderId}`)">查看详情</el-button>
           <!-- B-1：删除订单（仅已取消5/已退款7 显示） -->
           <el-button
@@ -48,7 +49,8 @@
             type="danger"
             plain
             @click="handleDeleteOrder(order.orderId)"
-          >删除</el-button>
+            >删除</el-button
+          >
         </div>
       </div>
     </el-card>
@@ -57,7 +59,7 @@
     <el-dialog v-model="refundDialogVisible" title="申请退款" width="480px">
       <el-form :model="refundForm" label-width="100px">
         <el-form-item label="退款商品" required>
-          <el-select v-model="refundForm.orderItemId" placeholder="选择退款商品" style="width: 100%;">
+          <el-select v-model="refundForm.orderItemId" placeholder="选择退款商品" style="width: 100%">
             <el-option
               v-for="item in refundableItems"
               :key="item.id"
@@ -67,10 +69,22 @@
           </el-select>
         </el-form-item>
         <el-form-item label="退款金额" required>
-          <el-input-number v-model="refundForm.amount" :min="0.01" :max="refundMaxAmount" :precision="2" style="width: 100%;" />
+          <el-input-number
+            v-model="refundForm.amount"
+            :min="0.01"
+            :max="refundMaxAmount"
+            :precision="2"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="退款原因" required>
-          <el-input v-model="refundForm.reason" type="textarea" :rows="3" maxlength="200" placeholder="请填写退款原因" />
+          <el-input
+            v-model="refundForm.reason"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            placeholder="请填写退款原因"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -89,7 +103,16 @@ import request from '@/api/order'
 const activeStatus = ref('')
 const orders = ref([])
 
-const statusMap = { '0': '待付款', '1': '待发货', '2': '已发货', '3': '已收货', '4': '已完成', '5': '已取消', '6': '退款中', '7': '已退款' }
+const statusMap = {
+  0: '待付款',
+  1: '待发货',
+  2: '已发货',
+  3: '已收货',
+  4: '已完成',
+  5: '已取消',
+  6: '退款中',
+  7: '已退款'
+}
 
 function formatStatus(status) {
   return statusMap[status] || '未知'
@@ -125,7 +148,7 @@ const refundMaxAmount = ref(0)
 function openRefundDialog(order) {
   currentRefundOrder.value = order
   // 可退款商品：非赠品行
-  refundableItems.value = (order.items || []).filter(i => !i.isGift)
+  refundableItems.value = (order.items || []).filter((i) => !i.isGift)
   const first = refundableItems.value[0]
   if (first) {
     refundForm.value = { orderItemId: first.id, reason: '', amount: Number(first.price) * first.quantity }
@@ -156,7 +179,7 @@ async function submitRefund() {
       orderItemId: refundForm.value.orderItemId,
       type: 1,
       reason: refundForm.value.reason,
-      amount: refundForm.value.amount,
+      amount: refundForm.value.amount
     })
     ElMessage.success('退款申请已提交，等待商家处理')
     refundDialogVisible.value = false

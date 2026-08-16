@@ -90,7 +90,11 @@ export default [
       'vue/singleline-html-element-content-newline': 'off',
       'vue/multiline-html-element-content-newline': 'off',
       // 属性顺序为纯风格偏好（Prettier 不管理该维度），关闭避免噪音；清理列为建议项
-      'vue/attributes-order': 'off'
+      'vue/attributes-order': 'off',
+      // Prettier 与 eslint-plugin-vue 格式规则冲突（F-02 全量格式化后暴露）：
+      // 缩进/换行由 Prettier 统一管理，eslint 关闭对应纯格式规则避免双重标准
+      'vue/html-indent': 'off',
+      'vue/html-closing-bracket-newline': 'off'
     }
   }))
 ]

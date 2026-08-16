@@ -2,7 +2,7 @@
   <div class="admin-products">
     <el-card>
       <h3>商品审核</h3>
-      <el-table :data="products" style="width: 100%; margin-top: 15px;">
+      <el-table :data="products" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="商品名称" />
         <el-table-column prop="shopName" label="店铺" width="150" />
@@ -13,8 +13,12 @@
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 2" type="success" size="small" @click="auditProduct(row, true)">通过</el-button>
-            <el-button v-if="row.status === 2" type="danger" size="small" @click="auditProduct(row, false)">拒绝</el-button>
+            <el-button v-if="row.status === 2" type="success" size="small" @click="auditProduct(row, true)"
+              >通过</el-button
+            >
+            <el-button v-if="row.status === 2" type="danger" size="small" @click="auditProduct(row, false)"
+              >拒绝</el-button
+            >
             <el-button v-if="row.status === 1" type="warning" size="small" @click="offlineProduct(row)">下架</el-button>
           </template>
         </el-table-column>
@@ -50,7 +54,9 @@ const currentProductId = ref(null)
 const auditForm = ref({ approved: true, reason: '' })
 
 onMounted(async () => {
-  try { products.value = (await request.getProducts()).records || [] } catch {}
+  try {
+    products.value = (await request.getProducts()).records || []
+  } catch {}
 })
 
 function statusType(status) {
@@ -70,10 +76,13 @@ async function confirmAudit() {
   }
   auditSubmitting.value = true
   try {
-    await request.auditProduct(currentProductId.value, { approved: auditForm.value.approved, reason: auditForm.value.reason })
+    await request.auditProduct(currentProductId.value, {
+      approved: auditForm.value.approved,
+      reason: auditForm.value.reason
+    })
     ElMessage.success(auditForm.value.approved ? '审核通过' : '已拒绝')
     auditDialogVisible.value = false
-    const p = products.value.find(p => p.id === currentProductId.value)
+    const p = products.value.find((p) => p.id === currentProductId.value)
     if (p) p.status = auditForm.value.approved ? 1 : 3
   } catch {
     ElMessage.error('操作失败')

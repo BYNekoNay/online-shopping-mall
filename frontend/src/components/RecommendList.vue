@@ -1,7 +1,15 @@
 <template>
   <div class="recommend-list">
     <el-row :gutter="20">
-      <el-col :xs="12" :sm="8" :md="6" :lg="4" v-for="(item, index) in list" :key="item.productId" style="margin-bottom: 20px;">
+      <el-col
+        :xs="12"
+        :sm="8"
+        :md="6"
+        :lg="4"
+        v-for="(item, index) in list"
+        :key="item.productId"
+        style="margin-bottom: 20px"
+      >
         <el-card class="product-card" :body-style="{ padding: '0px' }" @click="handleClick(item, index)">
           <div class="product-image">
             <img :src="item.mainImage" :alt="item.name" />
@@ -20,12 +28,17 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { getRecommendations, getSimilarProducts, getHistoryRecommendations, getPurchaseRecommendations } from '@/api/recommend'
+import {
+  getRecommendations,
+  getSimilarProducts,
+  getHistoryRecommendations,
+  getPurchaseRecommendations
+} from '@/api/recommend'
 import { recommendExposure, recommendClick } from '@/api/behavior'
 
 const props = defineProps({
   mode: { type: String, default: 'guess' },
-  productId: { type: [String, Number], default: null },
+  productId: { type: [String, Number], default: null }
 })
 
 const router = useRouter()
@@ -33,14 +46,19 @@ const list = ref([])
 const exposed = ref(false)
 
 // A-1/D-5 扩展：source 语义映射（guess=首页猜你喜欢 / similar=商品详情相似 / history=浏览历史推荐 / purchase=购买推荐）
-const SOURCE_MAP = { guess: 'home-guess', similar: 'product-similar', history: 'home-history', purchase: 'home-purchase' }
+const SOURCE_MAP = {
+  guess: 'home-guess',
+  similar: 'product-similar',
+  history: 'home-history',
+  purchase: 'home-purchase'
+}
 const source = () => SOURCE_MAP[props.mode] || 'home-guess'
 
 /** 上报推荐位曝光（仅一次）。 */
 function reportExposure() {
   if (exposed.value || !list.value || list.value.length === 0) return
   exposed.value = true
-  const productIds = list.value.map(i => i.productId)
+  const productIds = list.value.map((i) => i.productId)
   recommendExposure({ source: source(), productIds }).catch(() => {})
 }
 
@@ -49,7 +67,7 @@ async function handleClick(item, index) {
   recommendClick({
     source: source(),
     productId: item.productId,
-    position: index + 1, // 1-based
+    position: index + 1 // 1-based
   }).catch(() => {})
 
   // 跳转商品详情，携带推荐来源标记（供后端统计点击归因）

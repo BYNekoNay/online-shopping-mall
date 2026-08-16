@@ -16,7 +16,7 @@
         <h3>{{ currentCategoryName }}</h3>
       </div>
       <el-row :gutter="20">
-        <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in products" :key="item.id" style="margin-bottom: 20px;">
+        <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in products" :key="item.id" style="margin-bottom: 20px">
           <el-card class="product-card" @click="$router.push(`/product/${item.id}`)">
             <div class="product-image"><img :src="item.mainImage" :alt="item.name" /></div>
             <div class="product-info">
@@ -48,7 +48,7 @@ async function loadCategories() {
     categories.value = data || []
     // Build name map
     const buildMap = (list) => {
-      list.forEach(c => {
+      list.forEach((c) => {
         categoryNameMap.value[c.id] = c.name
         if (c.children) buildMap(c.children)
       })

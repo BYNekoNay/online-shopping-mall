@@ -4,22 +4,28 @@
       <el-empty description="加载中..." />
     </div>
     <template v-else>
-      <el-card style="margin-bottom: 15px;">
+      <el-card style="margin-bottom: 15px">
         <div class="section-header">
           <span>订单号：{{ order.orderNo }}</span>
           <el-tag :type="statusType(order.status)">{{ statusText(order.status) }}</el-tag>
         </div>
-        <div class="info-row"><span>下单时间：{{ formatTime(order.createTime) }}</span></div>
-        <div v-if="order.payTime" class="info-row"><span>支付时间：{{ formatTime(order.payTime) }}</span></div>
+        <div class="info-row">
+          <span>下单时间：{{ formatTime(order.createTime) }}</span>
+        </div>
+        <div v-if="order.payTime" class="info-row">
+          <span>支付时间：{{ formatTime(order.payTime) }}</span>
+        </div>
         <div class="info-row">
           <span>收货地址：{{ parseAddress(order.addressSnapshot) }}</span>
         </div>
-        <div v-if="order.remark" class="info-row"><span>备注：{{ order.remark }}</span></div>
+        <div v-if="order.remark" class="info-row">
+          <span>备注：{{ order.remark }}</span>
+        </div>
       </el-card>
 
-      <el-card style="margin-bottom: 15px;">
+      <el-card style="margin-bottom: 15px">
         <h4>商品清单</h4>
-        <el-table :data="order.items || []" style="width: 100%;">
+        <el-table :data="order.items || []" style="width: 100%">
           <el-table-column label="商品" min-width="300">
             <template #default="{ row }">
               <div class="item-cell">
@@ -43,38 +49,49 @@
 
       <el-card>
         <div class="amounts">
-          <div>商品金额：<span>¥{{ order.totalAmount }}</span></div>
-          <div>运费：<span>¥{{ order.freightAmount }}</span></div>
-          <div>优惠：<span>-¥{{ order.discountAmount }}</span></div>
-          <div class="pay-amount">实付金额：<strong>¥{{ order.payAmount }}</strong></div>
+          <div>
+            商品金额：<span>¥{{ order.totalAmount }}</span>
+          </div>
+          <div>
+            运费：<span>¥{{ order.freightAmount }}</span>
+          </div>
+          <div>
+            优惠：<span>-¥{{ order.discountAmount }}</span>
+          </div>
+          <div class="pay-amount">
+            实付金额：<strong>¥{{ order.payAmount }}</strong>
+          </div>
         </div>
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px">
           <el-button v-if="order.status === 0" type="primary" @click="goPay">去支付</el-button>
           <el-button v-if="order.status === 0" @click="cancelOrder">取消订单</el-button>
           <el-button v-if="order.status === 2" type="success" @click="confirmOrder">确认收货</el-button>
           <!-- R-1：申请退款（待发货1/已发货2/已收货3/已完成4，与后端 RefundService 放行口径一致） -->
-          <el-button
-            v-if="order.status >= 1 && order.status <= 4"
-            type="warning"
-            plain
-            @click="openRefundDialog"
-          >申请退款</el-button>
-          <el-button v-if="order.status >= 2 && order.status !== 5 && order.status !== 7" @click="showLogistics">查看物流</el-button>
+          <el-button v-if="order.status >= 1 && order.status <= 4" type="warning" plain @click="openRefundDialog"
+            >申请退款</el-button
+          >
+          <el-button v-if="order.status >= 2 && order.status !== 5 && order.status !== 7" @click="showLogistics"
+            >查看物流</el-button
+          >
           <el-button @click="$router.back()">返回</el-button>
         </div>
 
         <!-- 物流弹窗 -->
         <el-dialog v-model="logisticsVisible" title="物流信息" width="500px">
-          <div v-if="logisticsLoading" style="text-align: center; padding: 30px;">加载中...</div>
-          <div v-else-if="logisticsError" style="text-align: center; padding: 30px; color: #999;">{{ logisticsError }}</div>
-          <pre v-else style="white-space: pre-wrap; font-size: 13px; max-height: 400px; overflow-y: auto;">{{ logisticsInfo }}</pre>
+          <div v-if="logisticsLoading" style="text-align: center; padding: 30px">加载中...</div>
+          <div v-else-if="logisticsError" style="text-align: center; padding: 30px; color: #999">
+            {{ logisticsError }}
+          </div>
+          <pre v-else style="white-space: pre-wrap; font-size: 13px; max-height: 400px; overflow-y: auto">{{
+            logisticsInfo
+          }}</pre>
         </el-dialog>
 
         <!-- 退款申请 Dialog（R-1：待发货1/已发货2/已收货3/已完成4 可申请） -->
         <el-dialog v-model="refundDialogVisible" title="申请退款" width="480px">
           <el-form :model="refundForm" label-width="100px">
             <el-form-item label="退款商品" required>
-              <el-select v-model="refundForm.orderItemId" placeholder="选择退款商品" style="width: 100%;">
+              <el-select v-model="refundForm.orderItemId" placeholder="选择退款商品" style="width: 100%">
                 <el-option
                   v-for="item in refundableItems"
                   :key="item.id"
@@ -90,10 +107,22 @@
               </el-radio-group>
             </el-form-item>
             <el-form-item label="退款金额" required>
-              <el-input-number v-model="refundForm.amount" :min="0.01" :max="refundMaxAmount" :precision="2" style="width: 100%;" />
+              <el-input-number
+                v-model="refundForm.amount"
+                :min="0.01"
+                :max="refundMaxAmount"
+                :precision="2"
+                style="width: 100%"
+              />
             </el-form-item>
             <el-form-item label="退款原因" required>
-              <el-input v-model="refundForm.reason" type="textarea" :rows="3" maxlength="200" placeholder="请填写退款原因" />
+              <el-input
+                v-model="refundForm.reason"
+                type="textarea"
+                :rows="3"
+                maxlength="200"
+                placeholder="请填写退款原因"
+              />
             </el-form-item>
           </el-form>
           <template #footer>
@@ -117,7 +146,16 @@ const route = useRoute()
 const router = useRouter()
 const order = ref({})
 
-const statusMap = { '0': '待付款', '1': '待发货', '2': '已发货', '3': '已收货', '4': '已完成', '5': '已取消', '6': '退款中', '7': '已退款' }
+const statusMap = {
+  0: '待付款',
+  1: '待发货',
+  2: '已发货',
+  3: '已收货',
+  4: '已完成',
+  5: '已取消',
+  6: '退款中',
+  7: '已退款'
+}
 
 async function loadOrder() {
   try {
@@ -183,7 +221,7 @@ const refundMaxAmount = ref(0)
 
 function openRefundDialog() {
   // 可退款商品：非赠品行
-  refundableItems.value = (order.value.items || []).filter(i => !i.isGift)
+  refundableItems.value = (order.value.items || []).filter((i) => !i.isGift)
   const first = refundableItems.value[0]
   if (first) {
     const itemAmount = Number(first.price) * first.quantity
@@ -198,18 +236,21 @@ function openRefundDialog() {
 }
 
 // 切换退款商品时重算可退金额上限（金额 ≤ 该行实付 且 ≤ 订单实付）
-watch(() => refundForm.value.orderItemId, (id) => {
-  if (!id) {
-    refundMaxAmount.value = 0
-    return
+watch(
+  () => refundForm.value.orderItemId,
+  (id) => {
+    if (!id) {
+      refundMaxAmount.value = 0
+      return
+    }
+    const item = refundableItems.value.find((i) => i.id === id)
+    if (item) {
+      const maxAmount = Math.min(Number(item.price) * item.quantity, Number(order.value.payAmount || 0))
+      refundMaxAmount.value = maxAmount
+      refundForm.value.amount = maxAmount
+    }
   }
-  const item = refundableItems.value.find(i => i.id === id)
-  if (item) {
-    const maxAmount = Math.min(Number(item.price) * item.quantity, Number(order.value.payAmount || 0))
-    refundMaxAmount.value = maxAmount
-    refundForm.value.amount = maxAmount
-  }
-})
+)
 
 async function submitRefund() {
   if (!refundForm.value.orderItemId) {
@@ -234,7 +275,7 @@ async function submitRefund() {
       orderItemId: refundForm.value.orderItemId,
       type: refundForm.value.type,
       reason: refundForm.value.reason,
-      amount: refundForm.value.amount,
+      amount: refundForm.value.amount
     })
     ElMessage.success('退款申请已提交，等待商家处理')
     refundDialogVisible.value = false

@@ -3,7 +3,7 @@
     <el-card>
       <h2>商家入驻申请</h2>
       <p v-if="rejectReason" class="reject-reason">审核拒绝原因：{{ rejectReason }}</p>
-      <el-form :model="form" label-width="120px" style="max-width: 600px; margin-top: 20px;">
+      <el-form :model="form" label-width="120px" style="max-width: 600px; margin-top: 20px">
         <el-form-item label="店铺名称" required>
           <el-input v-model="form.name" />
         </el-form-item>

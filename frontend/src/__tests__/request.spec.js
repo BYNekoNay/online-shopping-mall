@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // 模拟 ElMessage（避免直接导入未使用的 vue/element-plus）
 vi.mock('element-plus', () => ({
   ElMessage: {
-    error: vi.fn(),
-  },
+    error: vi.fn()
+  }
 }))
 
 // 由于 request.js 依赖 router（需要完整 Vue 环境），这里改为测试拦截器逻辑本身

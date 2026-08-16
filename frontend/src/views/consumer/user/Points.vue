@@ -7,8 +7,8 @@
           <span class="value">{{ points }}</span>
         </div>
       </div>
-      <h3 style="margin-top: 30px;">积分流水</h3>
-      <el-table :data="records" style="width: 100%; margin-top: 15px;">
+      <h3 style="margin-top: 30px">积分流水</h3>
+      <el-table :data="records" style="width: 100%; margin-top: 15px">
         <el-table-column prop="changeAmount" label="变动" width="120">
           <template #default="{ row }">
             <span :class="row.changeAmount > 0 ? 'positive' : 'negative'">
@@ -69,6 +69,10 @@ onMounted(async () => {
   color: #f56c6c;
   margin-top: 10px;
 }
-.positive { color: #67c23a; }
-.negative { color: #f56c6c; }
+.positive {
+  color: #67c23a;
+}
+.negative {
+  color: #f56c6c;
+}
 </style>

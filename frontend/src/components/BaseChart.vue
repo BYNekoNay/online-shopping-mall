@@ -9,7 +9,7 @@ import echarts from '@/utils/echarts'
 
 const props = defineProps({
   option: { type: Object, required: true },
-  height: { type: String, default: '350px' },
+  height: { type: String, default: '350px' }
 })
 
 const chartEl = ref(null)

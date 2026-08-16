@@ -8,14 +8,23 @@ export default [
       code: 0,
       message: 'success',
       data: [
-        { id: 1, name: '满100减10', type: 1, discount: 10, minAmount: 100, validFrom: '2026-07-01', validTo: '2026-07-31', status: 1 },
-      ],
-    }),
+        {
+          id: 1,
+          name: '满100减10',
+          type: 1,
+          discount: 10,
+          minAmount: 100,
+          validFrom: '2026-07-01',
+          validTo: '2026-07-31',
+          status: 1
+        }
+      ]
+    })
   },
   {
     url: '/api/coupons/:id(\\d+)/receive',
     method: 'post',
-    response: () => ({ code: 0, message: 'success', data: null }),
+    response: () => ({ code: 0, message: 'success', data: null })
   },
   {
     url: '/api/admin/coupons',
@@ -24,18 +33,29 @@ export default [
       code: 0,
       message: 'success',
       data: [
-        { id: 1, name: '满100减10', type: 1, discount: 10, minAmount: 100, total: 1000, claimed: 340, validFrom: '2026-07-01', validTo: '2026-07-31', status: 1 },
-      ],
-    }),
+        {
+          id: 1,
+          name: '满100减10',
+          type: 1,
+          discount: 10,
+          minAmount: 100,
+          total: 1000,
+          claimed: 340,
+          validFrom: '2026-07-01',
+          validTo: '2026-07-31',
+          status: 1
+        }
+      ]
+    })
   },
   {
     url: '/api/admin/coupons',
     method: 'post',
-    response: () => ({ code: 0, message: 'success', data: { id: 2 } }),
+    response: () => ({ code: 0, message: 'success', data: { id: 2 } })
   },
   {
     url: '/api/admin/promotions',
     method: 'post',
-    response: () => ({ code: 0, message: 'success', data: { id: 1 } }),
-  },
+    response: () => ({ code: 0, message: 'success', data: { id: 1 } })
+  }
 ]

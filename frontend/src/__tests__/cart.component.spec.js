@@ -15,7 +15,7 @@ const { getCartMock, updateCartItemMock, deleteCartItemMock, messageMock } = vi.
   getCartMock: vi.fn(),
   updateCartItemMock: vi.fn(),
   deleteCartItemMock: vi.fn(),
-  messageMock: vi.fn(),
+  messageMock: vi.fn()
 }))
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -25,20 +25,20 @@ vi.mock('vue-router', async (importOriginal) => {
 
 vi.mock('element-plus', () => ({
   ElMessage: { success: messageMock, warning: messageMock },
-  ElMessageBox: { confirm: vi.fn().mockResolvedValue('confirm') },
+  ElMessageBox: { confirm: vi.fn().mockResolvedValue('confirm') }
 }))
 
 vi.mock('@/api/cart', () => ({
   default: {
     getCart: getCartMock,
     updateCartItem: updateCartItemMock,
-    deleteCartItem: deleteCartItemMock,
-  },
+    deleteCartItem: deleteCartItemMock
+  }
 }))
 
 // store/cart.js 内部走 @/utils/request（fetchList → request.get('/cart')），需一并 mock
 vi.mock('@/utils/request', () => ({
-  default: { get: getCartMock, put: vi.fn(), delete: vi.fn() },
+  default: { get: getCartMock, put: vi.fn(), delete: vi.fn() }
 }))
 
 import CartIndex from '@/views/consumer/cart/Index.vue'
@@ -47,7 +47,7 @@ import { useCartStore } from '@/store/cart'
 const InputNumberStub = {
   props: ['modelValue', 'min', 'max'],
   emits: ['update:modelValue', 'change'],
-  template: '<button class="stub-input" @click="$emit(\'change\', modelValue)">+</button>',
+  template: '<button class="stub-input" @click="$emit(\'change\', modelValue)">+</button>'
 }
 
 const stubs = {
@@ -55,12 +55,12 @@ const stubs = {
   'el-card': { template: '<div class="stub-card"><slot /></div>' },
   'el-empty': {
     props: ['description'],
-    template: '<div class="stub-empty">{{ description }}<slot /></div>',
+    template: '<div class="stub-empty">{{ description }}<slot /></div>'
   },
   'el-button': { template: '<button><slot /></button>' },
   'el-checkbox': { template: '<label><slot /></label>' },
   'el-row': { template: '<div><slot /></div>' },
-  'el-col': { template: '<div><slot /></div>' },
+  'el-col': { template: '<div><slot /></div>' }
 }
 
 function mountCart() {
@@ -86,7 +86,7 @@ describe('购物车页（F-T04~05）', () => {
 
   it('F-T05 修改数量调用 updateCartItem（携带新数量）', async () => {
     getCartMock.mockResolvedValue([
-      { id: 1, productId: 10, productName: '商品A', price: 100, quantity: 1, stock: 5, selected: 1 },
+      { id: 1, productId: 10, productName: '商品A', price: 100, quantity: 1, stock: 5, selected: 1 }
     ])
     updateCartItemMock.mockResolvedValue({ code: 0 })
     const { wrapper, store } = mountCart()

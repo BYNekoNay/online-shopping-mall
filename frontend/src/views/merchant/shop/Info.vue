@@ -2,7 +2,7 @@
   <div class="merchant-shop-info">
     <el-card>
       <h3>店铺信息</h3>
-      <el-form :model="form" label-width="100px" style="max-width: 500px; margin-top: 20px;">
+      <el-form :model="form" label-width="100px" style="max-width: 500px; margin-top: 20px">
         <el-form-item label="店铺名称"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="Logo"><el-input v-model="form.logo" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="form.description" type="textarea" /></el-form-item>

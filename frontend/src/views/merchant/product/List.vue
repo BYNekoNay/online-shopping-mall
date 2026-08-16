@@ -4,21 +4,37 @@
       <div class="header">
         <h3>商品管理</h3>
         <div>
-          <el-input v-model="keyword" placeholder="搜索商品" style="width: 200px; margin-right: 10px;" @keyup.enter="loadProducts" />
-          <el-select v-model="statusFilter" placeholder="状态" style="width: 120px; margin-right: 10px;" @change="loadProducts">
+          <el-input
+            v-model="keyword"
+            placeholder="搜索商品"
+            style="width: 200px; margin-right: 10px"
+            @keyup.enter="loadProducts"
+          />
+          <el-select
+            v-model="statusFilter"
+            placeholder="状态"
+            style="width: 120px; margin-right: 10px"
+            @change="loadProducts"
+          >
             <el-option label="全部" value="" />
             <el-option :label="ProductStatusLabel[ProductStatus.ONLINE]" :value="ProductStatus.ONLINE" />
             <el-option :label="ProductStatusLabel[ProductStatus.OFFLINE]" :value="ProductStatus.OFFLINE" />
             <el-option :label="ProductStatusLabel[ProductStatus.PENDING]" :value="ProductStatus.PENDING" />
             <el-option :label="ProductStatusLabel[ProductStatus.REJECTED]" :value="ProductStatus.REJECTED" />
           </el-select>
-          <el-button v-if="selectedIds.length > 0" type="success" size="small" @click="batchOperate('on')">批量上架</el-button>
-          <el-button v-if="selectedIds.length > 0" type="warning" size="small" @click="batchOperate('off')">批量下架</el-button>
-          <el-button v-if="selectedIds.length > 0" type="danger" size="small" @click="batchOperate('delete')">批量删除</el-button>
+          <el-button v-if="selectedIds.length > 0" type="success" size="small" @click="batchOperate('on')"
+            >批量上架</el-button
+          >
+          <el-button v-if="selectedIds.length > 0" type="warning" size="small" @click="batchOperate('off')"
+            >批量下架</el-button
+          >
+          <el-button v-if="selectedIds.length > 0" type="danger" size="small" @click="batchOperate('delete')"
+            >批量删除</el-button
+          >
           <el-button type="primary" @click="$router.push('/merchant/products/edit')">发布商品</el-button>
         </div>
       </div>
-      <el-table :data="products" style="width: 100%; margin-top: 15px;" @selection-change="handleSelectionChange">
+      <el-table :data="products" style="width: 100%; margin-top: 15px" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" />
         <el-table-column prop="name" label="商品名称" />
         <el-table-column prop="price" label="价格" width="120" />
@@ -33,7 +49,9 @@
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="$router.push(`/merchant/products/edit?id=${row.id}`)">编辑</el-button>
+            <el-button type="primary" size="small" @click="$router.push(`/merchant/products/edit?id=${row.id}`)"
+              >编辑</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -69,7 +87,7 @@ async function loadProducts() {
 }
 
 function handleSelectionChange(selection) {
-  selectedIds.value = selection.map(s => s.id)
+  selectedIds.value = selection.map((s) => s.id)
 }
 
 async function batchOperate(action) {
@@ -85,5 +103,11 @@ async function batchOperate(action) {
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 </style>

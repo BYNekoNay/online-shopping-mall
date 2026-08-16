@@ -6,7 +6,7 @@
         <el-button type="primary" @click="showCreateDialog">新建优惠券</el-button>
       </div>
 
-      <el-table :data="list" style="width: 100%; margin-top: 15px;">
+      <el-table :data="list" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="名称" />
         <el-table-column prop="type" label="类型" width="100">
@@ -22,7 +22,9 @@
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="editRow(row)">编辑</el-button>
-            <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.stock <= row.receivedCount">下线</el-button>
+            <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.stock <= row.receivedCount"
+              >下线</el-button
+            >
             <el-button size="small" type="danger" @click="deleteRow(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -77,8 +79,15 @@ const list = ref([])
 const dialogVisible = ref(false)
 const editing = ref(false)
 const form = ref({
-  id: null, name: '', type: 1, shopId: 0, stock: 100,
-  threshold: 100, discount: 10, validFrom: '', validTo: ''
+  id: null,
+  name: '',
+  type: 1,
+  shopId: 0,
+  stock: 100,
+  threshold: 100,
+  discount: 10,
+  validFrom: '',
+  validTo: ''
 })
 
 function typeName(t) {
@@ -92,12 +101,24 @@ async function load() {
   try {
     const data = await request.getCoupons()
     list.value = data || []
-  } catch { list.value = [] }
+  } catch {
+    list.value = []
+  }
 }
 
 function showCreateDialog() {
   editing.value = false
-  form.value = { id: null, name: '', type: 1, shopId: 0, stock: 100, threshold: 100, discount: 10, validFrom: '', validTo: '' }
+  form.value = {
+    id: null,
+    name: '',
+    type: 1,
+    shopId: 0,
+    stock: 100,
+    threshold: 100,
+    discount: 10,
+    validFrom: '',
+    validTo: ''
+  }
   dialogVisible.value = true
 }
 
@@ -153,5 +174,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

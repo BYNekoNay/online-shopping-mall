@@ -52,4 +52,18 @@ export function unfavoriteProduct(productId) {
   return request.delete(`/behavior/favorites/${productId}`)
 }
 
-export default { login, register, getProfile, updateProfile, getAddresses, addAddress, updateAddress, deleteAddress, getSearchHistory, clearSearchHistory, getFavorites, favoriteProduct, unfavoriteProduct }
+export default {
+  login,
+  register,
+  getProfile,
+  updateProfile,
+  getAddresses,
+  addAddress,
+  updateAddress,
+  deleteAddress,
+  getSearchHistory,
+  clearSearchHistory,
+  getFavorites,
+  favoriteProduct,
+  unfavoriteProduct
+}

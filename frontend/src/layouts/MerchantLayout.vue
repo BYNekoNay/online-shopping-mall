@@ -14,7 +14,7 @@
     <div class="content-area">
       <header class="top-bar">
         <div class="top-bar-left">
-          <span style="font-size:15px;font-weight:600;color:#0F172A;">{{ currentTitle }}</span>
+          <span style="font-size: 15px; font-weight: 600; color: #0f172a">{{ currentTitle }}</span>
         </div>
         <div class="top-bar-right">
           <el-avatar :size="32" class="merchant-avatar">{{ nickname?.charAt(0) || 'M' }}</el-avatar>
@@ -51,7 +51,7 @@ const titleMap = {
   '/merchant/refunds': '售后处理',
   '/merchant/statistics': '数据统计',
   '/merchant/apply': '商家入驻',
-  '/merchant/apply-pending': '审核进度',
+  '/merchant/apply-pending': '审核进度'
 }
 const currentTitle = computed(() => titleMap[currentRoute.value] || '商家后台')
 
@@ -63,14 +63,14 @@ const menuItems = computed(() => {
     { index: '/merchant/products', icon: Goods, title: '商品管理' },
     { index: '/merchant/orders', icon: Document, title: '订单管理' },
     { index: '/merchant/refunds', icon: RefreshRight, title: '售后处理' },
-    { index: '/merchant/statistics', icon: TrendCharts, title: '数据统计' },
+    { index: '/merchant/statistics', icon: TrendCharts, title: '数据统计' }
   ]
 })
 
 const redirectMap = {
   0: '/merchant/apply-pending',
   2: '/merchant/apply',
-  3: '/merchant/apply-pending',
+  3: '/merchant/apply-pending'
 }
 
 onMounted(async () => {
@@ -102,7 +102,7 @@ function handleLogout() {
 .sidebar-dark {
   width: 220px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, #1E293B, #0F172A);
+  background: linear-gradient(180deg, #1e293b, #0f172a);
   display: flex;
   flex-direction: column;
 }
@@ -112,14 +112,14 @@ function handleLogout() {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .sidebar-logo-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #7C3AED;
-  box-shadow: 0 0 8px rgba(124,58,237,0.6);
+  background: #7c3aed;
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.6);
 }
 .sidebar-logo-text {
   font-size: 17px;
@@ -138,15 +138,15 @@ function handleLogout() {
   line-height: 44px;
   margin: 2px 8px;
   border-radius: 10px;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255, 255, 255, 0.65);
   font-size: 14px;
 }
 .sidebar-menu .el-menu-item:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 .sidebar-menu .el-menu-item.is-active {
-  background: rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
   font-weight: 600;
 }
@@ -154,7 +154,7 @@ function handleLogout() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #F8FAFC;
+  background: #f8fafc;
 }
 .top-bar {
   height: 60px;
@@ -163,7 +163,7 @@ function handleLogout() {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid #e2e8f0;
 }
 .top-bar-right {
   display: flex;
@@ -171,7 +171,7 @@ function handleLogout() {
   gap: 12px;
 }
 .merchant-avatar {
-  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #fff;
   font-weight: 600;
 }

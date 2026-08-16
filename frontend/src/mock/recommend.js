@@ -13,12 +13,12 @@ export default [
             mainImage: 'https://via.placeholder.com/200',
             price: '@float(10, 300, 2)',
             score: '@float(0, 1, 4)',
-            algorithmType: 3,
-          },
-        ],
+            algorithmType: 3
+          }
+        ]
       })
       return { code: 0, message: 'success', data: items.list }
-    },
+    }
   },
   {
     url: '/api/recommend/similar/:id(\\d+)',
@@ -32,25 +32,25 @@ export default [
             mainImage: 'https://via.placeholder.com/200',
             price: '@float(10, 300, 2)',
             score: '@float(0, 1, 4)',
-            algorithmType: 2,
-          },
-        ],
+            algorithmType: 2
+          }
+        ]
       })
       return { code: 0, message: 'success', data: items.list }
-    },
+    }
   },
   {
     url: '/api/behavior/recommend-exposure',
     method: 'post',
     response: () => {
       return { code: 0, message: 'success', data: null }
-    },
+    }
   },
   {
     url: '/api/behavior/recommend-click',
     method: 'post',
     response: () => {
       return { code: 0, message: 'success', data: null }
-    },
-  },
+    }
+  }
 ]

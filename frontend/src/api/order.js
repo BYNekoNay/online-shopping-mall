@@ -42,4 +42,16 @@ export function refundOrder(orderId, data) {
   return request.post(`/orders/${orderId}/refund`, data)
 }
 
-export default { getOrders, getOrderDetail, createOrder, payOrder, cancelOrder, confirmOrder, deleteOrder, reviewOrder, refundOrder, getPoints, getPointsRecords }
+export default {
+  getOrders,
+  getOrderDetail,
+  createOrder,
+  payOrder,
+  cancelOrder,
+  confirmOrder,
+  deleteOrder,
+  reviewOrder,
+  refundOrder,
+  getPoints,
+  getPointsRecords
+}

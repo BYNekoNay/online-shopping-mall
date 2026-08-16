@@ -5,7 +5,7 @@
         <h3>积分商城管理</h3>
         <el-button type="primary" @click="openCreate">新增商品</el-button>
       </div>
-      <el-table :data="goodsList" style="width: 100%; margin-top: 15px;">
+      <el-table :data="goodsList" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="商品名称" />
         <el-table-column prop="pointsCost" label="所需积分" width="100" />
@@ -28,7 +28,7 @@
         :page-size="pageSize"
         :total="total"
         layout="total, prev, pager, next"
-        style="margin-top: 20px; justify-content: flex-end;"
+        style="margin-top: 20px; justify-content: flex-end"
         @current-change="load"
       />
     </el-card>
@@ -51,7 +51,13 @@
           <el-input v-model="form.description" type="textarea" :rows="2" maxlength="500" />
         </el-form-item>
         <el-form-item label="状态">
-          <el-switch v-model="form.status" :active-value="1" :inactive-value="0" active-text="上架" inactive-text="下架" />
+          <el-switch
+            v-model="form.status"
+            :active-value="1"
+            :inactive-value="0"
+            active-text="上架"
+            inactive-text="下架"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -129,5 +135,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

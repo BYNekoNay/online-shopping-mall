@@ -40,4 +40,14 @@ export function getBrowseHistory(limit = 20) {
   return request.get('/products/browse-history', { params: { limit } })
 }
 
-export default { getProducts, getProduct, searchProducts, getCategories, getProductReviews, getProductRating, getSearchHistory, clearSearchHistory, getBrowseHistory }
+export default {
+  getProducts,
+  getProduct,
+  searchProducts,
+  getCategories,
+  getProductReviews,
+  getProductRating,
+  getSearchHistory,
+  clearSearchHistory,
+  getBrowseHistory
+}

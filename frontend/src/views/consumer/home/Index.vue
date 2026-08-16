@@ -48,7 +48,7 @@
       <div class="section-header">
         <div class="header-accent ai-accent"></div>
         <h3 class="ai-title">
-          <span class="ai-badge" style="margin-right:10px;">AI 推荐</span>
+          <span class="ai-badge" style="margin-right: 10px">AI 推荐</span>
           猜你喜欢
         </h3>
       </div>
@@ -60,7 +60,7 @@
       <div class="section-header">
         <div class="header-accent ai-accent"></div>
         <h3 class="ai-title">
-          <span class="ai-badge" style="margin-right:10px;">AI 推荐</span>
+          <span class="ai-badge" style="margin-right: 10px">AI 推荐</span>
           浏览历史推荐
         </h3>
       </div>
@@ -72,7 +72,7 @@
       <div class="section-header">
         <div class="header-accent ai-accent"></div>
         <h3 class="ai-title">
-          <span class="ai-badge" style="margin-right:10px;">AI 推荐</span>
+          <span class="ai-badge" style="margin-right: 10px">AI 推荐</span>
           购买过同类
         </h3>
       </div>
@@ -100,7 +100,7 @@ const typeMap = { 1: '折扣', 2: '满减', 3: '满赠', 4: '套餐' }
 const banners = [
   { title: 'AI 智能推荐', desc: '基于协同过滤算法，为你发现好物', bg: 'linear-gradient(135deg, #4F46E5, #7C3AED)' },
   { title: '品质好货', desc: '精选商品，正品保障', bg: 'linear-gradient(135deg, #0EA5E9, #6366F1)' },
-  { title: '限时优惠', desc: '每日特价，不容错过', bg: 'linear-gradient(135deg, #7C3AED, #A855F7)' },
+  { title: '限时优惠', desc: '每日特价，不容错过', bg: 'linear-gradient(135deg, #7C3AED, #A855F7)' }
 ]
 
 onMounted(async () => {
@@ -132,7 +132,7 @@ function goCategory(id) {
 .banner-section {
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(79,70,229,0.08);
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.08);
 }
 .banner-slide {
   height: 420px;
@@ -165,15 +165,15 @@ function goCategory(id) {
   width: 4px;
   height: 22px;
   border-radius: 2px;
-  background: #4F46E5;
+  background: #4f46e5;
 }
 .ai-accent {
-  background: linear-gradient(180deg, #7C3AED, #4F46E5);
+  background: linear-gradient(180deg, #7c3aed, #4f46e5);
 }
 .section-header h3 {
   font-size: 20px;
   font-weight: 700;
-  color: #0F172A;
+  color: #0f172a;
 }
 .ai-title {
   display: flex;
@@ -185,7 +185,7 @@ function goCategory(id) {
   border-radius: 16px;
   padding: 24px;
   margin: 28px 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 .promotion-accent {
   background: linear-gradient(180deg, #f56c6c, #e6a23c);
@@ -193,7 +193,7 @@ function goCategory(id) {
 .promotion-title {
   font-size: 20px;
   font-weight: 700;
-  color: #0F172A;
+  color: #0f172a;
 }
 .promotion-list {
   display: grid;
@@ -209,7 +209,7 @@ function goCategory(id) {
 }
 .promotion-card:hover {
   border-color: #f56c6c;
-  box-shadow: 0 4px 12px rgba(245,108,108,0.1);
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.1);
   transform: translateY(-2px);
 }
 .promotion-tag {
@@ -239,7 +239,7 @@ function goCategory(id) {
   border-radius: 16px;
   padding: 24px;
   margin: 28px 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 .category-grid {
   display: grid;
@@ -253,31 +253,33 @@ function goCategory(id) {
   gap: 8px;
   padding: 18px 12px;
   border-radius: 12px;
-  background: #F8FAFC;
+  background: #f8fafc;
   cursor: pointer;
   transition: all 0.2s;
 }
 .category-card:hover {
-  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #fff;
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(79,70,229,0.15);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.15);
 }
-.category-card:hover .category-name { color: #fff; }
+.category-card:hover .category-name {
+  color: #fff;
+}
 .category-icon {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: #E0E7FF;
+  background: #e0e7ff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
   font-weight: 700;
-  color: #4F46E5;
+  color: #4f46e5;
 }
 .category-card:hover .category-icon {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
 }
 .category-name {

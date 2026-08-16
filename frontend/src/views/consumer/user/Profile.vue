@@ -2,7 +2,7 @@
   <div class="user-profile">
     <el-card>
       <h3>个人信息</h3>
-      <el-form :model="form" label-width="100px" style="max-width: 500px; margin-top: 20px;">
+      <el-form :model="form" label-width="100px" style="max-width: 500px; margin-top: 20px">
         <el-form-item label="用户名">
           <el-input v-model="form.username" disabled />
         </el-form-item>
@@ -33,7 +33,12 @@ const form = ref({ username: '', nickname: '', phone: '', email: '' })
 onMounted(async () => {
   try {
     const data = await request.getProfile()
-    form.value = { username: data.username, nickname: data.nickname || '', phone: data.phone || '', email: data.email || '' }
+    form.value = {
+      username: data.username,
+      nickname: data.nickname || '',
+      phone: data.phone || '',
+      email: data.email || ''
+    }
   } catch {
     ElMessage.error('加载个人信息失败')
   }

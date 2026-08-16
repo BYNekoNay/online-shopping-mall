@@ -1,7 +1,7 @@
 <template>
   <div class="order-batch-pay">
     <h2>订单支付</h2>
-    <el-card style="margin-bottom: 15px;">
+    <el-card style="margin-bottom: 15px">
       <div class="batch-tip">
         <el-alert title="多店铺订单提示" type="info" :closable="false">
           <template #default>
@@ -26,10 +26,10 @@
         </div>
       </div>
       <div class="order-footer">
-        <span>实付：<strong>¥{{ order.payAmount }}</strong></span>
-        <el-button type="primary" :loading="payingId === order.orderId" @click="handlePay(order)">
-          去支付
-        </el-button>
+        <span
+          >实付：<strong>¥{{ order.payAmount }}</strong></span
+        >
+        <el-button type="primary" :loading="payingId === order.orderId" @click="handlePay(order)"> 去支付 </el-button>
       </div>
     </div>
   </div>
@@ -68,7 +68,7 @@ async function handlePay(order) {
     await request.payOrder(order.orderId, { payType: 1 })
     ElMessage.success('支付成功')
     // 移除已支付订单
-    orders.value = orders.value.filter(o => o.orderId !== order.orderId)
+    orders.value = orders.value.filter((o) => o.orderId !== order.orderId)
     if (orders.value.length === 0) {
       router.push('/orders')
     }

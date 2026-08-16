@@ -18,20 +18,20 @@ export default [
             categoryName: 'Mock 分类',
             shopName: 'Mock 店铺',
             status: 1,
-            createTime: '@datetime',
-          },
+            createTime: '@datetime'
+          }
         ],
         total: 10,
         pages: 1,
         pageNum: 1,
-        pageSize: 10,
+        pageSize: 10
       })
       return {
         code: 0,
         message: 'success',
-        data: list,
+        data: list
       }
-    },
+    }
   },
   {
     url: '/api/products/:id',
@@ -47,8 +47,8 @@ export default [
           mainImage: 'https://via.placeholder.com/600',
           images: ['https://via.placeholder.com/600'],
           detail: '这是 Mock 商品描述',
-          price: 99.00,
-          originalPrice: 129.00,
+          price: 99.0,
+          originalPrice: 129.0,
           stock: 100,
           sales: 50,
           categoryName: '电子产品',
@@ -58,22 +58,22 @@ export default [
             {
               id: 101,
               specJson: '{"颜色":"红色","尺码":"XL"}',
-              price: 99.00,
+              price: 99.0,
               stock: 100,
-              image: 'https://via.placeholder.com/200',
+              image: 'https://via.placeholder.com/200'
             },
             {
               id: 102,
               specJson: '{"颜色":"蓝色","尺码":"L"}',
-              price: 89.00,
+              price: 89.0,
               stock: 50,
-              image: 'https://via.placeholder.com/200',
-            },
+              image: 'https://via.placeholder.com/200'
+            }
           ],
-          activePromotion: null,
-        },
+          activePromotion: null
+        }
       }
-    },
+    }
   },
   {
     url: '/api/products/search',
@@ -87,20 +87,20 @@ export default [
             id: 1,
             name: '搜索结果商品',
             mainImage: 'https://via.placeholder.com/300',
-            price: 99.00,
-            originalPrice: 129.00,
+            price: 99.0,
+            originalPrice: 129.0,
             stock: 100,
             sales: 50,
             categoryName: '电子产品',
-            status: 1,
-          },
+            status: 1
+          }
         ],
         total: 1,
         pages: 1,
         pageNum: 1,
-        pageSize: 10,
-      },
-    }),
+        pageSize: 10
+      }
+    })
   },
   {
     url: '/api/products/categories/tree',
@@ -109,15 +109,29 @@ export default [
       code: 0,
       message: 'success',
       data: [
-        { id: 1, parentId: 0, name: '电子产品', icon: '', sort: 1, status: 1, children: [
-          { id: 11, parentId: 1, name: '手机', icon: '', sort: 1, status: 1 },
-          { id: 12, parentId: 1, name: '电脑', icon: '', sort: 2, status: 1 },
-        ]},
-        { id: 2, parentId: 0, name: '服装鞋帽', icon: '', sort: 2, status: 1, children: [
-          { id: 21, parentId: 2, name: '男装', icon: '', sort: 1, status: 1 },
-        ]},
-      ],
-    }),
+        {
+          id: 1,
+          parentId: 0,
+          name: '电子产品',
+          icon: '',
+          sort: 1,
+          status: 1,
+          children: [
+            { id: 11, parentId: 1, name: '手机', icon: '', sort: 1, status: 1 },
+            { id: 12, parentId: 1, name: '电脑', icon: '', sort: 2, status: 1 }
+          ]
+        },
+        {
+          id: 2,
+          parentId: 0,
+          name: '服装鞋帽',
+          icon: '',
+          sort: 2,
+          status: 1,
+          children: [{ id: 21, parentId: 2, name: '男装', icon: '', sort: 1, status: 1 }]
+        }
+      ]
+    })
   },
   {
     url: '/api/recommend/guess-you-like',
@@ -129,15 +143,15 @@ export default [
             'productId|+1': 100,
             name: '猜你喜欢 @id',
             mainImage: 'https://via.placeholder.com/200',
-            price: '@float(10, 300, 2)',
-          },
-        ],
+            price: '@float(10, 300, 2)'
+          }
+        ]
       })
       return {
         code: 0,
         message: 'success',
-        data: items.list,
+        data: items.list
       }
-    },
-  },
+    }
+  }
 ]

@@ -5,7 +5,7 @@
         <h3>数据字典</h3>
         <el-button type="primary" @click="showCreateDialog">新建字典项</el-button>
       </div>
-      <el-table :data="dicts" style="width: 100%; margin-top: 15px;">
+      <el-table :data="dicts" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="dictType" label="类型" width="150" />
         <el-table-column prop="dictKey" label="键" width="120" />
@@ -100,5 +100,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

@@ -8,8 +8,8 @@
           <el-button type="primary" @click="$router.push('/')">去逛逛</el-button>
         </el-empty>
       </div>
-      <el-row v-else :gutter="20" style="margin-top: 15px;">
-        <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in records" :key="item.id" style="margin-bottom: 20px;">
+      <el-row v-else :gutter="20" style="margin-top: 15px">
+        <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in records" :key="item.id" style="margin-bottom: 20px">
           <el-card class="history-item" :body-style="{ padding: '0px' }" @click="$router.push(`/product/${item.id}`)">
             <div class="history-image">
               <img :src="item.mainImage" :alt="item.name" />
@@ -33,7 +33,7 @@ const records = ref([])
 
 async function loadHistory() {
   try {
-    records.value = await getBrowseHistory(20) || []
+    records.value = (await getBrowseHistory(20)) || []
   } catch {
     records.value = []
   }

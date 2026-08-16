@@ -16,7 +16,10 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('userId', String(userId.value))
     localStorage.setItem('role', String(role.value))
     localStorage.setItem('nickname', nickname.value)
-    localStorage.setItem('user', JSON.stringify({ token: token.value, userId: userId.value, role: role.value, nickname: nickname.value }))
+    localStorage.setItem(
+      'user',
+      JSON.stringify({ token: token.value, userId: userId.value, role: role.value, nickname: nickname.value })
+    )
   }
 
   function logout() {

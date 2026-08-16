@@ -4,7 +4,7 @@
       <div class="header">
         <h3>商家管理</h3>
       </div>
-      <el-table :data="shops" style="width: 100%; margin-top: 15px;">
+      <el-table :data="shops" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="店铺名称" />
         <el-table-column prop="contactName" label="联系人" width="120" />
@@ -28,7 +28,14 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-pagination v-model:current-page="pageNum" :page-size="pageSize" :total="total" layout="total, prev, pager, next" style="margin-top: 20px; justify-content: flex-end;" @current-change="load" />
+      <el-pagination
+        v-model:current-page="pageNum"
+        :page-size="pageSize"
+        :total="total"
+        layout="total, prev, pager, next"
+        style="margin-top: 20px; justify-content: flex-end"
+        @current-change="load"
+      />
     </el-card>
 
     <el-dialog v-model="levelDialogVisible" title="调整商家等级" width="400px">
@@ -103,5 +110,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

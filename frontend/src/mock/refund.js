@@ -27,20 +27,20 @@ export default [
             amount: 99.0,
             status: 1,
             handleRemark: '',
-            createTime: '2026-07-07 12:00:00',
-          },
-        ],
-      },
-    }),
+            createTime: '2026-07-07 12:00:00'
+          }
+        ]
+      }
+    })
   },
   {
     url: '/api/merchant/refunds/:id(\\d+)/audit',
     method: 'put',
-    response: () => ({ code: 0, message: 'success', data: null }),
+    response: () => ({ code: 0, message: 'success', data: null })
   },
   {
     url: '/api/orders/:id(\\d+)/refund',
     method: 'post',
-    response: () => ({ code: 0, message: 'success', data: null }),
-  },
+    response: () => ({ code: 0, message: 'success', data: null })
+  }
 ]

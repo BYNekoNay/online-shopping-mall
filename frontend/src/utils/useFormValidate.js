@@ -19,7 +19,7 @@ export const rules = {
     return {
       pattern: /^[a-zA-Z0-9_]{3,20}$/,
       message: msg,
-      trigger: 'blur',
+      trigger: 'blur'
     }
   },
   /** 手机号 */
@@ -27,7 +27,7 @@ export const rules = {
     return {
       pattern: /^1[3-9]\d{9}$/,
       message: msg,
-      trigger: 'blur',
+      trigger: 'blur'
     }
   },
   /** 邮箱 */
@@ -35,7 +35,7 @@ export const rules = {
     return {
       type: 'email',
       message: msg,
-      trigger: 'blur',
+      trigger: 'blur'
     }
   },
   /** 长度范围 */
@@ -47,7 +47,7 @@ export const rules = {
     return {
       pattern: /^[1-9]\d*$/,
       message: msg,
-      trigger: 'change',
+      trigger: 'change'
     }
   },
   /** 非负数字（价格等，最多两位小数） */
@@ -65,7 +65,7 @@ export const rules = {
           callback()
         }
       },
-      trigger: 'change',
+      trigger: 'change'
     }
   },
   /** 两次密码一致 */
@@ -78,9 +78,9 @@ export const rules = {
           callback()
         }
       },
-      trigger: 'blur',
+      trigger: 'blur'
     }
-  },
+  }
 }
 
 /** 表单校验快捷方法：validate 通过返回 true，否则提示并返回 false */

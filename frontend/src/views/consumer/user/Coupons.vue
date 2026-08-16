@@ -54,9 +54,7 @@
               </div>
             </div>
             <div class="coupon-right">
-              <el-tag
-                :type="coupon.status === 0 ? 'success' : coupon.status === 1 ? 'info' : 'danger'"
-              >
+              <el-tag :type="coupon.status === 0 ? 'success' : coupon.status === 1 ? 'info' : 'danger'">
                 {{ statusMap[coupon.status] }}
               </el-tag>
             </div>
@@ -75,12 +73,12 @@ import request from '@/api/coupon'
 const activeStatus = ref('-1')
 const coupons = ref([])
 const availableCoupons = ref([])
-const statusMap = { '0': '未使用', '1': '已使用', '2': '已过期' }
+const statusMap = { 0: '未使用', 1: '已使用', 2: '已过期' }
 
 const filteredCoupons = computed(() => {
   if (activeStatus.value === '-1') return availableCoupons.value
   if (activeStatus.value === '') return coupons.value
-  return coupons.value.filter(c => c.status === Number(activeStatus.value))
+  return coupons.value.filter((c) => c.status === Number(activeStatus.value))
 })
 
 async function loadCoupons() {
@@ -116,7 +114,9 @@ function getThreshold(rule) {
   try {
     const obj = JSON.parse(rule)
     return obj.threshold || 0
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
 function getDiscount(rule) {
@@ -124,7 +124,9 @@ function getDiscount(rule) {
   try {
     const obj = JSON.parse(rule)
     return obj.discount || 0
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
 function formatDate(dateStr) {

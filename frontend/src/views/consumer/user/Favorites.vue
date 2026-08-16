@@ -7,7 +7,7 @@
       </div>
       <div v-else class="favorite-list">
         <el-row :gutter="20">
-          <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in favorites" :key="item.id" style="margin-bottom: 20px;">
+          <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in favorites" :key="item.id" style="margin-bottom: 20px">
             <el-card class="product-card" @click="$router.push(`/product/${item.id}`)">
               <div class="product-image"><img :src="item.mainImage" :alt="item.name" /></div>
               <div class="product-info">

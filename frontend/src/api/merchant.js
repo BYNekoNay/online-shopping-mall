@@ -103,4 +103,26 @@ export function calculateFreight(params) {
   return request.get('/merchant/freight-templates/calculate', { params })
 }
 
-export default { applyShop, getApplyStatus, getShopInfo, updateShopInfo, getFreightTemplates, saveFreightTemplate, getMerchantProducts, createProduct, updateProduct, batchOperateProducts, getMerchantOrders, shipOrder, getLogisticsCompanies, getRefunds, auditRefund, getSalesStatistics, getTopProducts, getCategoriesTree, getProductDetail, getMerchantOrderDetail, calculateFreight }
+export default {
+  applyShop,
+  getApplyStatus,
+  getShopInfo,
+  updateShopInfo,
+  getFreightTemplates,
+  saveFreightTemplate,
+  getMerchantProducts,
+  createProduct,
+  updateProduct,
+  batchOperateProducts,
+  getMerchantOrders,
+  shipOrder,
+  getLogisticsCompanies,
+  getRefunds,
+  auditRefund,
+  getSalesStatistics,
+  getTopProducts,
+  getCategoriesTree,
+  getProductDetail,
+  getMerchantOrderDetail,
+  calculateFreight
+}

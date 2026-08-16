@@ -12,32 +12,28 @@ const createTestRouter = (_overrides = {}) => {
       meta: { requiresAuth: false },
       children: [
         { path: '', name: 'Home', component: MockComp },
-        { path: 'cart', name: 'Cart', meta: { requiresAuth: true }, component: MockComp },
-      ],
+        { path: 'cart', name: 'Cart', meta: { requiresAuth: true }, component: MockComp }
+      ]
     },
     {
       path: '/merchant',
       component: MockComp,
       meta: { requiresAuth: true, roles: [2] },
-      children: [
-        { path: 'products', name: 'MerchantProducts', component: MockComp },
-      ],
+      children: [{ path: 'products', name: 'MerchantProducts', component: MockComp }]
     },
     {
       path: '/admin',
       component: MockComp,
       meta: { requiresAuth: true, roles: [3] },
-      children: [
-        { path: 'users', name: 'AdminUsers', component: MockComp },
-      ],
+      children: [{ path: 'users', name: 'AdminUsers', component: MockComp }]
     },
     { path: '/login', name: 'Login', component: MockComp },
-    { path: '/403', name: 'Forbidden', component: MockComp },
+    { path: '/403', name: 'Forbidden', component: MockComp }
   ]
 
   const router = createRouter({
     history: createWebHistory(),
-    routes,
+    routes
   })
 
   // 复制项目 beforeEach 守卫逻辑

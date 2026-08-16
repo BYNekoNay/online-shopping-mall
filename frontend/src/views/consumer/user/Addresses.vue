@@ -3,7 +3,7 @@
     <el-card>
       <div class="header">
         <h3>收货地址</h3>
-        <el-button type="primary" @click="showForm = true; editingId = null; form = { receiver: '', phone: '', province: '', city: '', district: '', detail: '', isDefault: false }">新增地址</el-button>
+        <el-button type="primary" @click="openAdd">新增地址</el-button>
       </div>
       <el-dialog v-model="showForm" :title="editingId ? '编辑地址' : '新增地址'">
         <el-form :model="form" :rules="rules" ref="addressFormRef" label-width="100px">
@@ -24,7 +24,7 @@
           <el-button type="primary" @click="saveAddress">确定</el-button>
         </template>
       </el-dialog>
-      <el-table :data="addresses" style="width: 100%; margin-top: 15px;">
+      <el-table :data="addresses" style="width: 100%; margin-top: 15px">
         <el-table-column prop="receiver" label="收货人" />
         <el-table-column prop="phone" label="手机号" />
         <el-table-column prop="province" label="省份" />
@@ -62,18 +62,44 @@ const rules = {
   receiver: [formRules.required('请输入收货人')],
   phone: [formRules.required('请输入手机号'), formRules.phone()],
   province: [formRules.requiredSelect('请选择省份')],
-  detail: [formRules.required('请输入详细地址')],
+  detail: [formRules.required('请输入详细地址')]
 }
 
 const provinces = [
-  '北京市','天津市','河北省','山西省','内蒙古自治区',
-  '辽宁省','吉林省','黑龙江省',
-  '上海市','江苏省','浙江省','安徽省','福建省','江西省','山东省',
-  '河南省','湖北省','湖南省',
-  '广东省','广西壮族自治区','海南省',
-  '重庆市','四川省','贵州省','云南省','西藏自治区',
-  '陕西省','甘肃省','青海省','宁夏回族自治区','新疆维吾尔自治区',
-  '香港特别行政区','澳门特别行政区','台湾省'
+  '北京市',
+  '天津市',
+  '河北省',
+  '山西省',
+  '内蒙古自治区',
+  '辽宁省',
+  '吉林省',
+  '黑龙江省',
+  '上海市',
+  '江苏省',
+  '浙江省',
+  '安徽省',
+  '福建省',
+  '江西省',
+  '山东省',
+  '河南省',
+  '湖北省',
+  '湖南省',
+  '广东省',
+  '广西壮族自治区',
+  '海南省',
+  '重庆市',
+  '四川省',
+  '贵州省',
+  '云南省',
+  '西藏自治区',
+  '陕西省',
+  '甘肃省',
+  '青海省',
+  '宁夏回族自治区',
+  '新疆维吾尔自治区',
+  '香港特别行政区',
+  '澳门特别行政区',
+  '台湾省'
 ]
 
 onMounted(async () => {
@@ -108,9 +134,16 @@ function editAddress(row) {
   showForm.value = true
 }
 
+// 新增地址：重置表单并打开弹窗（F-02 由内联多语句改为方法，避免模板编译解析问题）
+function openAdd() {
+  showForm.value = true
+  editingId.value = null
+  form.value = { receiver: '', phone: '', province: '', city: '', district: '', detail: '', isDefault: false }
+}
+
 async function deleteAddress(id) {
   await request.deleteAddress(id)
-  addresses.value = addresses.value.filter(a => a.id !== id)
+  addresses.value = addresses.value.filter((a) => a.id !== id)
   ElMessage.success('删除成功')
 }
 </script>

@@ -2,7 +2,9 @@
   <div class="order-pay">
     <h2>订单支付</h2>
     <div class="order-info">
-      <p>订单金额：<strong>¥{{ orderDetail.payAmount }}</strong></p>
+      <p>
+        订单金额：<strong>¥{{ orderDetail.payAmount }}</strong>
+      </p>
     </div>
     <div class="pay-methods">
       <el-radio-group v-model="payType">
@@ -10,7 +12,7 @@
         <el-radio :label="2">模拟支付宝</el-radio>
       </el-radio-group>
     </div>
-    <el-button type="primary" size="large" :loading="paying" @click="handlePay" style="margin-top: 20px;">
+    <el-button type="primary" size="large" :loading="paying" @click="handlePay" style="margin-top: 20px">
       确认支付
     </el-button>
   </div>

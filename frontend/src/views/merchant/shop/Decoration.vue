@@ -2,20 +2,34 @@
   <div class="merchant-decoration">
     <el-card>
       <h3>店铺装修</h3>
-      <p style="color: #999; margin-top: 10px;">配置店铺首页的 banner、主题色与店铺信息</p>
-      <el-form :model="form" label-width="120px" style="margin-top: 20px;">
+      <p style="color: #999; margin-top: 10px">配置店铺首页的 banner、主题色与店铺信息</p>
+      <el-form :model="form" label-width="120px" style="margin-top: 20px">
         <el-form-item label="Banner 图片">
           <el-input v-model="form.bannerImage" placeholder="Banner 图片 URL（最长500字符）" />
         </el-form-item>
         <el-form-item label="主题色">
           <el-color-picker v-model="form.themeColor" />
-          <span style="margin-left: 10px; color: #999; font-size: 12px;">用于店铺页面主色调</span>
+          <span style="margin-left: 10px; color: #999; font-size: 12px">用于店铺页面主色调</span>
         </el-form-item>
         <el-form-item label="店铺公告">
-          <el-input v-model="form.announcement" type="textarea" :rows="2" maxlength="200" show-word-limit placeholder="如：本店新品上架，全场满 199 包邮" />
+          <el-input
+            v-model="form.announcement"
+            type="textarea"
+            :rows="2"
+            maxlength="200"
+            show-word-limit
+            placeholder="如：本店新品上架，全场满 199 包邮"
+          />
         </el-form-item>
         <el-form-item label="店铺简介">
-          <el-input v-model="form.intro" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="如：专注数码配件 8 年，正品保障" />
+          <el-input
+            v-model="form.intro"
+            type="textarea"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+            placeholder="如：专注数码配件 8 年，正品保障"
+          />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="saveDecoration">保存</el-button>
@@ -59,7 +73,7 @@ async function saveDecoration() {
       themeColor: form.value.themeColor,
       announcement: form.value.announcement,
       intro: form.value.intro,
-      floors: form.value.floors,
+      floors: form.value.floors
     }
     await request.updateShopInfo({ decorationConfig: JSON.stringify(payload) })
     ElMessage.success('保存成功')

@@ -5,7 +5,7 @@
         <h3>物流公司管理</h3>
         <el-button type="primary" @click="openCreate">新增公司</el-button>
       </div>
-      <el-table :data="companies" style="width: 100%; margin-top: 15px;">
+      <el-table :data="companies" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="公司名称" />
         <el-table-column prop="code" label="公司编码" width="140" />
@@ -36,7 +36,13 @@
           <el-input-number v-model="form.sort" :min="0" />
         </el-form-item>
         <el-form-item label="状态">
-          <el-switch v-model="form.status" :active-value="1" :inactive-value="0" active-text="启用" inactive-text="停用" />
+          <el-switch
+            v-model="form.status"
+            :active-value="1"
+            :inactive-value="0"
+            active-text="启用"
+            inactive-text="停用"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -50,7 +56,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getLogisticsCompanies, createLogisticsCompany, updateLogisticsCompany, deleteLogisticsCompany } from '@/api/admin'
+import {
+  getLogisticsCompanies,
+  createLogisticsCompany,
+  updateLogisticsCompany,
+  deleteLogisticsCompany
+} from '@/api/admin'
 
 const companies = ref([])
 const dialogVisible = ref(false)
@@ -59,7 +70,7 @@ const form = ref({ id: null, name: '', code: '', sort: 0, status: 1 })
 
 async function load() {
   try {
-    companies.value = await getLogisticsCompanies() || []
+    companies.value = (await getLogisticsCompanies()) || []
   } catch {
     companies.value = []
   }
@@ -109,5 +120,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

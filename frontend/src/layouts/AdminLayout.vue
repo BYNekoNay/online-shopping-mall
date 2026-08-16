@@ -69,7 +69,20 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { DataAnalysis, User, Goods, Menu, Shop, Ticket, Promotion, Star, Van, Document, List, Setting } from '@element-plus/icons-vue'
+import {
+  DataAnalysis,
+  User,
+  Goods,
+  Menu,
+  Shop,
+  Ticket,
+  Promotion,
+  Star,
+  Van,
+  Document,
+  List,
+  Setting
+} from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -91,7 +104,7 @@ function handleLogout() {
 .sidebar-dark {
   width: 220px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, #1E293B, #0F172A);
+  background: linear-gradient(180deg, #1e293b, #0f172a);
   display: flex;
   flex-direction: column;
 }
@@ -101,14 +114,14 @@ function handleLogout() {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .sidebar-logo-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #7C3AED;
-  box-shadow: 0 0 8px rgba(124,58,237,0.6);
+  background: #7c3aed;
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.6);
 }
 .sidebar-logo-text {
   font-size: 17px;
@@ -127,15 +140,15 @@ function handleLogout() {
   line-height: 44px;
   margin: 2px 8px;
   border-radius: 10px;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255, 255, 255, 0.65);
   font-size: 14px;
 }
 .sidebar-menu .el-menu-item:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 .sidebar-menu .el-menu-item.is-active {
-  background: rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
   font-weight: 600;
 }
@@ -146,7 +159,7 @@ function handleLogout() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #F8FAFC;
+  background: #f8fafc;
 }
 .top-bar {
   height: 60px;
@@ -155,7 +168,7 @@ function handleLogout() {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid #e2e8f0;
 }
 .top-bar-left .el-breadcrumb {
   font-size: 14px;
@@ -166,7 +179,7 @@ function handleLogout() {
   gap: 12px;
 }
 .admin-avatar {
-  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #fff;
   font-weight: 600;
 }

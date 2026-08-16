@@ -8,7 +8,16 @@
 import { describe, it, expect } from 'vitest'
 
 // 与 List.vue / Detail.vue 的 statusMap 同构（保持单一事实来源，此处仅为契约断言）
-const statusMap = { '0': '待付款', '1': '待发货', '2': '已发货', '3': '已收货', '4': '已完成', '5': '已取消', '6': '退款中', '7': '已退款' }
+const statusMap = {
+  0: '待付款',
+  1: '待发货',
+  2: '已发货',
+  3: '已收货',
+  4: '已完成',
+  5: '已取消',
+  6: '退款中',
+  7: '已退款'
+}
 const statusText = (status) => statusMap[status] || '未知'
 
 describe('订单状态文案契约（F-T06）', () => {

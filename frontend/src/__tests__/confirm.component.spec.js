@@ -11,47 +11,66 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 
 // vi.mock factory 会被提升，mock 函数必须用 vi.hoisted 声明（避免 TDZ）
-const { estimateOrderMock, createOrderMock, getAddressesMock, getUserCouponsMock, getPointsMock } =
-  vi.hoisted(() => ({
-    estimateOrderMock: vi.fn(),
-    createOrderMock: vi.fn(),
-    getAddressesMock: vi.fn(),
-    getUserCouponsMock: vi.fn(),
-    getPointsMock: vi.fn(),
-  }))
+const { estimateOrderMock, createOrderMock, getAddressesMock, getUserCouponsMock, getPointsMock } = vi.hoisted(() => ({
+  estimateOrderMock: vi.fn(),
+  createOrderMock: vi.fn(),
+  getAddressesMock: vi.fn(),
+  getUserCouponsMock: vi.fn(),
+  getPointsMock: vi.fn()
+}))
 
 // ---- mock 依赖 ----
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn() })
 }))
 
 vi.mock('element-plus', () => ({
-  ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
+  ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() }
 }))
 
 vi.mock('@/api/order', () => ({
-  default: { estimateOrder: estimateOrderMock, createOrder: createOrderMock },
+  default: { estimateOrder: estimateOrderMock, createOrder: createOrderMock }
 }))
 
 vi.mock('@/api/user', () => ({
-  default: { getAddresses: getAddressesMock },
+  default: { getAddresses: getAddressesMock }
 }))
 
 vi.mock('@/api/coupon', () => ({
-  default: { getUserCoupons: getUserCouponsMock, getPoints: getPointsMock },
+  default: { getUserCoupons: getUserCouponsMock, getPoints: getPointsMock }
 }))
 
 // mock cart store：返回固定购物车数据（2 个店铺各 1 件选中商品）
 vi.mock('@/store/cart', () => ({
   useCartStore: () => ({
     items: [
-      { id: 1, productId: 10, shopId: 1, shopName: '店铺A', selected: true,
-        productName: '商品A', productImage: '/a.jpg', price: 100, quantity: 1, specDesc: '' },
-      { id: 2, productId: 20, shopId: 2, shopName: '店铺B', selected: true,
-        productName: '商品B', productImage: '/b.jpg', price: 100, quantity: 1, specDesc: '' },
+      {
+        id: 1,
+        productId: 10,
+        shopId: 1,
+        shopName: '店铺A',
+        selected: true,
+        productName: '商品A',
+        productImage: '/a.jpg',
+        price: 100,
+        quantity: 1,
+        specDesc: ''
+      },
+      {
+        id: 2,
+        productId: 20,
+        shopId: 2,
+        shopName: '店铺B',
+        selected: true,
+        productName: '商品B',
+        productImage: '/b.jpg',
+        price: 100,
+        quantity: 1,
+        specDesc: ''
+      }
     ],
-    clear: vi.fn(),
-  }),
+    clear: vi.fn()
+  })
 }))
 
 import Confirm from '@/views/consumer/order/Confirm.vue'
@@ -65,15 +84,38 @@ describe('Confirm.vue 组件行为（F-T01~03）', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getAddressesMock.mockResolvedValue([
-      { id: 5, isDefault: 1, receiver: '测试', phone: '138', province: '四川', city: '攀枝花', district: '东区', detail: '学院' },
+      {
+        id: 5,
+        isDefault: 1,
+        receiver: '测试',
+        phone: '138',
+        province: '四川',
+        city: '攀枝花',
+        district: '东区',
+        detail: '学院'
+      }
     ])
     getUserCouponsMock.mockResolvedValue([])
     getPointsMock.mockResolvedValue({ points: 0 })
     estimateOrderMock.mockResolvedValue([
-      { shopId: 1, goodsAmount: 100, freightAmount: 10, promotionDiscountAmount: 0,
-        couponDiscountAmount: 0, pointsDeductAmount: 0, payAmount: 110 },
-      { shopId: 2, goodsAmount: 100, freightAmount: 10, promotionDiscountAmount: 0,
-        couponDiscountAmount: 0, pointsDeductAmount: 0, payAmount: 110 },
+      {
+        shopId: 1,
+        goodsAmount: 100,
+        freightAmount: 10,
+        promotionDiscountAmount: 0,
+        couponDiscountAmount: 0,
+        pointsDeductAmount: 0,
+        payAmount: 110
+      },
+      {
+        shopId: 2,
+        goodsAmount: 100,
+        freightAmount: 10,
+        promotionDiscountAmount: 0,
+        couponDiscountAmount: 0,
+        pointsDeductAmount: 0,
+        payAmount: 110
+      }
     ])
   })
 
@@ -101,10 +143,24 @@ describe('Confirm.vue 组件行为（F-T01~03）', () => {
 
   it('F-T03 券折扣>0 时显示优惠券行，实付=商品-折扣', async () => {
     estimateOrderMock.mockResolvedValue([
-      { shopId: 1, goodsAmount: 100, freightAmount: 10, promotionDiscountAmount: 0,
-        couponDiscountAmount: 20, pointsDeductAmount: 0, payAmount: 90 },
-      { shopId: 2, goodsAmount: 100, freightAmount: 10, promotionDiscountAmount: 0,
-        couponDiscountAmount: 0, pointsDeductAmount: 0, payAmount: 110 },
+      {
+        shopId: 1,
+        goodsAmount: 100,
+        freightAmount: 10,
+        promotionDiscountAmount: 0,
+        couponDiscountAmount: 20,
+        pointsDeductAmount: 0,
+        payAmount: 90
+      },
+      {
+        shopId: 2,
+        goodsAmount: 100,
+        freightAmount: 10,
+        promotionDiscountAmount: 0,
+        couponDiscountAmount: 0,
+        pointsDeductAmount: 0,
+        payAmount: 110
+      }
     ])
     const wrapper = mountConfirm()
     await flushPromises()

@@ -23,7 +23,9 @@
             </router-link>
             <router-link to="/orders" class="action-link">我的订单</router-link>
             <router-link v-if="role === 3" to="/admin/dashboard" class="action-link action-admin">管理后台</router-link>
-            <router-link v-if="role === 2" to="/merchant/products" class="action-link action-admin">商家中心</router-link>
+            <router-link v-if="role === 2" to="/merchant/products" class="action-link action-admin"
+              >商家中心</router-link
+            >
             <el-dropdown trigger="click">
               <span class="user-dropdown">
                 <el-avatar :size="32" class="user-avatar">{{ nickname?.charAt(0) || 'U' }}</el-avatar>
@@ -53,7 +55,7 @@
     <footer class="consumer-footer">
       <div class="footer-inner">
         <div class="footer-brand">
-          <span class="brand-gradient" style="font-size:18px;font-weight:700;">AI 智能商城</span>
+          <span class="brand-gradient" style="font-size: 18px; font-weight: 700">AI 智能商城</span>
           <p>基于协同过滤算法的智能推荐网络商城</p>
         </div>
         <div class="footer-links">
@@ -84,7 +86,7 @@ function handleLogout() {
 
 <style scoped>
 .consumer-header {
-  background: rgba(255,255,255,0.95);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
@@ -101,7 +103,7 @@ function handleLogout() {
 }
 .header-divider {
   height: 2px;
-  background: linear-gradient(90deg, #4F46E5, #7C3AED, transparent);
+  background: linear-gradient(90deg, #4f46e5, #7c3aed, transparent);
 }
 .logo-text {
   font-size: 22px;
@@ -130,15 +132,19 @@ function handleLogout() {
   left: 0;
   width: 0;
   height: 2px;
-  background: linear-gradient(90deg, #4F46E5, #7C3AED);
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
   transition: width 0.3s;
   border-radius: 1px;
 }
-.nav-link:hover { color: #4F46E5; }
+.nav-link:hover {
+  color: #4f46e5;
+}
 .nav-link:hover::after,
-.nav-link.router-link-exact-active::after { width: 100%; }
+.nav-link.router-link-exact-active::after {
+  width: 100%;
+}
 .nav-link.router-link-exact-active {
-  color: #4F46E5;
+  color: #4f46e5;
   font-weight: 600;
 }
 .header-actions {
@@ -152,23 +158,31 @@ function handleLogout() {
   text-decoration: none;
   transition: color 0.2s;
 }
-.action-link:hover { color: #4F46E5; }
+.action-link:hover {
+  color: #4f46e5;
+}
 .action-register {
   padding: 6px 18px;
-  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #fff;
   border-radius: 20px;
   font-weight: 500;
 }
-.action-register:hover { color: #fff; opacity: 0.9; }
+.action-register:hover {
+  color: #fff;
+  opacity: 0.9;
+}
 .action-admin {
   padding: 6px 14px;
-  background: linear-gradient(135deg, #DC2626, #991B1B);
+  background: linear-gradient(135deg, #dc2626, #991b1b);
   color: #fff;
   border-radius: 20px;
   font-weight: 500;
 }
-.action-admin:hover { color: #fff; opacity: 0.9; }
+.action-admin:hover {
+  color: #fff;
+  opacity: 0.9;
+}
 .user-dropdown {
   display: flex;
   align-items: center;
@@ -178,9 +192,11 @@ function handleLogout() {
   border-radius: 8px;
   transition: background 0.2s;
 }
-.user-dropdown:hover { background: #F1F5F9; }
+.user-dropdown:hover {
+  background: #f1f5f9;
+}
 .user-avatar {
-  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #fff;
   font-weight: 600;
 }
@@ -194,8 +210,8 @@ function handleLogout() {
   background: var(--el-bg-color);
 }
 .consumer-footer {
-  background: #1E293B;
-  color: rgba(255,255,255,0.6);
+  background: #1e293b;
+  color: rgba(255, 255, 255, 0.6);
   padding: 32px 24px;
 }
 .footer-inner {

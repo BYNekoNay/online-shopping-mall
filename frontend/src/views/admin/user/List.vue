@@ -5,19 +5,19 @@
         <h3>用户管理</h3>
       </div>
       <div class="filters">
-        <el-select v-model="filters.role" placeholder="角色" clearable style="width: 120px;">
+        <el-select v-model="filters.role" placeholder="角色" clearable style="width: 120px">
           <el-option label="消费者" :value="1" />
           <el-option label="商家" :value="2" />
           <el-option label="管理员" :value="3" />
         </el-select>
-        <el-select v-model="filters.status" placeholder="状态" clearable style="width: 120px;">
+        <el-select v-model="filters.status" placeholder="状态" clearable style="width: 120px">
           <el-option label="正常" :value="1" />
           <el-option label="禁用" :value="0" />
         </el-select>
-        <el-input v-model="filters.keyword" placeholder="用户名/昵称" style="width: 180px;" clearable />
+        <el-input v-model="filters.keyword" placeholder="用户名/昵称" style="width: 180px" clearable />
         <el-button type="primary" @click="load">查询</el-button>
       </div>
-      <el-table :data="users" style="width: 100%; margin-top: 15px;">
+      <el-table :data="users" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
@@ -34,7 +34,12 @@
         <el-table-column prop="createTime" label="注册时间" width="180" />
         <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
-            <el-select v-model="row.role" size="small" style="width: 100px; margin-right: 6px;" @change="(val) => changeRole(row, val)">
+            <el-select
+              v-model="row.role"
+              size="small"
+              style="width: 100px; margin-right: 6px"
+              @change="(val) => changeRole(row, val)"
+            >
               <el-option label="消费者" :value="1" />
               <el-option label="商家" :value="2" />
               <el-option label="管理员" :value="3" />
@@ -46,7 +51,14 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-pagination v-model:current-page="pageNum" :page-size="pageSize" :total="total" layout="total, prev, pager, next" style="margin-top: 20px; justify-content: flex-end;" @current-change="load" />
+      <el-pagination
+        v-model:current-page="pageNum"
+        :page-size="pageSize"
+        :total="total"
+        layout="total, prev, pager, next"
+        style="margin-top: 20px; justify-content: flex-end"
+        @current-change="load"
+      />
     </el-card>
 
     <!-- B-2 用户详情 Dialog -->
@@ -68,8 +80,8 @@
           <el-descriptions-item label="订单数">{{ detail.orderCount }}</el-descriptions-item>
           <el-descriptions-item label="累计消费">¥{{ detail.totalSpend }}</el-descriptions-item>
         </el-descriptions>
-        <div style="margin-top: 16px;">
-          <p style="font-weight: 500; margin: 0 0 8px;">最近行为</p>
+        <div style="margin-top: 16px">
+          <p style="font-weight: 500; margin: 0 0 8px">最近行为</p>
           <el-table :data="detail.recentBehaviors || []" size="small" empty-text="暂无行为记录">
             <el-table-column label="行为类型" width="100">
               <template #default="{ row }">
@@ -122,7 +134,9 @@ async function changeRole(row, role) {
   const original = row.role
   if (original === role) return
   try {
-    await ElMessageBox.confirm(`确认将用户 ${row.username} 的角色改为「${roleMap[role]}」？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(`确认将用户 ${row.username} 的角色改为「${roleMap[role]}」？`, '提示', {
+      type: 'warning'
+    })
     await request.updateUserRole(row.id, { role })
     ElMessage.success('角色修改成功，该用户需重新登录后生效')
   } catch {
@@ -148,6 +162,14 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
-.filters { display: flex; gap: 10px; margin-top: 15px; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
 </style>

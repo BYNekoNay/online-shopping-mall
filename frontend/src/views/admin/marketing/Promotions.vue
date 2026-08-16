@@ -6,7 +6,7 @@
         <el-button type="primary" @click="showCreateDialog">新建促销活动</el-button>
       </div>
 
-      <el-table :data="list" style="width: 100%; margin-top: 15px;">
+      <el-table :data="list" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="名称" />
         <el-table-column prop="type" label="类型" width="100">
@@ -29,7 +29,9 @@
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="editRow(row)">编辑</el-button>
-            <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.status !== 1">下线</el-button>
+            <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.status !== 1"
+              >下线</el-button
+            >
             <el-button size="small" type="danger" @click="deleteRow(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -61,7 +63,7 @@
         </el-form-item>
         <el-form-item label="折扣比例" v-if="form.type === 1">
           <el-input-number v-model="form.discountPercent" :min="0.1" :max="1" :step="0.1" :precision="1" />
-          <span style="margin-left: 8px; color: #999;">例：0.8 表示 8 折</span>
+          <span style="margin-left: 8px; color: #999">例：0.8 表示 8 折</span>
         </el-form-item>
         <el-form-item label="满减门槛" v-if="form.type === 2">
           <el-input-number v-model="form.threshold" :min="0" :step="10" />
@@ -96,9 +98,17 @@ const list = ref([])
 const dialogVisible = ref(false)
 const editing = ref(false)
 const form = ref({
-  id: null, name: '', type: 1, scope: 'PLATFORM', scopeId: 0,
-  startTime: '', endTime: '',
-  discountPercent: 0.8, threshold: 100, reduce: 20, packagePrice: 299
+  id: null,
+  name: '',
+  type: 1,
+  scope: 'PLATFORM',
+  scopeId: 0,
+  startTime: '',
+  endTime: '',
+  discountPercent: 0.8,
+  threshold: 100,
+  reduce: 20,
+  packagePrice: 299
 })
 
 function typeName(t) {
@@ -115,12 +125,26 @@ async function load() {
   try {
     const data = await request.getPromotions()
     list.value = data || []
-  } catch { list.value = [] }
+  } catch {
+    list.value = []
+  }
 }
 
 function showCreateDialog() {
   editing.value = false
-  form.value = { id: null, name: '', type: 1, scope: 'PLATFORM', scopeId: 0, startTime: '', endTime: '', discountPercent: 0.8, threshold: 100, reduce: 20, packagePrice: 299 }
+  form.value = {
+    id: null,
+    name: '',
+    type: 1,
+    scope: 'PLATFORM',
+    scopeId: 0,
+    startTime: '',
+    endTime: '',
+    discountPercent: 0.8,
+    threshold: 100,
+    reduce: 20,
+    packagePrice: 299
+  }
   dialogVisible.value = true
 }
 
@@ -148,7 +172,7 @@ function buildRuleJson() {
 async function submit() {
   const payload = {
     ...form.value,
-    ruleJson: buildRuleJson(),
+    ruleJson: buildRuleJson()
   }
   delete payload.discountPercent
   delete payload.threshold
@@ -189,5 +213,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

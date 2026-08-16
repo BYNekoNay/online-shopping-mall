@@ -4,7 +4,7 @@
       <div class="header">
         <h3>操作日志</h3>
       </div>
-      <el-table :data="logs" style="width: 100%; margin-top: 15px;">
+      <el-table :data="logs" style="width: 100%; margin-top: 15px">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="operatorId" label="操作人ID" width="120" />
         <el-table-column prop="operatorRole" label="角色" width="100">
@@ -16,7 +16,14 @@
         <el-table-column prop="target" label="目标" />
         <el-table-column prop="createTime" label="时间" width="180" />
       </el-table>
-      <el-pagination v-model:current-page="pageNum" :page-size="pageSize" :total="total" layout="total, prev, pager, next" style="margin-top: 20px; justify-content: flex-end;" @current-change="load" />
+      <el-pagination
+        v-model:current-page="pageNum"
+        :page-size="pageSize"
+        :total="total"
+        layout="total, prev, pager, next"
+        style="margin-top: 20px; justify-content: flex-end"
+        @current-change="load"
+      />
     </el-card>
   </div>
 </template>
@@ -46,5 +53,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>
