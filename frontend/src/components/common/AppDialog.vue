@@ -1,10 +1,5 @@
 <template>
-  <el-dialog
-    :model-value="modelValue"
-    :title="title"
-    :width="width"
-    @update:model-value="onUpdateModelValue"
-  >
+  <el-dialog :model-value="modelValue" :title="title" :width="width" @update:model-value="onUpdateModelValue">
     <slot />
     <template #footer>
       <slot name="footer">

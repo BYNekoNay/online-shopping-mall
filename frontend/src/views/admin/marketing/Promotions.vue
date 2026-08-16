@@ -18,16 +18,19 @@
         </template>
         <template #action="{ row }">
           <el-button size="small" @click="editRow(row)">编辑</el-button>
-          <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.status !== 1"
-            >下线</el-button
-          >
+          <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.status !== 1">下线</el-button>
           <el-button size="small" type="danger" @click="deleteRow(row)">删除</el-button>
         </template>
       </AppTable>
     </el-card>
 
     <!-- 创建/编辑弹窗 -->
-    <AppDialog v-model="dialogVisible" :title="editing ? '编辑促销活动' : '新建促销活动'" width="500px" @confirm="submit">
+    <AppDialog
+      v-model="dialogVisible"
+      :title="editing ? '编辑促销活动' : '新建促销活动'"
+      width="500px"
+      @confirm="submit"
+    >
       <el-form :model="form" label-width="100px">
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="类型">
