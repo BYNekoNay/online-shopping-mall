@@ -20,9 +20,9 @@
       </div>
       <div class="order-items">
         <div v-for="item in order.items" :key="item.id" class="order-item">
-          <img :src="item.productImageSnapshot" />
+          <img :src="item.productImage" />
           <div class="item-info">
-            <div>{{ item.productNameSnapshot }}</div>
+            <div>{{ item.productName }}</div>
             <div v-if="item.isGift" class="gift-tag">赠品</div>
           </div>
           <div class="item-price">¥{{ item.price }} x {{ item.quantity }}</div>
@@ -34,9 +34,9 @@
           <el-button v-if="order.status === 0" type="primary" @click="$router.push(`/order/pay/${order.orderId}`)">去支付</el-button>
           <el-button v-if="order.status === 0" @click="cancelOrder(order.orderId)">取消订单</el-button>
           <el-button v-if="order.status === 2" @click="confirmOrder(order.orderId)">确认收货</el-button>
-          <!-- R-1：申请退款（已收货3/已完成4，且非赠品/非退款中） -->
+          <!-- R-1：申请退款（待发货1/已发货2/已收货3/已完成4，与后端 RefundService 放行口径一致） -->
           <el-button
-            v-if="order.status === 3 || order.status === 4"
+            v-if="order.status >= 1 && order.status <= 4"
             type="warning"
             plain
             @click="openRefundDialog(order)"
@@ -61,7 +61,7 @@
             <el-option
               v-for="item in refundableItems"
               :key="item.id"
-              :label="`${item.productNameSnapshot} x${item.quantity}（¥${item.price}）`"
+              :label="`${item.productName} x${item.quantity}（¥${item.price}）`"
               :value="item.id"
             />
           </el-select>
