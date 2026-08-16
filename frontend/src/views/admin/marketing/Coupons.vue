@@ -6,33 +6,22 @@
         <el-button type="primary" @click="showCreateDialog">新建优惠券</el-button>
       </div>
 
-      <el-table :data="list" style="width: 100%; margin-top: 15px">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="名称" />
-        <el-table-column prop="type" label="类型" width="100">
-          <template #default="{ row }">
-            <el-tag :type="typeTag(row.type)">{{ typeName(row.type) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="stock" label="库存" width="100" />
-        <el-table-column prop="receivedCount" label="已领取" width="100" />
-        <el-table-column prop="validFrom" label="开始时间" width="180" />
-        <el-table-column prop="validTo" label="结束时间" width="180" />
-        <el-table-column prop="createTime" label="创建时间" width="180" />
-        <el-table-column label="操作" width="220" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="editRow(row)">编辑</el-button>
-            <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.stock <= row.receivedCount"
-              >下线</el-button
-            >
-            <el-button size="small" type="danger" @click="deleteRow(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <AppTable :columns="couponColumns" :data="list">
+        <template #type="{ row }">
+          <el-tag :type="typeTag(row.type)">{{ typeName(row.type) }}</el-tag>
+        </template>
+        <template #action="{ row }">
+          <el-button size="small" @click="editRow(row)">编辑</el-button>
+          <el-button size="small" type="warning" @click="offlineRow(row)" :disabled="row.stock <= row.receivedCount"
+            >下线</el-button
+          >
+          <el-button size="small" type="danger" @click="deleteRow(row)">删除</el-button>
+        </template>
+      </AppTable>
     </el-card>
 
     <!-- 创建/编辑弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑优惠券' : '新建优惠券'" width="500px">
+    <AppDialog v-model="dialogVisible" :title="editing ? '编辑优惠券' : '新建优惠券'" width="500px" @confirm="submit">
       <el-form :model="form" label-width="100px">
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="类型">
@@ -62,17 +51,15 @@
           <el-date-picker v-model="form.validTo" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
         </el-form-item>
       </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submit">保存</el-button>
-      </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AppTable from '@/components/common/AppTable.vue'
+import AppDialog from '@/components/common/AppDialog.vue'
 import request from '@/api/admin'
 
 const list = ref([])
@@ -89,6 +76,18 @@ const form = ref({
   validFrom: '',
   validTo: ''
 })
+
+const couponColumns = [
+  { prop: 'id', label: 'ID', width: 80 },
+  { prop: 'name', label: '名称' },
+  { label: '类型', slot: 'type', width: 100 },
+  { prop: 'stock', label: '库存', width: 100 },
+  { prop: 'receivedCount', label: '已领取', width: 100 },
+  { prop: 'validFrom', label: '开始时间', width: 180 },
+  { prop: 'validTo', label: '结束时间', width: 180 },
+  { prop: 'createTime', label: '创建时间', width: 180 },
+  { label: '操作', slot: 'action', width: 220, fixed: 'right' }
+]
 
 function typeName(t) {
   return { 1: '新人券', 2: '满减券', 3: '品类券', 4: '店铺券' }[t] || t

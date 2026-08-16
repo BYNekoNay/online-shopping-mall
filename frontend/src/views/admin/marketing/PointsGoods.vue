@@ -5,35 +5,18 @@
         <h3>积分商城管理</h3>
         <el-button type="primary" @click="openCreate">新增商品</el-button>
       </div>
-      <el-table :data="goodsList" style="width: 100%; margin-top: 15px">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="商品名称" />
-        <el-table-column prop="pointsCost" label="所需积分" width="100" />
-        <el-table-column prop="stock" label="库存" width="80" />
-        <el-table-column prop="description" label="描述" />
-        <el-table-column prop="status" label="状态" width="90">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '上架' : '下架' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160">
-          <template #default="{ row }">
-            <el-button size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" plain @click="remove(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination
-        v-model:current-page="pageNum"
-        :page-size="pageSize"
-        :total="total"
-        layout="total, prev, pager, next"
-        style="margin-top: 20px; justify-content: flex-end"
-        @current-change="load"
-      />
+      <AppTable :columns="goodsColumns" :data="goodsList" :pagination="pagination" @page-change="handlePageChange">
+        <template #status="{ row }">
+          <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '上架' : '下架' }}</el-tag>
+        </template>
+        <template #action="{ row }">
+          <el-button size="small" @click="openEdit(row)">编辑</el-button>
+          <el-button size="small" type="danger" plain @click="remove(row)">删除</el-button>
+        </template>
+      </AppTable>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑兑换商品' : '新增兑换商品'" width="480px">
+    <AppDialog v-model="dialogVisible" :title="isEdit ? '编辑兑换商品' : '新增兑换商品'" width="480px" @confirm="save">
       <el-form :model="form" label-width="90px">
         <el-form-item label="商品名称" required>
           <el-input v-model="form.name" maxlength="100" />
@@ -60,17 +43,15 @@
           />
         </el-form-item>
       </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="save">保存</el-button>
-      </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AppTable from '@/components/common/AppTable.vue'
+import AppDialog from '@/components/common/AppDialog.vue'
 import { getPointsGoodsList, createPointsGoods, updatePointsGoods, deletePointsGoods } from '@/api/admin'
 
 const goodsList = ref([])
@@ -81,6 +62,18 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const form = ref({ id: null, name: '', image: '', pointsCost: 100, stock: 0, description: '', status: 1 })
 
+const goodsColumns = [
+  { prop: 'id', label: 'ID', width: 80 },
+  { prop: 'name', label: '商品名称' },
+  { prop: 'pointsCost', label: '所需积分', width: 100 },
+  { prop: 'stock', label: '库存', width: 80 },
+  { prop: 'description', label: '描述' },
+  { label: '状态', slot: 'status', width: 90 },
+  { label: '操作', slot: 'action', width: 160 }
+]
+
+const pagination = computed(() => ({ currentPage: pageNum.value, pageSize: pageSize.value, total: total.value }))
+
 async function load() {
   try {
     const data = await getPointsGoodsList(pageNum.value, pageSize.value)
@@ -89,6 +82,11 @@ async function load() {
   } catch {
     goodsList.value = []
   }
+}
+
+function handlePageChange(page) {
+  pageNum.value = page
+  load()
 }
 
 function openCreate() {
