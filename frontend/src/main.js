@@ -1,7 +1,12 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
+// F-05 Element Plus 按需引入：移除全量注册与全量 CSS，模板组件由 unplugin-vue-components 自动解析
+// 命令式组件（JS API 调用，模板解析器不会注入样式）显式引入并补 style
+import { ElMessage, ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
+// F-05 主题兜底：显式引入 EP base css 于 theme.css 之前，保证 --el-color-* 品牌色覆盖生效
+import 'element-plus/theme-chalk/base.css'
 import './assets/styles/theme.css' // 自定义设计主题
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import App from './App.vue'
@@ -11,7 +16,6 @@ import pageViewPlugin from './plugins/page-view'
 
 const app = createApp(App)
 app.use(createPinia())
-app.use(ElementPlus, { size: 'default' })
 app.use(router)
 
 // 激活页面访问埋点

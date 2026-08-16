@@ -1,11 +1,20 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig(async ({ mode }) => {
   // F-04 修复：从 configEnv.mode 取 mode（而非硬编码 ''），使 `vite --mode mock` 能读到 .env.mock
   const useMock = loadEnv(mode, process.cwd()).VITE_USE_MOCK === 'true'
 
-  const plugins = [vue()]
+  const plugins = [
+    vue(),
+    // F-05 Element Plus 按需引入：模板组件由 unplugin 自动解析并按需加载样式
+    // dts: false——纯 JS 项目不生成 auto-imports.d.ts/components.d.ts，避免入库噪音
+    AutoImport({ resolvers: [ElementPlusResolver()], dts: false }),
+    Components({ resolvers: [ElementPlusResolver()], dts: false }),
+  ]
 
   if (useMock) {
     // M-27 修复：Mock 文件位于 src/mock/（原配置指向不存在的根级 mock/，Mock 模式恒不生效）
