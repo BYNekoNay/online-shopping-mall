@@ -17,8 +17,19 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SQL_DIR="$ROOT_DIR/backend/src/main/resources/sql"
 DATA_SQL="$ROOT_DIR/scripts/init-data.sql"
 SCHEMA_SQL="$SQL_DIR/V1__init_schema.sql"
-MODE="${1:-docker}"
-MYSQL_PASSWORD="${MYSQL_ROOT_PASSWORD:-root123}"
+MODE="docker"
+WARMUP=""
+for arg in "$@"; do
+  case "$arg" in
+    --local) MODE="local" ;;
+    --warmup) WARMUP="warmup" ;;
+  esac
+done
+# 密码允许为空（本地 root 常无密码）；docker 模式未显式指定时默认 root123
+MYSQL_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
+if [[ "$MODE" == "docker" && -z "$MYSQL_PASSWORD" ]]; then
+  MYSQL_PASSWORD="root123"
+fi
 MYSQL_DATABASE="${MYSQL_DATABASE:-mall}"
 
 if [[ ! -f "$SCHEMA_SQL" || ! -f "$DATA_SQL" ]]; then
@@ -32,12 +43,18 @@ echo "======================================================"
 echo " 演示环境重置（mode=$MODE, db=$MYSQL_DATABASE）"
 echo "======================================================"
 
+# 密码为空时不传 -p（避免空密码被当作错误密码）
+MYSQL_AUTH=()
+if [[ -n "$MYSQL_PASSWORD" ]]; then
+  MYSQL_AUTH=(-p"$MYSQL_PASSWORD")
+fi
+
 run_mysql() {
-  # $@ 为要执行的 SQL（管道输入）
+  # $@ 为要执行的 SQL（管道输入）；--default-character-set=utf8mb4 防止中文乱码/超长
   if [[ "$MODE" == "local" ]]; then
-    mysql -uroot -p"$MYSQL_PASSWORD" "$@"
+    mysql --default-character-set=utf8mb4 -uroot "${MYSQL_AUTH[@]}" "$@"
   else
-    docker exec -i mall-mysql mysql -uroot -p"$MYSQL_PASSWORD" "$@"
+    docker exec -i mall-mysql mysql --default-character-set=utf8mb4 -uroot "${MYSQL_AUTH[@]}" "$@"
   fi
 }
 
@@ -58,7 +75,7 @@ TABLE_COUNT="$(run_mysql "$MYSQL_DATABASE" -N -e "SELECT COUNT(*) FROM informati
 echo "  当前表数量: $TABLE_COUNT（预期 30）"
 
 # 可选：推荐预热（调用后端刷新接口，需容器启动）
-if [[ "${2:-}" == "--warmup" ]]; then
+if [[ "$WARMUP" == "warmup" ]]; then
   echo "[可选] 触发推荐预热..."
   BACKEND_URL="${BACKEND_URL:-http://localhost:8080}"
   curl -sf -X POST "$BACKEND_URL/api/admin/recommend/refresh" -H "Authorization: Bearer $DEMO_ADMIN_TOKEN" \

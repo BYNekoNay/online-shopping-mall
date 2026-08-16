@@ -34,5 +34,19 @@ export default defineConfig(async () => {
         },
       },
     },
+    // G 阶段：生产构建本地托管（vite preview）同样代理后端
+    preview: {
+      port: 4173,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+        '/uploads': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+      },
+    },
   }
 })
