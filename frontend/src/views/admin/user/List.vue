@@ -4,65 +4,36 @@
       <div class="header">
         <h3>用户管理</h3>
       </div>
-      <div class="filters">
-        <el-select v-model="filters.role" placeholder="角色" clearable style="width: 120px">
-          <el-option label="消费者" :value="1" />
-          <el-option label="商家" :value="2" />
-          <el-option label="管理员" :value="3" />
-        </el-select>
-        <el-select v-model="filters.status" placeholder="状态" clearable style="width: 120px">
-          <el-option label="正常" :value="1" />
-          <el-option label="禁用" :value="0" />
-        </el-select>
-        <el-input v-model="filters.keyword" placeholder="用户名/昵称" style="width: 180px" clearable />
-        <el-button type="primary" @click="load">查询</el-button>
-      </div>
-      <el-table :data="users" style="width: 100%; margin-top: 15px">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="用户名" />
-        <el-table-column prop="nickname" label="昵称" />
-        <el-table-column prop="role" label="角色" width="120">
-          <template #default="{ row }">
-            <el-tag>{{ roleMap[row.role] }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="120">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'">{{ row.status === 1 ? '正常' : '禁用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="createTime" label="注册时间" width="180" />
-        <el-table-column label="操作" width="230" fixed="right">
-          <template #default="{ row }">
-            <el-select
-              v-model="row.role"
-              size="small"
-              style="width: 100px; margin-right: 6px"
-              @change="(val) => changeRole(row, val)"
-            >
-              <el-option label="消费者" :value="1" />
-              <el-option label="商家" :value="2" />
-              <el-option label="管理员" :value="3" />
-            </el-select>
-            <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
-              {{ row.status === 1 ? '禁用' : '启用' }}
-            </el-button>
-            <el-button size="small" type="primary" plain @click="showDetail(row.id)">详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination
-        v-model:current-page="pageNum"
-        :page-size="pageSize"
-        :total="total"
-        layout="total, prev, pager, next"
-        style="margin-top: 20px; justify-content: flex-end"
-        @current-change="load"
-      />
+      <AppSearchForm :fields="searchFields" @search="handleSearch" @reset="handleReset" />
+      <AppTable :columns="userColumns" :data="users" :pagination="pagination" @page-change="handlePageChange">
+        <template #role="{ row }">
+          <el-tag>{{ roleMap[row.role] }}</el-tag>
+        </template>
+        <template #status="{ row }">
+          <el-tag :type="row.status === 1 ? 'success' : 'danger'">{{ row.status === 1 ? '正常' : '禁用' }}</el-tag>
+        </template>
+        <template #action="{ row }">
+          <el-select
+            v-model="row.role"
+            size="small"
+            style="width: 100px; margin-right: 6px"
+            @change="(val) => changeRole(row, val)"
+          >
+            <el-option label="消费者" :value="1" />
+            <el-option label="商家" :value="2" />
+            <el-option label="管理员" :value="3" />
+          </el-select>
+          <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
+            {{ row.status === 1 ? '禁用' : '启用' }}
+          </el-button>
+          <el-button size="small" type="primary" plain @click="showDetail(row.id)">详情</el-button>
+        </template>
+      </AppTable>
     </el-card>
 
     <!-- B-2 用户详情 Dialog -->
-    <el-dialog v-model="detailVisible" title="用户详情" width="560px">
+    <AppDialog v-model="detailVisible" title="用户详情" width="560px">
+      <template #footer><span /></template>
       <template v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="用户名">{{ detail.username }}</el-descriptions-item>
@@ -93,13 +64,16 @@
           </el-table>
         </div>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AppSearchForm from '@/components/common/AppSearchForm.vue'
+import AppTable from '@/components/common/AppTable.vue'
+import AppDialog from '@/components/common/AppDialog.vue'
 import request from '@/api/admin'
 
 const users = ref([])
@@ -108,6 +82,47 @@ const pageSize = ref(10)
 const total = ref(0)
 const roleMap = { 1: '消费者', 2: '商家', 3: '管理员' }
 const filters = ref({ role: null, status: null, keyword: '' })
+
+const searchFields = [
+  {
+    key: 'role',
+    label: '角色',
+    type: 'select',
+    placeholder: '角色',
+    width: '120px',
+    defaultValue: null,
+    options: [
+      { label: '消费者', value: 1 },
+      { label: '商家', value: 2 },
+      { label: '管理员', value: 3 }
+    ]
+  },
+  {
+    key: 'status',
+    label: '状态',
+    type: 'select',
+    placeholder: '状态',
+    width: '120px',
+    defaultValue: null,
+    options: [
+      { label: '正常', value: 1 },
+      { label: '禁用', value: 0 }
+    ]
+  },
+  { key: 'keyword', label: '', type: 'input', placeholder: '用户名/昵称', width: '180px', defaultValue: '' }
+]
+
+const userColumns = [
+  { prop: 'id', label: 'ID', width: 80 },
+  { prop: 'username', label: '用户名' },
+  { prop: 'nickname', label: '昵称' },
+  { label: '角色', slot: 'role', width: 120 },
+  { label: '状态', slot: 'status', width: 120 },
+  { prop: 'createTime', label: '注册时间', width: 180 },
+  { label: '操作', slot: 'action', width: 230, fixed: 'right' }
+]
+
+const pagination = computed(() => ({ currentPage: pageNum.value, pageSize: pageSize.value, total: total.value }))
 
 async function load() {
   try {
@@ -118,6 +133,21 @@ async function load() {
     users.value = []
     total.value = 0
   }
+}
+
+function handleSearch(values) {
+  filters.value = { ...values }
+  load()
+}
+
+function handleReset() {
+  filters.value = { role: null, status: null, keyword: '' }
+  load()
+}
+
+function handlePageChange(page) {
+  pageNum.value = page
+  load()
 }
 
 async function toggleStatus(row) {
@@ -166,10 +196,5 @@ onMounted(load)
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-.filters {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
 }
 </style>

@@ -2,47 +2,45 @@
   <div class="admin-products">
     <el-card>
       <h3>商品审核</h3>
-      <el-table :data="products" style="width: 100%; margin-top: 15px">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="商品名称" />
-        <el-table-column prop="shopName" label="店铺" width="150" />
-        <el-table-column prop="status" label="状态" width="120">
-          <template #default="{ row }">
-            <el-tag :type="statusType(row.status)">{{ statusMap[row.status] }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
-          <template #default="{ row }">
-            <el-button v-if="row.status === 2" type="success" size="small" @click="auditProduct(row, true)"
-              >通过</el-button
-            >
-            <el-button v-if="row.status === 2" type="danger" size="small" @click="auditProduct(row, false)"
-              >拒绝</el-button
-            >
-            <el-button v-if="row.status === 1" type="warning" size="small" @click="offlineProduct(row)">下架</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 审核对话框 -->
-      <el-dialog v-model="auditDialogVisible" :title="auditForm.approved ? '审核通过' : '审核拒绝'" width="500px">
-        <el-form :model="auditForm" label-width="100px">
-          <el-form-item v-if="!auditForm.approved" label="拒绝原因" required>
-            <el-input v-model="auditForm.reason" type="textarea" :rows="3" placeholder="请输入拒绝原因" />
-          </el-form-item>
-        </el-form>
-        <template #footer>
-          <el-button @click="auditDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="auditSubmitting" @click="confirmAudit">确认</el-button>
+      <AppTable :columns="productColumns" :data="products">
+        <template #status="{ row }">
+          <el-tag :type="statusType(row.status)">{{ statusMap[row.status] }}</el-tag>
         </template>
-      </el-dialog>
+        <template #action="{ row }">
+          <el-button v-if="row.status === 2" type="success" size="small" @click="auditProduct(row, true)"
+            >通过</el-button
+          >
+          <el-button v-if="row.status === 2" type="danger" size="small" @click="auditProduct(row, false)"
+            >拒绝</el-button
+          >
+          <el-button v-if="row.status === 1" type="warning" size="small" @click="offlineProduct(row)">下架</el-button>
+        </template>
+      </AppTable>
     </el-card>
+
+    <!-- 审核对话框 -->
+    <AppDialog
+      v-model="auditDialogVisible"
+      :title="auditForm.approved ? '审核通过' : '审核拒绝'"
+      width="500px"
+      confirm-text="确认"
+      :loading="auditSubmitting"
+      @confirm="confirmAudit"
+    >
+      <el-form :model="auditForm" label-width="100px">
+        <el-form-item v-if="!auditForm.approved" label="拒绝原因" required>
+          <el-input v-model="auditForm.reason" type="textarea" :rows="3" placeholder="请输入拒绝原因" />
+        </el-form-item>
+      </el-form>
+    </AppDialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import AppTable from '@/components/common/AppTable.vue'
+import AppDialog from '@/components/common/AppDialog.vue'
 import request from '@/api/admin'
 import { ProductStatusLabel, ProductStatusTagType } from '@/constants/product'
 
@@ -52,6 +50,14 @@ const auditDialogVisible = ref(false)
 const auditSubmitting = ref(false)
 const currentProductId = ref(null)
 const auditForm = ref({ approved: true, reason: '' })
+
+const productColumns = [
+  { prop: 'id', label: 'ID', width: 80 },
+  { prop: 'name', label: '商品名称' },
+  { prop: 'shopName', label: '店铺', width: 150 },
+  { label: '状态', slot: 'status', width: 120 },
+  { label: '操作', slot: 'action', width: 220, fixed: 'right' }
+]
 
 onMounted(async () => {
   try {
