@@ -7,6 +7,9 @@ export default [
   {
     ignores: [
       'dist/**',
+      'dist-rcheck/**', // 历史检查构建产物（git 已忽略，eslint 漏配）
+      '.tmp-build*/**', // 临时构建产物
+      '*.timestamp-*.mjs', // vite 配置加载生成的临时模块
       'node_modules/**',
       'src/mock/**',
       'coverage/**',
