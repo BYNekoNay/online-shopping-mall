@@ -23,6 +23,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+frontend/.tmp_*.txt
 
 # Redis
 *.rdb
