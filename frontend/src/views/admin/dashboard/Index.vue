@@ -1,11 +1,12 @@
 <template>
   <div class="admin-dashboard">
-    <el-row :gutter="20">
-      <el-col :span="6"><el-card><div class="stat"><div class="label">GMV</div><div class="value">{{ dashboard.gmv }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card><div class="stat"><div class="label">订单数</div><div class="value">{{ dashboard.orderCount }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card><div class="stat"><div class="label">新增用户</div><div class="value">{{ dashboard.newUserCount }}</div></div></el-card></el-col>
-      <el-col :span="6"><el-card><div class="stat"><div class="label">推荐点击率</div><div class="value">{{ dashboard.recommendCtr }}</div></div></el-card></el-col>
-    </el-row>
+    <div class="stat-row">
+      <el-card class="stat-card"><div class="stat"><div class="label">GMV</div><div class="value">{{ dashboard.gmv }}</div></div></el-card>
+      <el-card class="stat-card"><div class="stat"><div class="label">订单数</div><div class="value">{{ dashboard.orderCount }}</div></div></el-card>
+      <el-card class="stat-card"><div class="stat"><div class="label">新增用户</div><div class="value">{{ dashboard.newUserCount }}</div></div></el-card>
+      <el-card class="stat-card"><div class="stat"><div class="label">订单转化率</div><div class="value">{{ formatConversionRate(dashboard.conversionRate) }}</div></div></el-card>
+      <el-card class="stat-card"><div class="stat"><div class="label">推荐点击率</div><div class="value">{{ dashboard.recommendCtr }}</div></div></el-card>
+    </div>
 
     <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="12">
@@ -35,8 +36,17 @@ import { ref, computed, onMounted } from 'vue'
 import BaseChart from '@/components/BaseChart.vue'
 import request from '@/api/admin'
 
-const dashboard = ref({ gmv: '0', orderCount: 0, newUserCount: 0, recommendCtr: '0%' })
+const dashboard = ref({ gmv: '0', orderCount: 0, newUserCount: 0, conversionRate: 0, recommendCtr: '0%' })
 const detail = ref({ pv: 0, uv: 0, bounceRate: 0, avgStayDuration: 0, funnel: {} })
+
+// 转化率格式化：后端返回小数（如 0.12 → 12.00%），兼容字符串百分比/小数
+function formatConversionRate(rate) {
+  if (rate == null || rate === '') return '0.00%'
+  if (typeof rate === 'string' && rate.includes('%')) return rate
+  const num = Number(rate)
+  if (Number.isNaN(num)) return '0.00%'
+  return `${(num * 100).toFixed(2)}%`
+}
 
 // F-1：漏斗图 option（computed 响应 detail 变化）
 const funnelOption = computed(() => {
@@ -60,7 +70,7 @@ async function loadDashboard() {
   try {
     dashboard.value = await request.getDashboard()
   } catch {
-    dashboard.value = { gmv: '0', orderCount: 0, newUserCount: 0, recommendCtr: '0%' }
+    dashboard.value = { gmv: '0', orderCount: 0, newUserCount: 0, conversionRate: 0, recommendCtr: '0%' }
   }
 }
 
@@ -80,6 +90,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.stat-row { display: flex; gap: 20px; }
+.stat-card { flex: 1; }
 .stat { text-align: center; padding: 20px; }
 .stat .label { color: #999; font-size: 14px; }
 .stat .value { font-size: 28px; font-weight: bold; color: #409eff; margin-top: 10px; }
