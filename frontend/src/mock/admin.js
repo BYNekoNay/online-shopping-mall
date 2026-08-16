@@ -1,4 +1,4 @@
-import { Mock } from 'mockjs'
+import Mock from 'mockjs'
 
 export default [
   {
@@ -94,7 +94,7 @@ export default [
     }),
   },
   {
-    url: '/api/admin/users/\\d+/status',
+    url: '/api/admin/users/:id(\\d+)/status',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
@@ -117,12 +117,12 @@ export default [
     }),
   },
   {
-    url: '/api/admin/shops/\\d+/audit',
+    url: '/api/admin/shops/:id(\\d+)/audit',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/shops/\\d+/level',
+    url: '/api/admin/shops/:id(\\d+)/level',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
@@ -141,7 +141,7 @@ export default [
     }),
   },
   {
-    url: '/api/admin/system/config/.*',
+    url: '/api/admin/system/config/:path(.*)',
     method: 'get',
     response: (uri) => {
       const key = uri.replace('/api/admin/system/config/', '')
@@ -150,7 +150,7 @@ export default [
     },
   },
   {
-    url: '/api/admin/system/config/.*',
+    url: '/api/admin/system/config/:path(.*)',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
@@ -160,12 +160,12 @@ export default [
     response: () => ({ code: 0, message: 'success', data: { id: 3 } }),
   },
   {
-    url: '/api/admin/dicts/\\d+',
+    url: '/api/admin/dicts/:id(\\d+)',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/dicts/\\d+',
+    url: '/api/admin/dicts/:id(\\d+)',
     method: 'delete',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
@@ -242,17 +242,17 @@ export default [
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/coupons/\\d+',
+    url: '/api/admin/coupons/:id(\\d+)',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/coupons/\\d+/offline',
+    url: '/api/admin/coupons/:id(\\d+)/offline',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/coupons/\\d+',
+    url: '/api/admin/coupons/:id(\\d+)',
     method: 'delete',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
@@ -274,17 +274,17 @@ export default [
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/promotions/\\d+',
+    url: '/api/admin/promotions/:id(\\d+)',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/promotions/\\d+/offline',
+    url: '/api/admin/promotions/:id(\\d+)/offline',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/admin/promotions/\\d+',
+    url: '/api/admin/promotions/:id(\\d+)',
     method: 'delete',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
@@ -300,7 +300,7 @@ export default [
     }),
   },
   {
-    url: '/api/coupons/\\d+/receive',
+    url: '/api/coupons/:id(\\d+)/receive',
     method: 'post',
     response: () => ({ code: 0, message: 'success', data: { userCouponId: 1 } }),
   },
@@ -327,7 +327,7 @@ export default [
     }),
   },
   {
-    url: '/api/logistics/\\d+/track',
+    url: '/api/logistics/:id(\\d+)/track',
     method: 'get',
     response: () => ({
       code: 0,

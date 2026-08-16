@@ -1,4 +1,4 @@
-import { Mock } from 'mockjs'
+import Mock from 'mockjs'
 
 export default [
   {
@@ -13,7 +13,7 @@ export default [
     }),
   },
   {
-    url: '/api/coupons/\\d+/receive',
+    url: '/api/coupons/:id(\\d+)/receive',
     method: 'post',
     response: () => ({ code: 0, message: 'success', data: null }),
   },

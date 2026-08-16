@@ -1,8 +1,8 @@
-import { Mock } from 'mockjs'
+import Mock from 'mockjs'
 
 export default [
   {
-    url: '/api/logistics/\\d+',
+    url: '/api/logistics/:id(\\d+)',
     method: 'get',
     response: () => ({
       code: 0,

@@ -1,4 +1,4 @@
-import { Mock } from 'mockjs'
+import Mock from 'mockjs'
 
 export default [
   {
@@ -21,7 +21,7 @@ export default [
     },
   },
   {
-    url: '/api/recommend/similar/\\d+',
+    url: '/api/recommend/similar/:id(\\d+)',
     method: 'get',
     response: () => {
       const items = Mock.mock({

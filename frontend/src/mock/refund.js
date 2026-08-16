@@ -1,4 +1,4 @@
-import { Mock } from 'mockjs'
+import Mock from 'mockjs'
 
 // M-27 修复：Mock 地址与真实后端端点对齐——
 // 商家退款列表/审核：MerchantRefundController = GET/PUT /api/merchant/refunds[/{id}/audit]
@@ -34,12 +34,12 @@ export default [
     }),
   },
   {
-    url: '/api/merchant/refunds/\\d+/audit',
+    url: '/api/merchant/refunds/:id(\\d+)/audit',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/orders/\\d+/refund',
+    url: '/api/orders/:id(\\d+)/refund',
     method: 'post',
     response: () => ({ code: 0, message: 'success', data: null }),
   },

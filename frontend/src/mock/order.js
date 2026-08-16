@@ -1,4 +1,4 @@
-import { Mock } from 'mockjs'
+import Mock from 'mockjs'
 
 export default [
   {
@@ -42,7 +42,7 @@ export default [
     }),
   },
   {
-    url: '/api/orders/\\d+',
+    url: '/api/orders/:id(\\d+)',
     method: 'get',
     response: () => ({
       code: 0,
@@ -69,22 +69,22 @@ export default [
     }),
   },
   {
-    url: '/api/orders/\\d+/cancel',
+    url: '/api/orders/:id(\\d+)/cancel',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/orders/\\d+/confirm',
+    url: '/api/orders/:id(\\d+)/confirm',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
   {
-    url: '/api/orders/\\d+/pay',
+    url: '/api/orders/:id(\\d+)/pay',
     method: 'post',
     response: () => ({ code: 0, message: 'success', data: { paySuccess: true, payNo: 'PAY20260707103000000001' } }),
   },
   {
-    url: '/api/orders/items/\\d+/review',
+    url: '/api/orders/items/:id(\\d+)/review',
     method: 'post',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
@@ -134,7 +134,7 @@ export default [
     response: () => ({ code: 0, message: 'success', data: { id: 1 } }),
   },
   {
-    url: '/api/refunds/\\d+/audit',
+    url: '/api/refunds/:id(\\d+)/audit',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null }),
   },
