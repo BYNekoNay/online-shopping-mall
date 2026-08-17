@@ -11,6 +11,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:api": "vitest run --config vitest.api.config.js",
+    "test:e2e": "playwright test -c e2e/playwright.config.js",
+    "test:e2e:headed": "playwright test -c e2e/playwright.config.js --headed",
+    "test:all": "npm test && npm run test:api && npm run test:e2e",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write src/",
@@ -29,6 +33,7 @@
     "vue-router": "^4.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@vitejs/plugin-vue": "^5.0.4",
     "@vue/test-utils": "^2.4.5",
     "eslint": "^8.57.1",
