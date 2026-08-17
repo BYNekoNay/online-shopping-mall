@@ -67,6 +67,7 @@ frontend/dist_old_ui/
 frontend/.npm-cache-local/
 frontend/npm-cache-local2/
 frontend/vitest.config.js.timestamp-*.mjs
+frontend/vitest.api.config.js.timestamp-*.mjs
 
 # Runtime
 query
