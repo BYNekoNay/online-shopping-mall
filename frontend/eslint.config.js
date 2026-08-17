@@ -7,6 +7,7 @@ export default [
   {
     ignores: [
       'dist/**',
+      'dist_old_ui/**', // 历史构建产物（旧 UI 备份），eslint 此前漏配导致 lint 扫描上万行压缩代码
       'dist-rcheck/**', // 历史检查构建产物（git 已忽略，eslint 漏配）
       '.tmp-build*/**', // 临时构建产物
       '*.timestamp-*.mjs', // vite 配置加载生成的临时模块
@@ -17,7 +18,11 @@ export default [
       '*.config.js',
       'vite.config.js',
       'vitest.config.js',
-      '.npm-cache-local/**'
+      'vitest.api.config.js',
+      'e2e/**', // E2E 测试（Playwright），独立于前端 lint 范围
+      'api-tests/**', // 接口测试（Vitest node 环境），独立于前端 lint 范围
+      '.npm-cache-local/**',
+      'npm-cache-local2/**' // 本地 npm 缓存副本
     ]
   },
   {

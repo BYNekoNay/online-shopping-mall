@@ -39,9 +39,11 @@ public class OrderController {
     @Operation(summary = "订单列表")
     @GetMapping
     public Result<List<OrderVO>> list(@RequestParam(required = false) Integer pageNum,
-                                      @RequestParam(required = false) Integer pageSize) {
+                                      @RequestParam(required = false) Integer pageSize,
+                                      @RequestParam(required = false) Integer status) {
         // O-07 修复：支持分页参数（可选，缺省返回全量兼容既有前端）
-        return Result.success(orderService.listByUser(pageNum, pageSize));
+        // FRONT-02 修复：新增 status 参数按订单状态过滤（前端订单列表 tab 筛选此前恒失效）
+        return Result.success(orderService.listByUser(pageNum, pageSize, status));
     }
 
     @Operation(summary = "订单详情")

@@ -17,6 +17,12 @@ public class RecommendVO {
     private Double score;
     private Integer algorithmType;
 
+    /** FRONT-QA-02 修复：真实商品平均评分（review 表聚合，无评价为 null，前端展示星级用） */
+    private Double rating;
+
+    /** FRONT-QA-02 修复：真实商品销量（product.sales） */
+    private Integer sales;
+
     public static RecommendVO from(Object product, double score, int algorithmType) {
         RecommendVO vo = new RecommendVO();
         if (product instanceof com.pzhu.mall.modules.product.entity.Product p) {
@@ -24,6 +30,7 @@ public class RecommendVO {
             vo.setName(p.getName());
             vo.setMainImage(p.getMainImage());
             vo.setPrice(p.getPrice());
+            vo.setSales(p.getSales());
         }
         vo.setScore(score);
         vo.setAlgorithmType(algorithmType);
@@ -42,4 +49,8 @@ public class RecommendVO {
     public void setScore(Double score) { this.score = score; }
     public Integer getAlgorithmType() { return algorithmType; }
     public void setAlgorithmType(Integer algorithmType) { this.algorithmType = algorithmType; }
+    public Double getRating() { return rating; }
+    public void setRating(Double rating) { this.rating = rating; }
+    public Integer getSales() { return sales; }
+    public void setSales(Integer sales) { this.sales = sales; }
 }

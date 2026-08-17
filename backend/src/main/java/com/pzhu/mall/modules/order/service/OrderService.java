@@ -345,14 +345,19 @@ public class OrderService {
     /**
      * 获取当前用户的订单列表。
      * <p>O-07 修复：支持分页（pageNum/pageSize 可选，缺省返回全量以兼容既有前端）。</p>
+     * <p>FRONT-02 修复：新增 status 过滤（参照 listByMerchant 的 status 实现），
+     * 前端订单列表 tab 筛选此前因后端忽略 status 参数而恒显示全部订单。</p>
      */
-    public List<OrderVO> listByUser(Integer pageNum, Integer pageSize) {
+    public List<OrderVO> listByUser(Integer pageNum, Integer pageSize, Integer status) {
         Long userId = com.pzhu.mall.security.LoginUserContext.getCurrentUserId();
         var qw = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
                 .eq(Order::getUserId, userId)
                 // B-1 审核修正：过滤已删除订单（deleteOrder 软删后不显示）
-                .eq(Order::getIsDeleted, 0)
-                .orderByDesc(Order::getCreateTime);
+                .eq(Order::getIsDeleted, 0);
+        if (status != null) {
+            qw.eq(Order::getStatus, status);
+        }
+        qw.orderByDesc(Order::getCreateTime);
         List<Order> orders;
         if (pageNum != null && pageSize != null && pageSize > 0) {
             com.baomidou.mybatisplus.extension.plugins.pagination.Page<Order> page =
@@ -365,10 +370,10 @@ public class OrderService {
     }
 
     /**
-     * 兼容旧调用（无分页参数）。
+     * 兼容旧调用（无分页参数、无状态过滤）。
      */
     public List<OrderVO> listByUser() {
-        return listByUser(null, null);
+        return listByUser(null, null, null);
     }
 
     /**

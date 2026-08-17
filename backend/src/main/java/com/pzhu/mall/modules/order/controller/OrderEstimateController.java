@@ -62,6 +62,10 @@ public class OrderEstimateController {
     @Resource
     private com.pzhu.mall.modules.shop.mapper.ShopMapper shopMapper;
 
+    // FRONT-07 修复：估价与下单同口径——通过 UserCoupon 记录校验券归属/状态/适用范围
+    @Resource
+    private com.pzhu.mall.modules.marketing.mapper.UserCouponMapper userCouponMapper;
+
     @Operation(summary = "订单估价（按店铺分组）")
     @PostMapping
     public Result<List<OrderEstimateVO>> estimate(@RequestBody EstimateRequest request) {
@@ -86,14 +90,24 @@ public class OrderEstimateController {
         }
 
         List<OrderEstimateVO> result = new ArrayList<>();
+        // FRONT-07 修复：与 OrderService.createOrder/OrderGroupProcessor 同口径——
+        // 优惠券、积分抵扣为单一资源，跨店铺分组仅应用一次（首个分组），
+        // 避免估价在多个分组重复抵扣导致"确认页显示金额 < 实际下单实付"
+        boolean pointsProcessed = false;
+        boolean couponProcessed = false;
         for (java.util.Map.Entry<Long, List<ProductItemDTO>> entry : byShop.entrySet()) {
             Long shopId = entry.getKey();
             List<ProductItemDTO> groupItems = entry.getValue();
 
             BigDecimal goodsAmount = BigDecimal.ZERO;
             List<OrderEstimateVO.ItemEstimateVO> itemVOs = new ArrayList<>();
+            // FRONT-07 修复：收集分组内商品品类 ID，供品类券适用范围校验（与下单侧一致）
+            java.util.Set<Long> categoryIds = new java.util.LinkedHashSet<>();
             for (ProductItemDTO item : groupItems) {
                 Product product = productMapper.selectById(item.getProductId());
+                if (product != null && product.getCategoryId() != null) {
+                    categoryIds.add(product.getCategoryId());
+                }
                 Sku sku = item.getSkuId() != null ? skuMapper.selectById(item.getSkuId()) : null;
                 // C-1 修复：估价与下单同口径——校验 SKU 与商品的绑定关系，
                 // 防止伪造"商品A+商品B的SKU"组合得到被篡改的估价金额
@@ -123,15 +137,29 @@ public class OrderEstimateController {
             BigDecimal freightAmount = freightService.calculate(shopId, province, goodsAmount);
             BigDecimal promotionDiscount = promotionService.calculateDiscount(shopId, goodsAmount);
 
-            // 优惠券抵扣
+            // 优惠券抵扣（FRONT-07 修复：仅首个分组应用一次，并通过 UserCoupon 记录校验
+            // 归属/状态/有效期/店铺券/品类券适用范围，与下单侧 OrderGroupProcessor 完全同口径）
             BigDecimal couponDiscount = BigDecimal.ZERO;
-            if (request.getCouponId() != null) {
-                couponDiscount = couponService.calculateDiscount(request.getCouponId(), goodsAmount);
+            if (request.getCouponId() != null && !couponProcessed) {
+                couponProcessed = true;
+                com.pzhu.mall.modules.marketing.entity.UserCoupon userCoupon =
+                        userCouponMapper.selectOne(
+                                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.pzhu.mall.modules.marketing.entity.UserCoupon>()
+                                        .eq(com.pzhu.mall.modules.marketing.entity.UserCoupon::getUserId, userId)
+                                        .eq(com.pzhu.mall.modules.marketing.entity.UserCoupon::getCouponId, request.getCouponId())
+                                        .eq(com.pzhu.mall.modules.marketing.entity.UserCoupon::getStatus, 0)
+                                        .last("LIMIT 1")
+                        );
+                if (userCoupon != null) {
+                    couponDiscount = couponService.calculateDiscountByUserCoupon(
+                            userCoupon.getId(), goodsAmount, userId, shopId, new ArrayList<>(categoryIds));
+                }
             }
 
-            // 积分抵扣
+            // 积分抵扣（FRONT-07 修复：仅首个分组应用一次，与下单侧 H-5 语义对齐）
             BigDecimal pointsDeduct = BigDecimal.ZERO;
-            if (Boolean.TRUE.equals(request.getUsePoints())) {
+            if (Boolean.TRUE.equals(request.getUsePoints()) && !pointsProcessed) {
+                pointsProcessed = true;
                 java.math.BigDecimal[] deductResult = pointsService.calculateDeduct(userId, goodsAmount);
                 pointsDeduct = deductResult[0];
             }

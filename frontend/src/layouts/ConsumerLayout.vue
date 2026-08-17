@@ -16,8 +16,8 @@
             <router-link to="/register" class="action-link action-register">注册</router-link>
           </template>
           <template v-else>
-            <router-link to="/cart" class="action-link">
-              <el-badge :value="0" :hidden="true">
+            <router-link to="/cart" class="action-link cart-link">
+              <el-badge :value="cartCount" :max="99" :hidden="cartCount === 0">
                 <el-icon :size="20"><ShoppingCart /></el-icon>
               </el-badge>
             </router-link>
@@ -67,16 +67,26 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { useCartStore } from '@/store/cart'
 import { ArrowDown, ShoppingCart } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const cartStore = useCartStore()
 const token = computed(() => userStore.token)
 const role = computed(() => userStore.role)
 const nickname = computed(() => userStore.nickname)
+// 已登录时展示购物车角标数量
+const cartCount = computed(() => cartStore.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0))
+
+onMounted(() => {
+  if (userStore.token) {
+    cartStore.fetchList()
+  }
+})
 
 function handleLogout() {
   userStore.logout()
@@ -160,6 +170,15 @@ function handleLogout() {
 }
 .action-link:hover {
   color: #4f46e5;
+}
+.cart-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px;
+}
+.cart-link :deep(.el-badge__content) {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  border: none;
 }
 .action-register {
   padding: 6px 18px;

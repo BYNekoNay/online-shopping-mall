@@ -19,16 +19,19 @@
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    background: #f5f7fa;
+                    background: linear-gradient(180deg, #f8fafc, #eef2f7);
                     border-radius: 8px;
                     overflow: hidden;
                   "
                 >
                   <img
                     v-if="g.image"
-                    :src="g.image"
+                    :src="resolvedGoodsImage(g)"
+                    :data-seed="g.id"
                     alt="商品图"
+                    loading="lazy"
                     style="max-width: 100%; max-height: 100%; object-fit: cover"
+                    @error="handleImgError"
                   />
                   <span v-else style="color: #999">无图片</span>
                 </div>
@@ -67,13 +70,29 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPointsGoods, exchangeGoods, getExchangeLogs } from '@/api/points'
+// FRONT-09 修复：积分余额接口在 api/coupon.js 导出（getPoints），不在 api/points.js
+import { getPoints } from '@/api/coupon'
 import { useUserStore } from '@/store/user'
+import { resolveImg, buildFallbackUrl } from '@/utils/image'
 
 const userStore = useUserStore()
 const activeTab = ref('goods')
 const goodsList = ref([])
 const logs = ref([])
 const myPoints = ref(0)
+
+/** 积分商品图兜底。 */
+function resolvedGoodsImage(g) {
+  return resolveImg(g.image || '', g.id ?? g.name ?? 'default', 240, 240)
+}
+
+function handleImgError(event) {
+  const img = event && event.target
+  if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return
+  const fallback = buildFallbackUrl(img.getAttribute('data-seed') || 'default', 240, 240)
+  if (img.getAttribute('src') === fallback) return
+  img.setAttribute('src', fallback)
+}
 
 async function loadGoods() {
   try {
@@ -89,6 +108,16 @@ async function loadLogs() {
     logs.value = await getExchangeLogs(20)
   } catch {
     logs.value = []
+  }
+}
+
+// FRONT-09 修复：加载当前用户积分余额（此前 myPoints 从未赋值，恒显示 0）
+async function loadMyPoints() {
+  try {
+    const data = await getPoints()
+    myPoints.value = (data && data.points) || 0
+  } catch {
+    myPoints.value = 0
   }
 }
 
@@ -109,5 +138,7 @@ async function exchange(goods) {
 onMounted(() => {
   loadGoods()
   loadLogs()
+  // FRONT-09 修复：加载积分余额（此前恒显示 0）
+  loadMyPoints()
 })
 </script>

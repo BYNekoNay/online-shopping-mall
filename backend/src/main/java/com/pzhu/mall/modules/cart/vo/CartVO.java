@@ -19,6 +19,11 @@ public class CartVO {
     private Integer stock;
     private Boolean stockEnough;
 
+    // FRONT-06 修复：补充店铺信息，供确认下单页跨店拆单展示（此前购物车项无 shopId/shopName，
+    // 前端 Confirm.vue 全部商品合并到 undefined 组"店铺"，跨店拆单显示错误）
+    private Long shopId;
+    private String shopName;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getProductId() { return productId; }
@@ -41,4 +46,8 @@ public class CartVO {
     public void setStock(Integer stock) { this.stock = stock; }
     public Boolean getStockEnough() { return stockEnough; }
     public void setStockEnough(Boolean stockEnough) { this.stockEnough = stockEnough; }
+    public Long getShopId() { return shopId; }
+    public void setShopId(Long shopId) { this.shopId = shopId; }
+    public String getShopName() { return shopName; }
+    public void setShopName(String shopName) { this.shopName = shopName; }
 }

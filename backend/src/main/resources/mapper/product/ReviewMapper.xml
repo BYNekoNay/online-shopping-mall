@@ -18,4 +18,15 @@
         WHERE product_id = #{productId}
     </select>
 
+    <!-- FRONT-QA-02 修复：批量查询多商品平均评分（列表页/推荐页填充真实评分，避免 N+1） -->
+    <select id="selectAvgRatingByProductIds" resultType="java.util.Map">
+        SELECT product_id AS productId, AVG(rating) AS avgRating
+        FROM review
+        WHERE product_id IN
+        <foreach collection="productIds" item="pid" open="(" separator="," close=")">
+            #{pid}
+        </foreach>
+        GROUP BY product_id
+    </select>
+
 </mapper>

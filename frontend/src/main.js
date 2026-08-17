@@ -14,10 +14,13 @@ import App from './App.vue'
 import router from './router'
 import request from './utils/request'
 import pageViewPlugin from './plugins/page-view'
+// 消费者端图片懒加载 + 兜底指令（全局注册，v-lazy-img）
+import lazyImg from './directives/lazyImg'
 
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
+app.directive('lazy-img', lazyImg)
 
 // 激活页面访问埋点
 pageViewPlugin(router, (data) => request.post('/behavior/page-view', data))

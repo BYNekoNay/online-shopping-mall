@@ -11,6 +11,9 @@ import com.pzhu.mall.modules.order.mapper.OrderItemMapper;
 import com.pzhu.mall.modules.order.mapper.OrderMapper;
 import com.pzhu.mall.modules.product.entity.Review;
 import com.pzhu.mall.modules.product.mapper.ReviewMapper;
+import com.pzhu.mall.modules.product.vo.ReviewVO;
+import com.pzhu.mall.modules.user.entity.User;
+import com.pzhu.mall.modules.user.mapper.UserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -22,6 +25,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 商品评价服务。
@@ -34,6 +41,9 @@ public class ReviewService {
 
     @Resource
     private ReviewMapper reviewMapper;
+
+    @Resource
+    private UserMapper userMapper;
 
     @Resource
     private OrderItemMapper orderItemMapper;
@@ -95,15 +105,53 @@ public class ReviewService {
     /**
      * 查询商品评价列表（分页）。
      * <p>H-22 修复：原实现 selectList 全量返回，热门商品评价量大时响应膨胀；改为分页查询。</p>
+     * <p>FRONT-04 修复：返回 ReviewVO（含 userNickname），批量联表 user 表填充评价人昵称，
+     * 此前前端 review.userNickname 恒为 undefined，评价人全部显示"匿名用户"。</p>
      */
-    public PageResult<Review> listByProduct(Long productId, long pageNum, long pageSize) {
+    public PageResult<ReviewVO> listByProduct(Long productId, long pageNum, long pageSize) {
         Page<Review> page = new Page<>(pageNum, pageSize);
         Page<Review> result = reviewMapper.selectPage(page,
                 new LambdaQueryWrapper<Review>()
                         .eq(Review::getProductId, productId)
                         .orderByDesc(Review::getCreateTime)
         );
-        return new PageResult<>(result.getTotal(), pageNum, pageSize, result.getPages(), result.getRecords());
+        List<ReviewVO> vos = toVOList(result.getRecords());
+        return new PageResult<>(result.getTotal(), pageNum, pageSize, result.getPages(), vos);
+    }
+
+    /**
+     * FRONT-04 修复：Review 实体批量转 ReviewVO，并一次性查出评价人昵称（消除 N+1）。
+     */
+    private List<ReviewVO> toVOList(List<Review> reviews) {
+        if (reviews == null || reviews.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        Set<Long> userIds = reviews.stream()
+                .map(Review::getUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> nicknameMap = new java.util.HashMap<>();
+        if (!userIds.isEmpty()) {
+            List<User> users = userMapper.selectBatchIds(userIds);
+            if (users != null) {
+                for (User u : users) {
+                    nicknameMap.put(u.getId(), u.getNickname());
+                }
+            }
+        }
+        return reviews.stream().map(r -> {
+            ReviewVO vo = new ReviewVO();
+            vo.setId(r.getId());
+            vo.setOrderItemId(r.getOrderItemId());
+            vo.setUserId(r.getUserId());
+            vo.setProductId(r.getProductId());
+            vo.setRating(r.getRating());
+            vo.setContent(r.getContent());
+            vo.setImages(r.getImages());
+            vo.setCreateTime(r.getCreateTime());
+            vo.setUserNickname(nicknameMap.get(r.getUserId()));
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**

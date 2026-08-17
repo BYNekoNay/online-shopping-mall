@@ -4,34 +4,46 @@
       <el-empty description="加载中..." />
     </div>
     <template v-else>
-      <el-card style="margin-bottom: 15px">
+      <el-card class="detail-card" shadow="never" style="margin-bottom: 15px">
         <div class="section-header">
-          <span>订单号：{{ order.orderNo }}</span>
-          <el-tag :type="statusType(order.status)">{{ statusText(order.status) }}</el-tag>
+          <span class="order-no">订单号：{{ order.orderNo }}</span>
+          <el-tag :type="statusType(order.status)" effect="light" round>{{ statusText(order.status) }}</el-tag>
         </div>
-        <div class="info-row">
-          <span>下单时间：{{ formatTime(order.createTime) }}</span>
-        </div>
-        <div v-if="order.payTime" class="info-row">
-          <span>支付时间：{{ formatTime(order.payTime) }}</span>
-        </div>
-        <div class="info-row">
-          <span>收货地址：{{ parseAddress(order.addressSnapshot) }}</span>
-        </div>
-        <div v-if="order.remark" class="info-row">
-          <span>备注：{{ order.remark }}</span>
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">下单时间</span>
+            <span>{{ formatTime(order.createTime) }}</span>
+          </div>
+          <div v-if="order.payTime" class="info-row">
+            <span class="info-label">支付时间</span>
+            <span>{{ formatTime(order.payTime) }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">收货地址</span>
+            <span>{{ parseAddress(order.addressSnapshot) }}</span>
+          </div>
+          <div v-if="order.remark" class="info-row">
+            <span class="info-label">备注</span>
+            <span>{{ order.remark }}</span>
+          </div>
         </div>
       </el-card>
 
-      <el-card style="margin-bottom: 15px">
-        <h4>商品清单</h4>
+      <el-card class="detail-card" shadow="never" style="margin-bottom: 15px">
+        <h4 class="card-title">商品清单</h4>
         <el-table :data="order.items || []" style="width: 100%">
           <el-table-column label="商品" min-width="300">
             <template #default="{ row }">
               <div class="item-cell">
-                <img :src="row.productImage" />
+                <img
+                  :src="resolvedItemImage(row)"
+                  :data-seed="row.productId"
+                  :alt="row.productName"
+                  loading="lazy"
+                  @error="handleImgError"
+                />
                 <div>
-                  <div>{{ row.productName }}</div>
+                  <div class="cell-name">{{ row.productName }}</div>
                   <el-tag v-if="row.isGift" type="warning" size="small">赠品</el-tag>
                 </div>
               </div>
@@ -47,22 +59,22 @@
         </el-table>
       </el-card>
 
-      <el-card>
+      <el-card class="detail-card" shadow="never">
         <div class="amounts">
-          <div>
-            商品金额：<span>¥{{ order.totalAmount }}</span>
+          <div class="amount-row">
+            <span>商品金额</span><span>¥{{ order.totalAmount }}</span>
           </div>
-          <div>
-            运费：<span>¥{{ order.freightAmount }}</span>
+          <div class="amount-row">
+            <span>运费</span><span>¥{{ order.freightAmount }}</span>
           </div>
-          <div>
-            优惠：<span>-¥{{ order.discountAmount }}</span>
+          <div class="amount-row" v-if="order.discountAmount">
+            <span>优惠</span><span class="discount">-¥{{ order.discountAmount }}</span>
           </div>
-          <div class="pay-amount">
-            实付金额：<strong>¥{{ order.payAmount }}</strong>
+          <div class="amount-row pay-amount">
+            <span>实付金额</span><strong>¥{{ order.payAmount }}</strong>
           </div>
         </div>
-        <div style="margin-top: 20px">
+        <div class="action-bar">
           <el-button v-if="order.status === 0" type="primary" @click="goPay">去支付</el-button>
           <el-button v-if="order.status === 0" @click="cancelOrder">取消订单</el-button>
           <el-button v-if="order.status === 2" type="success" @click="confirmOrder">确认收货</el-button>
@@ -141,6 +153,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/order'
 import { queryLogistics } from '@/api/logistics'
+import { resolveImg, buildFallbackUrl } from '@/utils/image'
 
 const route = useRoute()
 const router = useRouter()
@@ -155,6 +168,19 @@ const statusMap = {
   5: '已取消',
   6: '退款中',
   7: '已退款'
+}
+
+/** 订单商品图兜底。 */
+function resolvedItemImage(item) {
+  return resolveImg(item.productImage || '', item.productId ?? item.productName ?? 'default', 100, 100)
+}
+
+function handleImgError(event) {
+  const img = event && event.target
+  if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return
+  const fallback = buildFallbackUrl(img.getAttribute('data-seed') || 'default', 100, 100)
+  if (img.getAttribute('src') === fallback) return
+  img.setAttribute('src', fallback)
 }
 
 async function loadOrder() {
@@ -313,32 +339,96 @@ async function showLogistics() {
 </script>
 
 <style scoped>
+.order-detail {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 0 24px;
+}
+.loading {
+  padding: 80px 0;
+}
+.detail-card {
+  border: 1px solid #eef0f4;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+}
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+.order-no {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px 24px;
+  margin-top: 14px;
+}
 .info-row {
-  margin-top: 8px;
-  color: #666;
+  color: #334155;
+  font-size: 14px;
+}
+.info-label {
+  color: #94a3b8;
+  margin-right: 8px;
+}
+.card-title {
+  font-size: 16px;
+  color: #0f172a;
+  margin-bottom: 12px;
 }
 .item-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .item-cell img {
-  width: 50px;
-  height: 50px;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 10px;
+  border: 1px solid #eef0f4;
+  background: #f8fafc;
+  flex-shrink: 0;
 }
-.amounts div {
+.cell-name {
+  font-size: 14px;
+  color: #0f172a;
+}
+.amounts {
+  max-width: 360px;
+  margin-left: auto;
+}
+.amount-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  color: #64748b;
+  font-size: 14px;
+}
+.amount-row .discount {
+  color: #ef4444;
+}
+.amount-row.pay-amount {
+  border-top: 1px solid #f1f5f9;
   margin-top: 6px;
+  padding-top: 14px;
+  font-size: 15px;
+  color: #0f172a;
+  font-weight: 600;
 }
-.pay-amount {
-  margin-top: 10px;
-  font-size: 16px;
-  color: #f56c6c;
+.amount-row.pay-amount strong {
+  font-size: 22px;
+  color: #ef4444;
+}
+.action-bar {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 </style>

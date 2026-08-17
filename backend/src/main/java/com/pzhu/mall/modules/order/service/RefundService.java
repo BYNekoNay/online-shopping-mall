@@ -120,6 +120,14 @@ public class RefundService {
             if (item.getIsGift() != null && item.getIsGift() == 1) {
                 throw new BusinessException(ErrorCode.PARAM_ERROR, "赠品不允许单独退款");
             }
+            // FRONT-11 修复：行级校验——退款金额不得超过所选订单项的行实付金额（price × quantity），
+            // 防止用户对多商品订单中单个行申请超过该行金额的退款（此前仅校验 ≤ 订单总实付）
+            if (item.getPrice() != null && item.getQuantity() != null) {
+                BigDecimal lineAmount = item.getPrice().multiply(new BigDecimal(item.getQuantity()));
+                if (dto.getAmount().compareTo(lineAmount) > 0) {
+                    throw new BusinessException(ErrorCode.PARAM_ERROR, "退款金额不能超过该商品金额");
+                }
+            }
         }
 
         // O-02 修复：幂等键移至全部校验通过后写入。

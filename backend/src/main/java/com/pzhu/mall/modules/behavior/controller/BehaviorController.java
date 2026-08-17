@@ -56,19 +56,35 @@ public class BehaviorController {
     }
 
     @Operation(summary = "推荐位曝光埋点")
-    @RequireRole(1)
     @PostMapping("/recommend-exposure")
-    public Result<Void> recommendExposure(@Valid @RequestBody RecommendExposureDTO dto) {
+    public Result<Void> recommendExposure(@RequestBody RecommendExposureDTO dto) {
+        // FRONT-01 修复：推荐位埋点匿名放行——未登录时不落库、静默返回成功（参考 /behavior/record 模式），
+        // 避免匿名用户访问首页时因 10002 被前端拦截器强制跳转登录页
+        Long userId = LoginUserContext.getCurrentUserId();
+        if (userId == null) {
+            return Result.success();
+        }
+        // 埋点为 best-effort：source/productIds 缺失时静默忽略，不阻塞页面
+        if (dto == null || dto.getSource() == null || dto.getProductIds() == null || dto.getProductIds().isEmpty()) {
+            return Result.success();
+        }
         behaviorService.recordRecommendExposure(dto);
         return Result.success();
     }
 
     @Operation(summary = "推荐位点击埋点（记为浏览行为 type=1）")
-    @RequireRole(1)
     @PostMapping("/recommend-click")
-    public Result<Void> recommendClick(@Valid @RequestBody RecommendClickDTO dto) {
+    public Result<Void> recommendClick(@RequestBody RecommendClickDTO dto) {
+        // FRONT-01 修复：匿名放行——未登录不记录点击，静默返回成功，避免匿名用户被强制跳转登录
+        Long userId = LoginUserContext.getCurrentUserId();
+        if (userId == null) {
+            return Result.success();
+        }
         // M-11 修复：userId 强制取登录态，不信任 DTO 传入值，防止已登录用户伪造他人点击污染推荐输入
-        dto.setUserId(LoginUserContext.getCurrentUserId());
+        if (dto == null || dto.getProductId() == null) {
+            return Result.success();
+        }
+        dto.setUserId(userId);
         behaviorService.recordRecommendClick(dto);
         return Result.success();
     }

@@ -87,9 +87,9 @@ public class ProductController {
 
     @Operation(summary = "商品评价列表（分页）")
     @GetMapping("/{id}/reviews")
-    public Result<PageResult<Review>> reviews(@PathVariable Long id,
-                                              @RequestParam(defaultValue = "1") long pageNum,
-                                              @RequestParam(defaultValue = "20") long pageSize) {
+    public Result<PageResult<com.pzhu.mall.modules.product.vo.ReviewVO>> reviews(@PathVariable Long id,
+                                                                                 @RequestParam(defaultValue = "1") long pageNum,
+                                                                                 @RequestParam(defaultValue = "20") long pageSize) {
         // H-22 修复：分页返回，pageSize 上限 100，防止热门商品评价全量加载
         if (pageSize > 100) {
             pageSize = 100;
@@ -97,6 +97,7 @@ public class ProductController {
         if (pageNum < 1) {
             pageNum = 1;
         }
+        // FRONT-04 修复：返回 ReviewVO（含 userNickname），评价人昵称真实展示
         return Result.success(reviewService.listByProduct(id, pageNum, pageSize));
     }
 

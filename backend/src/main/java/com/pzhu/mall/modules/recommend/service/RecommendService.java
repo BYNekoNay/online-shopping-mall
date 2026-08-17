@@ -55,6 +55,10 @@ public class RecommendService {
     @Resource
     private UserBehaviorMapper userBehaviorMapper;
 
+    // FRONT-QA-02 修复：填充推荐商品真实评分（review 表聚合）
+    @Resource
+    private com.pzhu.mall.modules.product.mapper.ReviewMapper reviewMapper;
+
     /**
      * 猜你喜欢（优先 Redis → 数据库 → 热门兜底）。
      */
@@ -66,7 +70,7 @@ public class RecommendService {
             List<RecommendVO> redisResults = readFromRedis(userId, limit);
             if (!redisResults.isEmpty()) {
                 log.info("[推荐-猜你喜欢] 用户={} 命中Redis缓存，返回{}条", userId, redisResults.size());
-                return redisResults;
+                return fillRating(redisResults);
             }
         }
 
@@ -100,7 +104,7 @@ public class RecommendService {
                 writeToRedis(userId, dbResults, limit);
             }
             log.info("[推荐-猜你喜欢] 用户={} 命中数据库，返回{}条", userId, vos.size());
-            return vos;
+            return fillRating(vos);
         }
 
         // 3. 数据库无结果：返回热门商品兜底
@@ -111,9 +115,10 @@ public class RecommendService {
                         .eq(Product::getStatus, 1)
                         .orderByDesc(Product::getSales)
         );
-        return hotPage.getRecords().stream()
+        List<RecommendVO> hotVos = hotPage.getRecords().stream()
                 .map(p -> RecommendVO.from(p, 0.0, 4))
                 .collect(Collectors.toList());
+        return fillRating(hotVos);
     }
 
     /**
@@ -129,7 +134,7 @@ public class RecommendService {
         List<RecommendVO> cached = readSimilarFromRedis(productId, limit);
         if (!cached.isEmpty()) {
             log.info("[推荐-相似商品] 商品={} 命中Redis缓存，返回{}条", productId, cached.size());
-            return cached;
+            return fillRating(cached);
         }
 
         // 2. ItemCF 实时计算相似商品
@@ -151,7 +156,7 @@ public class RecommendService {
             if (!vos.isEmpty()) {
                 writeSimilarToRedis(productId, similarScores);
                 log.info("[推荐-相似商品] 商品={} ItemCF计算返回{}条", productId, vos.size());
-                return vos;
+                return fillRating(vos);
             }
         }
 
@@ -167,9 +172,10 @@ public class RecommendService {
                             .eq(Product::getStatus, 1)
                             .orderByDesc(Product::getSales)
             );
-            return similarHotPage.getRecords().stream()
+            List<RecommendVO> similarHotVos = similarHotPage.getRecords().stream()
                     .map(p -> RecommendVO.from(p, 0.0, 4))
                     .collect(Collectors.toList());
+            return fillRating(similarHotVos);
         }
         log.info("[推荐-相似商品] 商品={} 不存在，返回空列表", productId);
         return List.of();
@@ -259,7 +265,7 @@ public class RecommendService {
             }
         }
         log.info("[推荐-{}] 用户={} 种子商品={} 返回{}条", tag, userId, viewedIds.size(), vos.size());
-        return vos;
+        return fillRating(vos);
     }
 
     // ==================== Redis 读写 ====================
@@ -410,5 +416,43 @@ public class RecommendService {
                     return RecommendVO.from(p, score, algoType);
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * FRONT-QA-02 修复：批量填充推荐商品真实评分（review 表按商品聚合，无评价置 null）。
+     * 返回同一 List 便于链式 return；score 仍为推荐算法分数，两者语义分离。
+     */
+    private List<RecommendVO> fillRating(List<RecommendVO> vos) {
+        if (vos == null || vos.isEmpty()) {
+            return vos;
+        }
+        List<Long> productIds = vos.stream()
+                .map(RecommendVO::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (productIds.isEmpty()) {
+            return vos;
+        }
+        List<java.util.Map<String, Object>> rows = reviewMapper.selectAvgRatingByProductIds(productIds);
+        if (rows == null || rows.isEmpty()) {
+            return vos;
+        }
+        Map<Long, Double> ratingMap = new HashMap<>();
+        for (java.util.Map<String, Object> row : rows) {
+            Object pid = row.get("productId");
+            Object avg = row.get("avgRating");
+            if (pid instanceof Number && avg instanceof Number) {
+                ratingMap.put(((Number) pid).longValue(), ((Number) avg).doubleValue());
+            }
+        }
+        for (RecommendVO vo : vos) {
+            if (vo.getProductId() != null) {
+                Double avg = ratingMap.get(vo.getProductId());
+                if (avg != null) {
+                    vo.setRating(java.math.BigDecimal.valueOf(avg).setScale(1, java.math.RoundingMode.HALF_UP).doubleValue());
+                }
+            }
+        }
+        return vos;
     }
 }

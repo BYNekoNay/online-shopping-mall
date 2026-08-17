@@ -66,6 +66,19 @@ describe('RecommendList 埋点（F-T11~12）', () => {
     pushMock.mockReset()
     recommendExposureMock.mockResolvedValue({})
     recommendClickMock.mockResolvedValue({})
+    // FRONT-01 修复：埋点仅登录用户上报，测试需模拟登录态（token）才能触发曝光/点击埋点
+    localStorage.setItem('token', 'test-token')
+    localStorage.setItem('user', JSON.stringify({ token: 'test-token', userId: 1, role: 1 }))
+  })
+
+  it('FRONT-01 未登录（无 token）时不上报曝光埋点', async () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    getRecommendationsMock.mockResolvedValue([{ productId: 10, name: '商品A', price: 99, mainImage: '/a.jpg' }])
+    const wrapper = mountList()
+    await flushPromises()
+    expect(recommendExposureMock).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('F-T11 guess 模式加载后上报曝光：source=home-guess、productIds 全量、仅一次', async () => {

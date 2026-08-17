@@ -1,32 +1,39 @@
 <template>
   <div class="order-batch-pay">
-    <h2>订单支付</h2>
-    <el-card style="margin-bottom: 15px">
-      <div class="batch-tip">
-        <el-alert title="多店铺订单提示" type="info" :closable="false">
-          <template #default>
-            本次共创建 {{ orders.length }} 个子订单，请依次完成支付。您也可以稍后在"我的订单"中分别支付。
-          </template>
-        </el-alert>
-      </div>
-    </el-card>
+    <div class="page-header">
+      <h2>订单支付</h2>
+      <span class="page-sub">多店铺订单，请依次完成支付</span>
+    </div>
+    <div class="batch-tip">
+      <el-alert title="多店铺订单提示" type="info" :closable="false">
+        <template #default>
+          本次共创建 {{ orders.length }} 个子订单，请依次完成支付。您也可以稍后在"我的订单"中分别支付。
+        </template>
+      </el-alert>
+    </div>
     <div v-for="order in orders" :key="order.orderId" class="order-card">
       <div class="order-header">
-        <span>订单号：{{ order.orderNo }}</span>
+        <span class="order-no">订单号：{{ order.orderNo }}</span>
         <span class="order-amount">¥{{ order.payAmount }}</span>
       </div>
       <div class="order-items">
         <div v-for="item in order.items" :key="item.id" class="order-item">
-          <img :src="item.productImage" />
+          <img
+            :src="resolvedItemImage(item)"
+            :data-seed="item.productId"
+            :alt="item.productName"
+            loading="lazy"
+            @error="handleImgError"
+          />
           <div class="item-info">
-            <div>{{ item.productName }}</div>
+            <div class="item-name">{{ item.productName }}</div>
             <div v-if="item.isGift" class="gift-tag">赠品</div>
           </div>
           <div class="item-price">¥{{ item.price }} x {{ item.quantity }}</div>
         </div>
       </div>
       <div class="order-footer">
-        <span
+        <span class="pay-amount"
           >实付：<strong>¥{{ order.payAmount }}</strong></span
         >
         <el-button type="primary" :loading="payingId === order.orderId" @click="handlePay(order)"> 去支付 </el-button>
@@ -40,10 +47,24 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/order'
+import { resolveImg, buildFallbackUrl } from '@/utils/image'
 
 const router = useRouter()
 const orders = ref([])
 const payingId = ref(null)
+
+/** 商品图兜底。 */
+function resolvedItemImage(item) {
+  return resolveImg(item.productImage || '', item.productId ?? item.productName ?? 'default', 120, 120)
+}
+
+function handleImgError(event) {
+  const img = event && event.target
+  if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return
+  const fallback = buildFallbackUrl(img.getAttribute('data-seed') || 'default', 120, 120)
+  if (img.getAttribute('src') === fallback) return
+  img.setAttribute('src', fallback)
+}
 
 onMounted(() => {
   // 从路由 state 或 sessionStorage 恢复订单列表
@@ -82,46 +103,87 @@ async function handlePay(order) {
 
 <style scoped>
 .order-batch-pay {
-  max-width: 800px;
-  margin: 20px auto;
+  max-width: 860px;
+  margin: 24px auto;
+  padding: 0 24px;
+}
+.page-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.page-header h2 {
+  font-size: 22px;
+  color: #0f172a;
+}
+.page-sub {
+  font-size: 13px;
+  color: #94a3b8;
 }
 .batch-tip {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 .order-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 15px;
+  border: 1px solid #eef0f4;
+  border-radius: 16px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.order-card:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.08);
 }
 .order-header {
   display: flex;
   justify-content: space-between;
   padding-bottom: 10px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #f6f8fb;
+}
+.order-no {
+  font-size: 13px;
+  color: #334155;
 }
 .order-amount {
-  color: #f56c6c;
-  font-weight: bold;
+  color: #ef4444;
+  font-weight: 700;
 }
 .order-item {
   display: flex;
   align-items: center;
   gap: 15px;
   padding: 10px 0;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #f6f8fb;
+}
+.order-item:last-child {
+  border-bottom: none;
 }
 .order-item img {
   width: 60px;
   height: 60px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 10px;
+  border: 1px solid #eef0f4;
+  background: #f8fafc;
+  flex-shrink: 0;
 }
 .item-info {
   flex: 1;
+  min-width: 0;
+}
+.item-name {
+  font-size: 14px;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .item-price {
-  color: #666;
+  color: #64748b;
+  font-size: 13px;
 }
 .gift-tag {
   display: inline-block;
@@ -136,7 +198,15 @@ async function handlePay(order) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 10px;
-  border-top: 1px solid #f5f5f5;
+  padding-top: 12px;
+  border-top: 1px solid #f6f8fb;
+}
+.pay-amount {
+  font-size: 13px;
+  color: #334155;
+}
+.pay-amount strong {
+  font-size: 18px;
+  color: #ef4444;
 }
 </style>

@@ -38,6 +38,10 @@ public class CartService {
     @Resource
     private SkuMapper skuMapper;
 
+    // FRONT-06 修复：填充购物车项店铺信息（shopId/shopName），供确认页跨店拆单
+    @Resource
+    private com.pzhu.mall.modules.shop.mapper.ShopMapper shopMapper;
+
     /** M-02：单条购物车项的最大购买数量上限 */
     private static final int MAX_CART_QUANTITY = 99;
 
@@ -73,6 +77,21 @@ public class CartService {
                         .collect(Collectors.toMap(Sku::getId, s -> s));
             }
 
+            // FRONT-06 修复：批量加载店铺信息（shopName），避免 N+1
+            Set<Long> shopIds = products.stream()
+                    .map(Product::getShopId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Map<Long, String> shopNameMap = new HashMap<>();
+            if (!shopIds.isEmpty()) {
+                List<com.pzhu.mall.modules.shop.entity.Shop> shops = shopMapper.selectBatchIds(shopIds);
+                if (shops != null) {
+                    for (com.pzhu.mall.modules.shop.entity.Shop s : shops) {
+                        shopNameMap.put(s.getId(), s.getName());
+                    }
+                }
+            }
+
         List<CartVO> voList = new ArrayList<>();
         for (Cart item : items) {
             CartVO vo = new CartVO();
@@ -88,6 +107,9 @@ public class CartService {
             vo.setMainImage(product.getMainImage());
             vo.setPrice(product.getPrice());
             vo.setStock(product.getStock());
+            // FRONT-06 修复：填充店铺信息（商品下架时 productMap 缺失会 continue，此处仅当 product 存在时设置）
+            vo.setShopId(product.getShopId());
+            vo.setShopName(shopNameMap.get(product.getShopId()));
 
             if (item.getSkuId() != null) {
                 Sku sku = skuMap.get(item.getSkuId());

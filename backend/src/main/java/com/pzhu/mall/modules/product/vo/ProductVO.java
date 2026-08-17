@@ -28,6 +28,9 @@ public class ProductVO {
     /** 当前商品命中的生效促销（无命中时为 null） */
     private Object activePromotion;
 
+    /** FRONT-QA-02 修复：真实商品平均评分（review 表动态聚合，无评价为 null） */
+    private Double rating;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getShopId() { return shopId; }
@@ -62,4 +65,6 @@ public class ProductVO {
     public void setCreateTime(java.time.LocalDateTime createTime) { this.createTime = createTime; }
     public Object getActivePromotion() { return activePromotion; }
     public void setActivePromotion(Object activePromotion) { this.activePromotion = activePromotion; }
+    public Double getRating() { return rating; }
+    public void setRating(Double rating) { this.rating = rating; }
 }

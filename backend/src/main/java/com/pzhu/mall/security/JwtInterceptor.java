@@ -22,7 +22,11 @@ public class JwtInterceptor implements HandlerInterceptor {
             "/api/recommend/similar/",
             "/api/promotions/active",
             "/api/behavior/page-view",
-            "/api/behavior/page-view/"
+            "/api/behavior/page-view/",
+            // FRONT-01 修复：推荐位曝光/点击埋点加入白名单（匿名放行），与 BehaviorController 匿名处理配套，
+            // 防止匿名用户浏览首页时被 10002 强制跳转登录
+            "/api/behavior/recommend-exposure",
+            "/api/behavior/recommend-click"
     };
 
     public JwtInterceptor(JwtUtil jwtUtil, AccountStatusService accountStatusService) {

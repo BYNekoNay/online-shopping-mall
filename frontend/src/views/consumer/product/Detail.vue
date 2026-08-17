@@ -13,23 +13,43 @@
             <!-- D-1 多图轮播：images 逗号分隔多图 → el-carousel；单图/无多图用主图 -->
             <el-carousel v-if="galleryImages.length > 1" height="400px" indicator-position="outside" arrow="always">
               <el-carousel-item v-for="(img, idx) in galleryImages" :key="idx">
-                <el-image :src="img" fit="contain" style="width: 100%; height: 100%" />
+                <el-image :src="img" fit="contain" style="width: 100%; height: 100%" :preview-src-list="galleryImages" />
               </el-carousel-item>
             </el-carousel>
-            <el-image v-else :src="product.mainImage" fit="contain" style="width: 400px; height: 400px" />
+            <el-image
+              v-else
+              :src="galleryImages[0] || ''"
+              fit="contain"
+              style="width: 400px; height: 400px"
+              :preview-src-list="galleryImages"
+            />
           </div>
           <div class="info-section">
-            <h1>{{ product.name }}</h1>
-            <div class="price-row">
-              <span class="price">¥{{ product.price }}</span>
-              <span class="original-price" v-if="product.originalPrice">¥{{ product.originalPrice }}</span>
+            <div class="title-row">
+              <h1>{{ product.name }}</h1>
+              <span v-if="product.activePromotion" class="detail-promo-ribbon">
+                {{ formatPromotionTag(product.activePromotion) }}
+              </span>
             </div>
-            <div class="stock-info">
-              <span v-if="product.stock > 0">库存：{{ product.stock }} | 销量：{{ product.sales }}</span>
-              <span v-else class="sold-out-text">已售罄</span>
-            </div>
-            <div class="promotion-tag" v-if="product.activePromotion">
-              {{ formatPromotionTag(product.activePromotion) }}
+            <div class="price-panel">
+              <div class="price-row">
+                <span class="price">¥{{ product.price }}</span>
+                <span class="original-price" v-if="product.originalPrice">¥{{ product.originalPrice }}</span>
+                <span class="price-off" v-if="discountRate">约 {{ discountRate }} 折</span>
+              </div>
+              <div class="rating-sales-row">
+                <span class="rating-stars" aria-hidden="true">
+                  <span v-for="idx in 5" :key="idx" class="star" :class="{ filled: idx <= starRating }">★</span>
+                </span>
+                <span v-if="averageRating > 0" class="rating-num">{{ averageRating }} 分</span>
+                <span v-else class="rating-num muted">暂无评分</span>
+                <span class="dot-sep"></span>
+                <span class="sales-num">销量 {{ product.sales || 0 }}</span>
+                <span class="dot-sep"></span>
+                <span class="stock-num" :class="{ 'sold-out-text': product.stock === 0 }">
+                  {{ product.stock > 0 ? `库存 ${product.stock}` : '已售罄' }}
+                </span>
+              </div>
             </div>
             <div class="sku-section" v-if="product.skuList && product.skuList.length > 0">
               <h4>选择规格</h4>
@@ -42,9 +62,18 @@
               </div>
               <div v-if="selectedSku && selectedSku.stock === 0" class="sold-out-tip">该规格已售罄</div>
             </div>
+            <div class="service-row">
+              <span class="service-item">✓ 正品保障</span>
+              <span class="service-item">✓ 七天无理由退换</span>
+              <span class="service-item">✓ 极速发货</span>
+            </div>
             <div class="actions">
               <el-button type="primary" size="large" :disabled="!canAddToCart" @click="addToCart">
                 {{ canAddToCartText }}
+              </el-button>
+              <!-- FRONT-10 修复：收藏/取消收藏入口（此前收藏功能无任何 UI 入口，功能不可达） -->
+              <el-button v-if="isLogin" size="large" :type="isFavorited ? 'warning' : 'default'" plain @click="toggleFavorite">
+                {{ isFavorited ? '已收藏 ♥' : '收藏' }}
               </el-button>
             </div>
           </div>
@@ -63,12 +92,13 @@
 
         <!-- 商品评价 -->
         <div class="reviews-section">
-          <h3>商品评价 ({{ rating?.totalCount || 0 }})</h3>
+          <h3>商品评价 ({{ rating?.reviewCount || 0 }})</h3>
           <!-- 评分概况 -->
           <div v-if="rating" class="rating-summary">
             <div class="average-rating">
-              <span class="rating-score">{{ rating.averageRating }}</span>
-              <el-rate :model-value="Math.round(rating.averageRating)" disabled />
+              <span class="rating-score">{{ rating.avgRating }}</span>
+              <el-rate :model-value="Math.round(Number(rating.avgRating) || 0)" disabled />
+              <span class="rating-total">共 {{ rating.reviewCount || 0 }} 条评价</span>
             </div>
           </div>
           <!-- 评价列表 -->
@@ -93,19 +123,26 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/product'
 import { addToCart as addToCartApi } from '@/api/cart'
+import { getFavorites, favoriteProduct, unfavoriteProduct } from '@/api/user'
 import { useCartStore } from '@/store/cart'
+import { useUserStore } from '@/store/user'
 import RecommendList from '@/components/RecommendList.vue'
 // C-3：富文本详情 XSS 白名单过滤
 import DOMPurify from 'dompurify'
+import { resolveImg } from '@/utils/image'
 
 const route = useRoute()
 const cartStore = useCartStore()
+const userStore = useUserStore()
 const productId = computed(() => Number(route.params.id))
 const loading = ref(false)
 const product = ref({})
 const selectedSkuId = ref(null)
 const reviews = ref([])
 const rating = ref(null)
+// FRONT-10 修复：收藏状态（登录用户进入详情时从收藏列表判断）
+const isLogin = computed(() => !!userStore.token)
+const isFavorited = ref(false)
 
 // C-3：商品详情经 DOMPurify 白名单过滤后再 v-html 渲染（防 XSS）
 const safeDetail = computed(() => {
@@ -138,15 +175,20 @@ const safeDetail = computed(() => {
   })
 })
 
-// D-1 多图轮播：images 逗号分隔 → 数组；空则回退主图
+// D-1 多图轮播：images 逗号分隔 → 数组；空则回退主图；全部经占位图兜底
 const galleryImages = computed(() => {
   const raw = product.value.images
-  if (!raw) return [product.value.mainImage].filter(Boolean)
-  const list = raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  return list.length > 0 ? list : [product.value.mainImage].filter(Boolean)
+  const seed = productId.value || product.value.id || 'default'
+  let list = []
+  if (raw) {
+    list = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  if (list.length === 0 && product.value.mainImage) list = [product.value.mainImage]
+  if (list.length === 0) list = ['']
+  return list.map((src) => resolveImg(src, seed, 600, 600))
 })
 
 const selectedSku = computed(() => {
@@ -172,6 +214,27 @@ const canAddToCartText = computed(() => {
   return '加入购物车'
 })
 
+// 评分星（四舍五入到整星）
+// FRONT-04 修复：后端 ProductRatingVO 字段为 avgRating/reviewCount（此前误用 averageRating/totalCount）
+const starRating = computed(() => {
+  const avg = Number(product.value.rating ?? rating.value?.avgRating ?? 0)
+  if (!Number.isFinite(avg) || avg <= 0) return 0
+  return Math.min(5, Math.round(avg))
+})
+
+const averageRating = computed(() => {
+  const avg = Number(product.value.rating ?? rating.value?.avgRating ?? 0)
+  return Number.isFinite(avg) && avg > 0 ? avg.toFixed(1) : 0
+})
+
+// 折扣率（原价 > 现价时展示）
+const discountRate = computed(() => {
+  const price = Number(product.value.price)
+  const original = Number(product.value.originalPrice)
+  if (!Number.isFinite(price) || !Number.isFinite(original) || original <= 0 || price >= original) return ''
+  return ((price / original) * 10).toFixed(1)
+})
+
 function formatPromotionTag(promotion) {
   const typeMap = { 1: '折扣', 2: '满减', 3: '满赠', 4: '套餐' }
   return `${typeMap[promotion.type] || '促销'}: ${promotion.name}`
@@ -192,6 +255,34 @@ async function addToCart() {
   }
 }
 
+// FRONT-10 修复：加载收藏状态（登录用户从收藏列表判断当前商品是否已收藏）
+async function loadFavoriteState() {
+  if (!isLogin.value || !productId.value) return
+  try {
+    const favorites = (await getFavorites()) || []
+    isFavorited.value = favorites.some((f) => Number(f.productId ?? f.id) === Number(productId.value))
+  } catch {
+    isFavorited.value = false
+  }
+}
+
+// FRONT-10 修复：收藏/取消收藏切换
+async function toggleFavorite() {
+  try {
+    if (isFavorited.value) {
+      await unfavoriteProduct(productId.value)
+      isFavorited.value = false
+      ElMessage.success('已取消收藏')
+    } else {
+      await favoriteProduct(productId.value)
+      isFavorited.value = true
+      ElMessage.success('收藏成功')
+    }
+  } catch {
+    // error handled by interceptor（未登录会跳转登录页）
+  }
+}
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -203,6 +294,8 @@ onMounted(async () => {
     ])
     reviews.value = reviewsRes?.records || []
     rating.value = ratingRes || null
+    // FRONT-10 修复：加载收藏状态（登录用户）
+    loadFavoriteState()
   } catch {
     ElMessage.error('加载商品信息失败')
   } finally {
@@ -214,82 +307,181 @@ onMounted(async () => {
 <style scoped>
 .product-detail {
   max-width: 1200px;
-  margin: 20px auto;
-  background: #fff;
-  padding: 30px;
-  border-radius: 8px;
+  margin: 24px auto;
+  padding: 0 24px;
 }
 .detail-content {
   display: flex;
-  gap: 30px;
+  gap: 40px;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
 }
 .image-section {
   flex-shrink: 0;
+  width: 400px;
+}
+.image-section :deep(.el-carousel__container) {
+  border-radius: 14px;
+  background: #f8fafc;
+}
+.image-section :deep(.el-image) {
+  background: #f8fafc;
+  border-radius: 14px;
 }
 .info-section {
   flex: 1;
+  min-width: 0;
+}
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 .info-section h1 {
   font-size: 22px;
-  margin-bottom: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  flex: 1;
+}
+.detail-promo-ribbon {
+  flex-shrink: 0;
+  margin-top: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+.price-panel {
+  margin: 18px 0;
+  background: linear-gradient(135deg, #fff7f7, #fff);
+  border: 1px solid #fee2e2;
+  border-radius: 14px;
+  padding: 18px 20px;
 }
 .price-row {
-  margin: 20px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 .price {
-  font-size: 28px;
-  color: #f56c6c;
-  font-weight: bold;
+  font-size: 32px;
+  color: #ef4444;
+  font-weight: 800;
+  line-height: 1;
 }
 .original-price {
-  font-size: 16px;
-  color: #999;
+  font-size: 15px;
+  color: #b0b7c3;
   text-decoration: line-through;
-  margin-left: 10px;
 }
-.stock-info {
-  color: #666;
-  margin-bottom: 15px;
+.price-off {
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ef4444;
+  background: #fff1f1;
+  border-radius: 6px;
+}
+.rating-sales-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.rating-stars .star.filled {
+  color: #f59e0b;
+}
+.rating-num {
+  font-size: 13px;
+  color: #f59e0b;
+  font-weight: 600;
+}
+.rating-num.muted {
+  color: #94a3b8;
+  font-weight: 400;
+}
+.dot-sep {
+  width: 1px;
+  height: 14px;
+  background: #e2e8f0;
+}
+.sales-num,
+.stock-num {
+  font-size: 13px;
+  color: #64748b;
 }
 .sold-out-text {
-  color: #f56c6c;
-  font-weight: bold;
-  font-size: 16px;
-}
-.sold-out-tip {
-  color: #f56c6c;
-  font-size: 14px;
-  margin-top: 8px;
-}
-.promotion-tag {
-  display: inline-block;
-  padding: 5px 12px;
-  background: #fdf6ec;
-  color: #e6a23c;
-  border-radius: 4px;
-  margin-bottom: 15px;
+  color: #ef4444;
+  font-weight: 600;
 }
 .sku-section {
   margin: 20px 0;
 }
+.sku-section h4 {
+  font-size: 14px;
+  color: #334155;
+  margin-bottom: 10px;
+}
 .sku-options {
   margin-top: 10px;
 }
+.sold-out-tip {
+  color: #ef4444;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.service-row {
+  display: flex;
+  gap: 20px;
+  padding: 14px 0;
+  border-top: 1px dashed #eef0f4;
+  border-bottom: 1px dashed #eef0f4;
+  flex-wrap: wrap;
+}
+.service-item {
+  font-size: 13px;
+  color: #059669;
+}
 .actions {
-  margin-top: 30px;
+  margin-top: 24px;
+  display: flex;
+  gap: 14px;
+}
+.actions .el-button {
+  min-width: 140px;
 }
 .similar-section {
   margin-top: 40px;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  padding: 24px;
 }
 .similar-section h3 {
-  margin-bottom: 15px;
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #0f172a;
 }
 /* C-3 商品详情展示区 */
 .product-description {
-  margin-top: 30px;
+  margin-top: 24px;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  padding: 24px;
 }
 .product-description h3 {
+  font-size: 18px;
   margin-bottom: 15px;
+  color: #0f172a;
 }
 .description-body {
   line-height: 1.8;
@@ -303,12 +495,14 @@ onMounted(async () => {
 }
 /* 评价区域 */
 .reviews-section {
-  margin-top: 40px;
-  padding-top: 30px;
-  border-top: 1px solid #e4e7ed;
+  margin-top: 24px;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 20px;
+  padding: 24px;
 }
 .reviews-section h3 {
-  font-size: 20px;
+  font-size: 18px;
   margin-bottom: 20px;
   color: #0f172a;
 }
@@ -329,7 +523,11 @@ onMounted(async () => {
 .rating-score {
   font-size: 36px;
   font-weight: 700;
-  color: #f56c6c;
+  color: #f59e0b;
+}
+.rating-total {
+  font-size: 13px;
+  color: #94a3b8;
 }
 .reviews-list {
   display: flex;
@@ -338,12 +536,13 @@ onMounted(async () => {
 }
 .review-item {
   padding: 16px 20px;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
   transition: all 0.2s;
 }
 .review-item:hover {
-  border-color: #409eff;
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.06);
 }
 .review-user {
   font-weight: 600;
@@ -357,6 +556,15 @@ onMounted(async () => {
 }
 .review-time {
   font-size: 12px;
-  color: #999;
+  color: #94a3b8;
+}
+@media (max-width: 900px) {
+  .detail-content {
+    flex-direction: column;
+    padding: 20px;
+  }
+  .image-section {
+    width: 100%;
+  }
 }
 </style>

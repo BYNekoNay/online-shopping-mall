@@ -1,6 +1,7 @@
 <template>
   <div class="category-page">
     <div class="category-sidebar">
+      <div class="sidebar-title">商品分类</div>
       <div
         v-for="cat in categories"
         :key="cat.id"
@@ -8,22 +9,18 @@
         :class="{ active: selectedCategoryId === cat.id }"
         @click="selectCategory(cat.id)"
       >
+        <span class="item-emoji">{{ categoryEmoji(cat.name) }}</span>
         {{ cat.name }}
       </div>
     </div>
     <div class="product-area">
-      <div v-if="selectedCategoryId" class="selected-header">
-        <h3>{{ currentCategoryName }}</h3>
+      <div class="selected-header">
+        <h3>{{ currentCategoryName || '全部商品' }}</h3>
+        <span class="header-count">{{ products.length }} 件商品</span>
       </div>
       <el-row :gutter="20">
         <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in products" :key="item.id" style="margin-bottom: 20px">
-          <el-card class="product-card" @click="$router.push(`/product/${item.id}`)">
-            <div class="product-image"><img :src="item.mainImage" :alt="item.name" /></div>
-            <div class="product-info">
-              <div class="product-name">{{ item.name }}</div>
-              <div class="product-price">¥{{ item.price }}</div>
-            </div>
-          </el-card>
+          <ProductCard :item="item" />
         </el-col>
       </el-row>
       <el-empty v-if="products.length === 0 && selectedCategoryId" description="该分类下暂无商品" />
@@ -32,9 +29,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import request from '@/api/product'
+import ProductCard from '@/components/ProductCard.vue'
+import { categoryEmoji } from '@/utils/category'
 
+const route = useRoute()
 const categories = ref([])
 const products = ref([])
 const selectedCategoryId = ref(null)
@@ -75,77 +76,108 @@ function selectCategory(id) {
   loadProducts(id)
 }
 
-onMounted(() => {
-  loadCategories()
+// FRONT-03 修复：首页分类卡片跳转 /category?id=xx 后，分类页需读取 query.id 并定位到该分类
+function applyQueryCategory() {
+  const id = route.query.id
+  if (id !== undefined && id !== null && id !== '') {
+    const num = Number(id)
+    if (Number.isFinite(num) && num > 0) {
+      selectCategory(num)
+      return
+    }
+  }
+  // 无有效 query 时展示全部商品
+  selectedCategoryId.value = null
   loadProducts()
+}
+
+onMounted(async () => {
+  await loadCategories()
+  applyQueryCategory()
 })
+
+// FRONT-03 修复：分类页内/首页反复跳转不同分类时响应 query.id 变化
+watch(
+  () => route.query.id,
+  () => {
+    applyQueryCategory()
+  }
+)
 </script>
 
 <style scoped>
 .category-page {
   display: flex;
   max-width: 1200px;
-  margin: 20px auto;
+  margin: 0 auto;
+  padding: 24px;
   gap: 20px;
+  align-items: flex-start;
 }
 .category-sidebar {
   width: 200px;
   background: #fff;
-  border-radius: 8px;
-  padding: 10px;
+  border: 1px solid #eef0f4;
+  border-radius: 16px;
+  padding: 12px;
   flex-shrink: 0;
+  position: sticky;
+  top: 84px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.sidebar-title {
+  padding: 8px 14px 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 8px;
 }
 .category-item {
-  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 10px;
   font-size: 14px;
+  color: #334155;
   transition: all 0.2s;
 }
 .category-item:hover {
-  background: #ecf5ff;
-  color: #409eff;
+  background: #f5f3ff;
+  color: #4f46e5;
 }
 .category-item.active {
-  background: #409eff;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #fff;
-  font-weight: bold;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.24);
+}
+.item-emoji {
+  font-size: 16px;
+  line-height: 1;
 }
 .product-area {
   flex: 1;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 16px;
+  padding: 20px;
+  min-height: 60vh;
 }
 .selected-header {
-  margin-bottom: 15px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 18px;
 }
 .selected-header h3 {
   font-size: 18px;
-  color: #333;
+  color: #0f172a;
 }
-.product-card {
-  cursor: pointer;
-}
-.product-image {
-  width: 100%;
-  height: 200px;
-  overflow: hidden;
-}
-.product-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.product-info {
-  padding: 10px;
-}
-.product-name {
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.product-price {
-  color: #f56c6c;
-  font-weight: bold;
-  margin-top: 5px;
+.header-count {
+  font-size: 13px;
+  color: #94a3b8;
 }
 </style>

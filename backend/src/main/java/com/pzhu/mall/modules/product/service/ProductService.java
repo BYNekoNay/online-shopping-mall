@@ -11,6 +11,7 @@ import com.pzhu.mall.modules.product.entity.Category;
 import com.pzhu.mall.modules.product.entity.Product;
 import com.pzhu.mall.modules.product.mapper.ProductMapper;
 import com.pzhu.mall.modules.product.mapper.CategoryMapper;
+import com.pzhu.mall.modules.product.mapper.ReviewMapper;
 import com.pzhu.mall.modules.behavior.service.BehaviorService;
 import com.pzhu.mall.modules.product.vo.ProductVO;
 import com.pzhu.mall.modules.product.vo.SkuVO;
@@ -52,6 +53,10 @@ public class ProductService {
 
     @Resource
     private com.pzhu.mall.modules.marketing.service.PromotionService promotionService;
+
+    // FRONT-QA-02 修复：填充商品真实评分（review 表动态聚合）
+    @Resource
+    private ReviewMapper reviewMapper;
 
     public ProductMapper getProductMapper() {
         return productMapper;
@@ -106,14 +111,17 @@ public class ProductService {
         if (query.getMaxPrice() != null) {
             qw.le(Product::getPrice, query.getMaxPrice());
         }
-        qw.orderByDesc(Product::getCreateTime);
-        if ("sales".equals(query.getSort())) {
+        // FRONT-QA-01 修复：排序构造——未传 sort（或传 new）时按创建时间倒序；
+        // 传销量/价格排序时仅按该字段排序（此前 create_time 恒为主排序，销量/价格排序被覆盖而失效）
+        if (query.getSort() == null || query.getSort().isEmpty() || "new".equals(query.getSort())) {
+            qw.orderByDesc(Product::getCreateTime);
+        } else if ("sales".equals(query.getSort())) {
             qw.orderByDesc(Product::getSales);
         } else if ("price_asc".equals(query.getSort())) {
             qw.orderByAsc(Product::getPrice);
         } else if ("price_desc".equals(query.getSort())) {
             qw.orderByDesc(Product::getPrice);
-        } else if ("new".equals(query.getSort())) {
+        } else {
             qw.orderByDesc(Product::getCreateTime);
         }
 
@@ -151,6 +159,9 @@ public class ProductService {
         List<ProductVO> voList = result.getRecords().stream()
                 .map(p -> toVO(p, categoryNameMap.get(p.getCategoryId()), skuMap.get(p.getId())))
                 .collect(Collectors.toList());
+
+        // FRONT-QA-02 修复：批量填充真实商品评分（review 表聚合，避免 N+1）
+        fillRating(voList);
 
         return new PageResult<>(result.getTotal(), query.getPageNum(), query.getPageSize(), result.getPages(), voList);
     }
@@ -198,7 +209,15 @@ public class ProductService {
     }
 
     public ProductVO toVO(Product product) {
-        return toVO(product, null, null);
+        ProductVO vo = toVO(product, null, null);
+        // FRONT-QA-02 修复：单品详情填充真实评分（review 表聚合）
+        if (product != null && product.getId() != null) {
+            Double avg = reviewMapper.avgRatingByProductId(product.getId());
+            if (avg != null) {
+                vo.setRating(java.math.BigDecimal.valueOf(avg).setScale(1, java.math.RoundingMode.HALF_UP).doubleValue());
+            }
+        }
+        return vo;
     }
 
     /**
@@ -232,6 +251,39 @@ public class ProductService {
         return products.stream()
                 .map(p -> toVO(p, categoryNameMap.get(p.getCategoryId()), skuMap.getOrDefault(p.getId(), null)))
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * FRONT-QA-02 修复：批量填充商品真实评分（review 表按商品聚合，无评价置 null）。
+     */
+    private void fillRating(List<ProductVO> voList) {
+        if (voList == null || voList.isEmpty()) {
+            return;
+        }
+        java.util.Set<Long> productIds = voList.stream()
+                .map(ProductVO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (productIds.isEmpty()) {
+            return;
+        }
+        List<java.util.Map<String, Object>> rows = reviewMapper.selectAvgRatingByProductIds(new ArrayList<>(productIds));
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        java.util.Map<Long, Double> ratingMap = new java.util.HashMap<>();
+        for (java.util.Map<String, Object> row : rows) {
+            Object pid = row.get("productId");
+            Object avg = row.get("avgRating");
+            if (pid instanceof Number && avg instanceof Number) {
+                ratingMap.put(((Number) pid).longValue(), ((Number) avg).doubleValue());
+            }
+        }
+        voList.forEach(vo -> {
+            if (vo.getId() != null) {
+                vo.setRating(ratingMap.get(vo.getId()));
+            }
+        });
     }
 
     /**

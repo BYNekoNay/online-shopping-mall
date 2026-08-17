@@ -48,6 +48,14 @@ frontend/src/mock/_*.bundled_*.mjs
 /_*
 _tmp_*
 *.err
+# 前端调试残留（测试任务产生，被占用暂无法物理删除，先忽略不入库）
+frontend/.tmp_*
+
+# E2E / Playwright 产物
+frontend/playwright-report/
+frontend/test-results/
+frontend/e2e/test-results/
+frontend/dist_old_ui/
 
 # IDE state
 .omc/

@@ -24,4 +24,11 @@ public interface ReviewMapper extends BaseMapper<Review> {
      * 统计某商品评价数量。
      */
     Long countByProductId(@Param("productId") Long productId);
+
+    /**
+     * FRONT-QA-02 修复：批量查询多个商品的平均评分（商品列表/推荐列表填充真实评分）。
+     *
+     * @return 每行包含 productId（Long）与 avgRating（Double）键的 Map 列表
+     */
+    List<java.util.Map<String, Object>> selectAvgRatingByProductIds(@Param("productIds") List<Long> productIds);
 }
