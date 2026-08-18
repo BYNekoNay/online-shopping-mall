@@ -34,6 +34,7 @@ dump.rdb
 backend/target/
 backend/target_*/
 backend/.build-bak/
+/.build-bak/
 
 # 前端构建产物（含验证目录）
 frontend/dist/
