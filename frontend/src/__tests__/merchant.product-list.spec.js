@@ -98,4 +98,59 @@ describe('merchant/product/List.vue 商品管理页（F-08）', () => {
     expect(text).not.toContain('批量上架')
     wrapper.unmount()
   })
+
+  // 缺陷 2 修复：API 创建商品 images 可能是 JSON 数组字符串 / 数组 / 缺失，
+  // skus / detail 字段存在也不应导致 ErrorBoundary 渲染崩溃。
+  it('API 创建商品（含 images/detail/skus）正常渲染不崩溃', async () => {
+    getMerchantProductsMock.mockResolvedValue({
+      records: [
+        // 形态 1：images 为 JSON 数组字符串
+        {
+          id: '1234567890123456789',
+          name: 'API商品-字符串图',
+          price: 99,
+          stock: 10,
+          sales: 0,
+          status: 2,
+          images: '["https://a.jpg","https://b.jpg"]',
+          detail: '<p>富文本</p>',
+          skus: [{ specJson: '{"规格":"默认"}', price: 99, stock: 10 }]
+        },
+        // 形态 2：images 为真实数组
+        {
+          id: '1234567890123456790',
+          name: 'API商品-数组图',
+          price: 199,
+          stock: 5,
+          sales: 1,
+          status: 1,
+          images: ['https://c.jpg'],
+          detail: '',
+          skus: []
+        },
+        // 形态 3：images 缺失，回退 mainImage
+        {
+          id: '1234567890123456791',
+          name: 'API商品-无图',
+          price: 9.9,
+          stock: 100,
+          sales: 0,
+          status: 0,
+          mainImage: '',
+          skus: null
+        }
+      ]
+    })
+    const wrapper = mountList()
+    await flushPromises()
+
+    // 三行均渲染，无异常
+    expect(wrapper.findAll('.stub-row')).toHaveLength(3)
+    const text = wrapper.text()
+    expect(text).toContain('API商品-字符串图')
+    expect(text).toContain('API商品-数组图')
+    expect(text).toContain('API商品-无图')
+    expect(text).toContain('商品管理')
+    wrapper.unmount()
+  })
 })

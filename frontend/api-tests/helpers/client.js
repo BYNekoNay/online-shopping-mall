@@ -6,21 +6,18 @@
  *  - 统一携带 Bearer token；
  *  - 提供断言 helper：expectOk（code=0）、expectCode（指定错误码）。
  */
+import { parseApiJsonSafe } from '../../src/utils/safeJson.js'
+
 export const API_BASE = process.env.API_BASE_URL || 'http://8.160.181.12/api'
 
 /**
  * 解析后端 JSON 响应（处理雪花 ID 精度）：
  * 后端雪花 ID（Long，19 位数字）超过 JS 安全整数 2^53，JSON.parse 会丢精度，
- * 导致按 ID 操作的请求 404。此处先在原始文本中把"以 Id/id 结尾的键 + 15 位以上数字"
- * 改写为字符串，再 parse，确保 ID 原值无损。
- * 小 ID（种子商品 100 等）与 total/price/score 等字段不受影响。
+ * 导致按 ID 操作的请求 404。实现委托给 src/utils/safeJson（生产侧同源），确保
+ * 线上 axios 拦截器与接口测试解析口径一致。
  */
 export function parseApiJson(text) {
-  // 1) "xxxId"/"xxxid" 键 + 15 位以上数字 → 引号包裹（如 userId/shopId/orderId）
-  // 2) 顶层/内层 "data": <15 位以上裸数字> → 引号包裹（如 POST /user/addresses 返回 data=地址ID）
-  let safeText = text.replace(/"(\w*[Ii][Dd])":\s*(\d{15,})/g, '"$1":"$2"')
-  safeText = safeText.replace(/"data":\s*(\d{15,})/g, '"data":"$1"')
-  return JSON.parse(safeText)
+  return parseApiJsonSafe(text)
 }
 
 /**

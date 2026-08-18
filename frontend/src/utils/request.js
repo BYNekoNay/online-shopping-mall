@@ -2,10 +2,25 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { useUserStore } from '@/store/user'
+import { parseApiJsonSafe } from '@/utils/safeJson'
 
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 10000
+  timeout: 10000,
+  // 雪花 ID 精度保护：19 位 Long 超 2^53，JSON.parse 丢精度。
+  // 覆盖默认 transformResponse，在原始文本中把 *Id / id / data 键的
+  // 15 位以上数字改写为字符串再 parse，与 utils/safeJson 保持一致。
+  transformResponse: [
+    function transformResponse(data) {
+      if (typeof data !== 'string') return data
+      try {
+        return parseApiJsonSafe(data)
+      } catch {
+        // 非 JSON 响应（如空体、二进制）按原样返回，由上层拦截器按业务错误处理
+        return data
+      }
+    }
+  ]
 })
 
 service.interceptors.request.use((config) => {

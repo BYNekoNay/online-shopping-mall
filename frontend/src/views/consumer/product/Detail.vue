@@ -134,7 +134,9 @@ import { resolveImg } from '@/utils/image'
 const route = useRoute()
 const cartStore = useCartStore()
 const userStore = useUserStore()
-const productId = computed(() => Number(route.params.id))
+// 雪花 ID（19 位 Long）超 JS Number 安全整数，转字符串避免 JSON.parse 后丢精度；
+// 后端 Long 可直接接受字符串参数，路由 params 本身就是字符串。
+const productId = computed(() => String(route.params.id ?? ''))
 const loading = ref(false)
 const product = ref({})
 const selectedSkuId = ref(null)
@@ -260,7 +262,7 @@ async function loadFavoriteState() {
   if (!isLogin.value || !productId.value) return
   try {
     const favorites = (await getFavorites()) || []
-    isFavorited.value = favorites.some((f) => Number(f.productId ?? f.id) === Number(productId.value))
+    isFavorited.value = favorites.some((f) => String(f.productId ?? f.id ?? '') === productId.value)
   } catch {
     isFavorited.value = false
   }

@@ -49,10 +49,9 @@ function reportPageEnter(to, requestFn) {
 
 // 页面离开时回填
 function reportPageLeave(_requestFn) {
-  const idStr = sessionStorage.getItem('current_page_view_id')
-  if (!idStr) return
-
-  const id = Number(idStr)
+  // 雪花 ID 修复：current_page_view_id 为后端返回的 19 位 Long，必须保持字符串
+  // 直接放入 URL；Number() 会丢精度导致 leave 接口 404。
+  const id = sessionStorage.getItem('current_page_view_id')
   if (!id) return
 
   const enterStr = sessionStorage.getItem('current_page_enter_time')

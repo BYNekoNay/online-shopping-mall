@@ -9,6 +9,8 @@ export default [
       'dist/**',
       'dist_old_ui/**', // 历史构建产物（旧 UI 备份），eslint 此前漏配导致 lint 扫描上万行压缩代码
       'dist-rcheck/**', // 历史检查构建产物（git 已忽略，eslint 漏配）
+      'dist-bak-*/**', // 历史构建备份（QA 回归/返工产物），与 dist_old_ui 同类
+      'dist-qa-bak-*/**', // 历史 QA 构建备份
       '.tmp-build*/**', // 临时构建产物
       '*.timestamp-*.mjs', // vite 配置加载生成的临时模块
       'node_modules/**',
