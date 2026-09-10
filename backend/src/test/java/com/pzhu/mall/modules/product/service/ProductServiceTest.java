@@ -41,6 +41,7 @@ class ProductServiceTest {
     private SkuMapper skuMapper;
     private SearchHistoryMapper searchHistoryMapper;
     private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
+    private com.pzhu.mall.modules.product.mapper.ReviewMapper reviewMapper;
     private BehaviorService behaviorService;
     private PromotionService promotionService;
     private ProductService service;
@@ -54,12 +55,16 @@ class ProductServiceTest {
         userBehaviorMapper = mock(com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper.class);
         behaviorService = mock(BehaviorService.class);
         promotionService = mock(PromotionService.class);
+        // 2dff4dd 为 ProductService 新增 ReviewMapper 依赖（详情页评分填充），测试须同步注入；
+        // avgRatingByProductId 返回 null 时服务端已判空跳过，Mockito 默认返回即可。
+        reviewMapper = mock(com.pzhu.mall.modules.product.mapper.ReviewMapper.class);
         service = new ProductService();
         inject(service, "productMapper", productMapper);
         inject(service, "categoryMapper", categoryMapper);
         inject(service, "skuMapper", skuMapper);
         inject(service, "searchHistoryMapper", searchHistoryMapper);
         inject(service, "userBehaviorMapper", userBehaviorMapper);
+        inject(service, "reviewMapper", reviewMapper);
         inject(service, "behaviorService", behaviorService);
         inject(service, "promotionService", promotionService);
         when(promotionService.matchActive(any())).thenReturn(Collections.emptyList());

@@ -37,6 +37,7 @@ class RecommendServiceTest {
     private StringRedisTemplate stringRedisTemplate;
     private RecommendCalculateService recommendCalculateService;
     private com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper userBehaviorMapper;
+    private com.pzhu.mall.modules.product.mapper.ReviewMapper reviewMapper;
     private RecommendService service;
 
     @BeforeAll
@@ -54,12 +55,16 @@ class RecommendServiceTest {
         stringRedisTemplate = mock(StringRedisTemplate.class);
         recommendCalculateService = mock(RecommendCalculateService.class);
         userBehaviorMapper = mock(com.pzhu.mall.modules.behavior.mapper.UserBehaviorMapper.class);
+        // 2dff4dd 为 RecommendService 新增 ReviewMapper 依赖（评分聚合），测试须同步注入；
+        // 服务端对 selectAvgRatingByProductIds 返回值已做 null/空判，Mockito 默认返回即可。
+        reviewMapper = mock(com.pzhu.mall.modules.product.mapper.ReviewMapper.class);
         service = new RecommendService();
         inject(service, "recommendResultMapper", recommendResultMapper);
         inject(service, "productMapper", productMapper);
         inject(service, "stringRedisTemplate", stringRedisTemplate);
         inject(service, "recommendCalculateService", recommendCalculateService);
         inject(service, "userBehaviorMapper", userBehaviorMapper);
+        inject(service, "reviewMapper", reviewMapper);
     }
 
     // ==================== guessYouLike（猜你喜欢） ====================

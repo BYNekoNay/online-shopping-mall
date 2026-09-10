@@ -91,10 +91,13 @@ class BehaviorControllerTest {
 
     @Test
     void recommendExposure_delegates() {
-        // BC-05：推荐位曝光
+        // BC-05：推荐位曝光。
+        // 2dff4dd 起 recommendExposure 为 best-effort 语义：source/productIds 缺失时静默忽略，
+        // 故本用例必须携带完整 source + productIds 才会真正委托到 behaviorService。
         LoginUserContext.set(100L, 1);
         var dto = new com.pzhu.mall.modules.behavior.dto.RecommendExposureDTO();
         dto.setSource("home-guess");
+        dto.setProductIds(java.util.List.of(1L, 2L));
 
         controller.recommendExposure(dto);
 
