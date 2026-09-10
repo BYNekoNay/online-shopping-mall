@@ -141,13 +141,18 @@ function getFirstImage(row) {
   if (trimmed.startsWith('[')) {
     try {
       const arr = JSON.parse(trimmed)
-      if (Array.isArray(arr) && arr.length) return String(arr[0] || '').trim()
+      // 只要成功解析出数组就必须在本分支闭环返回：
+      // 空数组返回 ''（调用方据此渲染占位图），绝不落到下面的逗号分隔分支
+      if (Array.isArray(arr)) {
+        return arr.length ? String(arr[0] ?? '').trim() : ''
+      }
     } catch {
       // JSON 解析失败 → 回退到逗号分隔
     }
   }
-  // 逗号分隔取第一张
-  return trimmed.split(',')[0].trim() || ''
+  // 逗号分隔取第一张；先剥掉首尾方括号，兼容 '[a.jpg,b.jpg]' 这类非法 JSON 形态
+  const fallback = trimmed.replace(/^\[|\]$/g, '').trim()
+  return fallback.split(',')[0].trim() || ''
 }
 </script>
 

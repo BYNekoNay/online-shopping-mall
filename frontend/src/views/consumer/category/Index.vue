@@ -6,7 +6,7 @@
         v-for="cat in categories"
         :key="cat.id"
         class="category-item"
-        :class="{ active: selectedCategoryId === cat.id }"
+        :class="{ active: selectedCategoryId === String(cat.id) }"
         @click="selectCategory(cat.id)"
       >
         <span class="item-emoji">{{ categoryEmoji(cat.name) }}</span>
@@ -71,20 +71,26 @@ async function loadProducts(categoryId) {
   }
 }
 
+// 分类 ID 口径统一为字符串：19 位雪花 ID 经 Number() 会丢精度（docs/08 §3.7），
+// 且模板用严格相等比较高亮，两侧必须同型，否则小整数分类高亮失效。
 function selectCategory(id) {
-  selectedCategoryId.value = id
-  loadProducts(id)
+  const sid = id === null || id === undefined || id === '' ? null : String(id)
+  selectedCategoryId.value = sid
+  loadProducts(sid)
 }
 
 // FRONT-03 修复：首页分类卡片跳转 /category?id=xx 后，分类页需读取 query.id 并定位到该分类
 function applyQueryCategory() {
-  const id = route.query.id
-  if (id !== undefined && id !== null && id !== '') {
-    const num = Number(id)
-    if (Number.isFinite(num) && num > 0) {
-      selectCategory(num)
-      return
-    }
+  const raw = route.query.id
+  // 保留字符串原值：19 位雪花 ID 经 Number() 会丢精度（docs/08 §3.7）
+  const sid = raw === undefined || raw === null || raw === '' ? null : String(raw)
+  // 正整数 ID 校验：容忍前导零，但排除 '0'/'00' 等全零输入——旧逻辑 Number('0') > 0 为假，
+  // 应回落"全部商品"而非带 categoryId=0 请求。
+  if (sid !== null && /^0*[1-9]\d*$/.test(sid)) {
+    // 归一化前导零：'03'/'003' → '3'，保证与模板 String(cat.id) 的严格相等比较同型同值，
+    // 否则会「带 categoryId 请求筛选了商品，但侧边栏不高亮、header 显示全部商品」自相矛盾。
+    selectCategory(sid.replace(/^0+/, ''))
+    return
   }
   // 无有效 query 时展示全部商品
   selectedCategoryId.value = null
