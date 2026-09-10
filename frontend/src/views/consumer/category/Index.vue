@@ -13,23 +13,34 @@
         {{ cat.name }}
       </div>
     </div>
-    <div class="product-area">
+    <div class="product-area" ref="productAreaRef">
       <div class="selected-header">
         <h3>{{ currentCategoryName || '全部商品' }}</h3>
-        <span class="header-count">{{ products.length }} 件商品</span>
+        <!-- A1：展示后端真实总数（total），而非当前页加载条数 products.length -->
+        <span class="header-count">{{ total }} 件商品</span>
       </div>
       <el-row :gutter="20">
         <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in products" :key="item.id" style="margin-bottom: 20px">
           <ProductCard :item="item" />
         </el-col>
       </el-row>
+      <!-- A2：商品列表分页（任务书「商品浏览-商品列表（分页）」合规要求） -->
+      <el-pagination
+        v-if="total > 0"
+        :current-page="pageNum"
+        :page-size="pageSize"
+        :total="total"
+        layout="prev, pager, next"
+        style="margin-top: 20px; justify-content: center"
+        @current-change="handlePageChange"
+      />
       <el-empty v-if="products.length === 0 && selectedCategoryId" description="该分类下暂无商品" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import request from '@/api/product'
 import ProductCard from '@/components/ProductCard.vue'
@@ -40,6 +51,13 @@ const categories = ref([])
 const products = ref([])
 const selectedCategoryId = ref(null)
 const categoryNameMap = ref({})
+// A2：分页状态。pageSize 取 12（栅格 :xs="12" :sm="8" :md="6" :lg="6" 即 2/3/4 列，
+// 12 能被 2、3、4 整除，尾行不会出现残缺；此处相对 admin 的 10 属有意偏离）。
+const pageNum = ref(1)
+const pageSize = ref(12)
+const total = ref(0)
+// A2：商品区 DOM 引用，翻页后滚动回顶部使用
+const productAreaRef = ref(null)
 
 const currentCategoryName = computed(() => categoryNameMap.value[selectedCategoryId.value] || '')
 
@@ -60,15 +78,43 @@ async function loadCategories() {
   }
 }
 
-async function loadProducts(categoryId) {
+// A3：递归查找分类树（支持 children 嵌套），ID 一律用字符串比较，
+// 避免 19 位雪花 ID 经 Number() 丢精度（docs/08 §3.7）。
+function findCategoryById(tree, id) {
+  if (!Array.isArray(tree)) return null
+  for (const c of tree) {
+    if (String(c.id) === String(id)) return c
+    if (c.children && c.children.length) {
+      const found = findCategoryById(c.children, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+async function loadProducts(categoryId = selectedCategoryId.value) {
   try {
-    const params = {}
-    if (categoryId) params.categoryId = categoryId
+    const params = { pageNum: pageNum.value, pageSize: pageSize.value }
+    // categoryId 一律传字符串（docs/08 §3.7）
+    if (categoryId !== null && categoryId !== undefined && categoryId !== '') {
+      params.categoryId = String(categoryId)
+    }
     const data = await request.getProducts(params)
     products.value = data.records || data || []
+    // A1：取后端真实总数，缺失时回落当前页条数
+    total.value = data.total ?? data.records?.length ?? 0
   } catch {
     products.value = []
+    total.value = 0
   }
+}
+
+// A2：翻页处理——更新页码 → 重新加载 → 滚回商品区顶部
+async function handlePageChange(page) {
+  pageNum.value = page
+  await loadProducts()
+  await nextTick()
+  productAreaRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // 分类 ID 口径统一为字符串：19 位雪花 ID 经 Number() 会丢精度（docs/08 §3.7），
@@ -76,6 +122,8 @@ async function loadProducts(categoryId) {
 function selectCategory(id) {
   const sid = id === null || id === undefined || id === '' ? null : String(id)
   selectedCategoryId.value = sid
+  // A2：切换分类必须重置页码，否则从第 3 页切到只有 1 页的分类会得到空列表
+  pageNum.value = 1
   loadProducts(sid)
 }
 
@@ -89,12 +137,16 @@ function applyQueryCategory() {
   if (sid !== null && /^0*[1-9]\d*$/.test(sid)) {
     // 归一化前导零：'03'/'003' → '3'，保证与模板 String(cat.id) 的严格相等比较同型同值，
     // 否则会「带 categoryId 请求筛选了商品，但侧边栏不高亮、header 显示全部商品」自相矛盾。
-    selectCategory(sid.replace(/^0+/, ''))
-    return
+    const normalized = sid.replace(/^0+/, '')
+    // A3：校验分类 ID 是否真实存在于分类树中。不存在则视为无效筛选，回落「全部商品」，
+    // 避免 header 回落到「全部商品」而列表为空 + el-empty 提示「该分类下暂无商品」的自相矛盾。
+    if (findCategoryById(categories.value, normalized)) {
+      selectCategory(normalized)
+      return
+    }
   }
-  // 无有效 query 时展示全部商品
-  selectedCategoryId.value = null
-  loadProducts()
+  // 无有效 query 或分类不存在时展示全部商品
+  selectCategory(null)
 }
 
 onMounted(async () => {

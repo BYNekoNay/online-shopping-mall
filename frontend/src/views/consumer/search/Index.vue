@@ -8,14 +8,14 @@
           placeholder="搜索商品"
           clearable
           size="large"
-          @keyup.enter="doSearch"
-          @clear="doSearch"
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
           <template #append>
-            <el-button type="primary" @click="doSearch">搜索</el-button>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
           </template>
         </el-input>
       </div>
@@ -38,7 +38,7 @@
     <!-- 排序与筛选 -->
     <div class="search-filters">
       <span class="filter-label">排序：</span>
-      <el-radio-group v-model="sort" @change="doSearch">
+      <el-radio-group v-model="sort" @change="handleSearch">
         <el-radio-button label="sales">销量</el-radio-button>
         <el-radio-button label="price_asc">价格升序</el-radio-button>
         <el-radio-button label="price_desc">价格降序</el-radio-button>
@@ -63,17 +63,29 @@
         placeholder="最高价"
         class="price-input"
       />
-      <el-button type="primary" plain size="small" style="margin-left: 8px" @click="doSearch">筛选</el-button>
+      <el-button type="primary" plain size="small" style="margin-left: 8px" @click="handleSearch">筛选</el-button>
     </div>
 
     <!-- 结果列表 -->
     <div class="search-results">
+      <!-- B：展示匹配总数（与分类页口径一致，data.total） -->
+      <div v-if="total > 0" class="results-summary">共 {{ total }} 件商品</div>
       <el-row :gutter="20">
         <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="item in results" :key="item.id" style="margin-bottom: 20px">
           <ProductCard :item="item" />
         </el-col>
       </el-row>
       <el-empty v-if="!searching && results.length === 0" description="暂无搜索结果" />
+      <!-- B：搜索结果分页（pageSize=12，与分类页一致） -->
+      <el-pagination
+        v-if="total > 0"
+        :current-page="pageNum"
+        :page-size="pageSize"
+        :total="total"
+        layout="prev, pager, next"
+        style="margin-top: 20px; justify-content: center"
+        @current-change="handlePageChange"
+      />
     </div>
   </div>
 </template>
@@ -97,6 +109,10 @@ const minPrice = ref(null)
 const maxPrice = ref(null)
 const results = ref([])
 const searching = ref(false)
+// B：分页状态。pageSize 取 12（栅格 2/3/4 列均整除，尾行不残缺；与分类页一致）。
+const pageNum = ref(1)
+const pageSize = ref(12)
+const total = ref(0)
 // D-3 搜索历史
 const searchHistory = ref([])
 
@@ -107,15 +123,33 @@ async function doSearch() {
       keyword: keyword.value,
       sort: sort.value,
       minPrice: minPrice.value ?? undefined,
-      maxPrice: maxPrice.value ?? undefined
+      maxPrice: maxPrice.value ?? undefined,
+      pageNum: pageNum.value,
+      pageSize: pageSize.value
     })
     results.value = data.records || data || []
+    // B：取后端真实总数，缺失时回落当前页条数
+    total.value = data.total ?? data.records?.length ?? 0
     loadHistory()
   } catch {
     results.value = []
+    total.value = 0
   } finally {
     searching.value = false
   }
+}
+
+// B：用户主动发起搜索（关键词/排序/价格变化）时，页码必须重置为 1，
+// 否则会带着旧页码请求到空结果页。
+function handleSearch() {
+  pageNum.value = 1
+  doSearch()
+}
+
+// B：翻页处理——仅更新页码后加载，不重置页码
+function handlePageChange(page) {
+  pageNum.value = page
+  doSearch()
 }
 
 // D-3：加载搜索历史（登录用户）
@@ -131,7 +165,7 @@ async function loadHistory() {
 // 点击历史关键词回填并搜索
 function useHistoryKeyword(kw) {
   keyword.value = kw
-  doSearch()
+  handleSearch()
 }
 
 // 清空历史
@@ -144,7 +178,7 @@ async function clearHistory() {
 }
 
 if (route.query.keyword) {
-  doSearch()
+  handleSearch()
 } else {
   loadHistory()
 }
@@ -208,5 +242,10 @@ onMounted(() => {
 }
 .search-results {
   margin-top: 24px;
+}
+.results-summary {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #94a3b8;
 }
 </style>
