@@ -181,12 +181,12 @@ export default [
     response: () => ({ code: 0, message: 'success', data: { id: 3 } })
   },
   {
-    url: '/api/admin/dicts/:id(\\d+)',
+    url: '/api/admin/system/dicts/:id(\\d+)',
     method: 'put',
     response: () => ({ code: 0, message: 'success', data: null })
   },
   {
-    url: '/api/admin/dicts/:id(\\d+)',
+    url: '/api/admin/system/dicts/:id(\\d+)',
     method: 'delete',
     response: () => ({ code: 0, message: 'success', data: null })
   },
