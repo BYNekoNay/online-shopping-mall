@@ -83,6 +83,46 @@ class MerchantStatisticsServiceTest {
         assertTrue(sqlSegment.contains("status") && sqlSegment.contains("IN"));
     }
 
+    @Test
+    void getTopProducts_noOrderItems_returnsEmptyWithoutEmptyIn() {
+        // 线上实锤修复（code 10005 / IN ()）：商家有订单但名下无任何订单明细（零销量）时，
+        // 不得把空集合拼进 IN () 触发 SQLSyntaxErrorException，应直接返回空结果
+        Order order = new Order();
+        order.setId(1L);
+        order.setShopId(1L);
+        order.setStatus(1);
+        when(orderMapper.selectList(any())).thenReturn(Collections.singletonList(order));
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        List<Map<String, Object>> top = service.getTopProducts(1L);
+
+        assertTrue(top.isEmpty());
+        verify(reviewMapper, never()).selectList(any());
+    }
+
+    @Test
+    void getTopProducts_allGiftItems_returnsEmptyWithoutEmptyIn() {
+        // 同上：明细全为赠品行时 salesByProduct 亦为空，同样不得拼进 IN ()
+        Order order = new Order();
+        order.setId(1L);
+        order.setShopId(1L);
+        order.setStatus(1);
+        when(orderMapper.selectList(any())).thenReturn(Collections.singletonList(order));
+
+        OrderItem gift = new OrderItem();
+        gift.setOrderId(1L);
+        gift.setProductId(99L);
+        gift.setPrice(BigDecimal.ZERO);
+        gift.setQuantity(1);
+        gift.setIsGift(1);
+        when(orderItemMapper.selectList(any())).thenReturn(Collections.singletonList(gift));
+
+        List<Map<String, Object>> top = service.getTopProducts(1L);
+
+        assertTrue(top.isEmpty());
+        verify(reviewMapper, never()).selectList(any());
+    }
+
     private static void inject(Object target, String fieldName, Object value) {
         try {
             var field = target.getClass().getDeclaredField(fieldName);

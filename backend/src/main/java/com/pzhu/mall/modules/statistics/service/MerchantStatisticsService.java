@@ -157,6 +157,14 @@ public class MerchantStatisticsService {
             nameByProduct.putIfAbsent(pid, item.getProductNameSnapshot());
         }
 
+        // IN 空集合防御：若该商家名下订单明细为空（或全部为赠品行），
+        // salesByProduct 为空集合，直接返回空结果，避免把空集合拼进
+        // IN () 触发 SQLSyntaxErrorException（线上实锤：商家零销量时
+        // /api/merchant/statistics/top-products 返回 code 10005）
+        if (salesByProduct.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
         // B-3：批量加载 TOP10 商品的评价，计算好评率（评分≥4 占比；无评价 → null）
         List<Long> topProductIds = salesByProduct.entrySet().stream()
                 .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
