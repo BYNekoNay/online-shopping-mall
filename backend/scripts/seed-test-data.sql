@@ -1,40 +1,58 @@
 -- ============================================================
 -- 完整测试数据脚本
--- 覆盖：用户、店铺、商品、SKU、地址、优惠券、促销、
+-- 覆盖：用户、店铺、运费模板、商品、SKU、地址、优惠券、促销、
 --       购物车、订单、支付、物流、评价、积分、行为、推荐
--- 执行前会清空所有业务表数据（保留表结构）
+-- 执行前会 TRUNCATE 所有业务表（保留表结构，并重置 AUTO_INCREMENT）
 -- 适用于 MySQL 8.0+
 -- 使用方式：mysql -uroot -p mall < seed-test-data.sql
+--
+-- ⚠️ 执行须知（重要）：
+-- 1. 本脚本必须整体执行，不可放在用户事务内重放——
+--    TRUNCATE 属于 DDL，会隐式提交（implicit commit），事务内部分回滚无效。
+-- 2. TRUNCATE 会把 AUTO_INCREMENT 计数器重置回 1，orders 将得到 id=1~10，
+--    与下方 order_item/payment/logistics/refund/review/points_record
+--    硬编码的 order_id=1~10 对齐（脚本的设计意图）。请勿改用 DELETE
+--    清理 orders（DELETE 不重置自增计数器，会导致子表外键全部成为孤儿）。
+-- 3. 订单实际覆盖 status 0~6（0-待付款, 1-待发货, 2-已发货, 3-已收货,
+--    4-已完成, 5-已取消, 6-退款中），不覆盖 7-已退款；
+--    其中 status=0（待付款）的 2 笔订单（order_no 20260701001、20260703001）
+--    会被系统每分钟的订单超时自动取消任务（OrderTimeoutTask）回收为
+--    status=5（已取消）——这是系统正常行为，本脚本不处理，属预期现象。
 -- ============================================================
 
 USE mall;
 
 -- ============================================================
--- 0. 清理已有数据（按外键依赖顺序反向删除）
+-- 0. 清理已有数据（按外键依赖顺序反向 TRUNCATE）
+--    使用 TRUNCATE 而非 DELETE：TRUNCATE 会重置 AUTO_INCREMENT 计数器，
+--    保证 orders 重放后得到 id=1~10，与子表硬编码 order_id 对齐；
+--    TRUNCATE 属 DDL 会隐式提交，故本脚本不可在事务内执行（见头部说明）。
 -- ============================================================
-DELETE FROM page_view_log;
-DELETE FROM search_history;
-DELETE FROM recommend_result;
-DELETE FROM user_score;
-DELETE FROM user_behavior;
-DELETE FROM points_record;
-DELETE FROM review;
-DELETE FROM refund;
-DELETE FROM order_item;
-DELETE FROM logistics;
-DELETE FROM payment;
-DELETE FROM orders;
-DELETE FROM cart;
-DELETE FROM user_coupon;
-DELETE FROM promotion;
-DELETE FROM coupon;
-DELETE FROM address;
-DELETE FROM sku;
-DELETE FROM product;
-DELETE FROM freight_template;
-DELETE FROM shop;
-DELETE FROM operation_log;
-DELETE FROM user;
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE page_view_log;
+TRUNCATE TABLE search_history;
+TRUNCATE TABLE recommend_result;
+TRUNCATE TABLE user_score;
+TRUNCATE TABLE user_behavior;
+TRUNCATE TABLE points_record;
+TRUNCATE TABLE review;
+TRUNCATE TABLE refund;
+TRUNCATE TABLE order_item;
+TRUNCATE TABLE logistics;
+TRUNCATE TABLE payment;
+TRUNCATE TABLE orders;
+TRUNCATE TABLE cart;
+TRUNCATE TABLE user_coupon;
+TRUNCATE TABLE promotion;
+TRUNCATE TABLE coupon;
+TRUNCATE TABLE address;
+TRUNCATE TABLE sku;
+TRUNCATE TABLE product;
+TRUNCATE TABLE freight_template;
+TRUNCATE TABLE shop;
+TRUNCATE TABLE operation_log;
+TRUNCATE TABLE user;
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
 -- 1. BCrypt 密码常量（H-11 修复：轮换弱口令）
@@ -83,42 +101,56 @@ INSERT INTO `shop` (`id`, `merchant_user_id`, `name`, `logo`, `description`, `le
 (2, 21, 'FashionStore',    '/images/shop/fashion.png',  '时尚潮流服饰精品店',   1, 1, '李四', '13900000002', 'LIC2024002', '/images/license/fashion.jpg', '主营服装鞋帽');
 
 -- ============================================================
+-- 3.1 运费模板（依据 docs/10-数据库规范.md §2.2 freight_template 表结构
+--     与 §2.2.1 省份-大区映射表；id 不显式指定，走 AUTO_INCREMENT，
+--     避免重蹈 orders 自增计数器覆辙）
+--     region_rule_json 未列出的大区按 default_fee 计算（见 §2.2）
+-- ============================================================
+INSERT INTO `freight_template` (`shop_id`, `name`, `region_rule_json`, `free_shipping_threshold`, `default_fee`) VALUES
+(1, 'DigitalStore 默认运费模板',
+ '[{"region":"华东","fee":8},{"region":"华南","fee":10},{"region":"华北","fee":10},{"region":"华中","fee":10},{"region":"西南","fee":12},{"region":"西北","fee":15},{"region":"东北","fee":15},{"region":"港澳台","fee":30}]',
+ 4999.00, 12.00),
+(2, 'FashionStore 默认运费模板',
+ '[{"region":"华东","fee":6},{"region":"华南","fee":8},{"region":"华北","fee":8},{"region":"华中","fee":8},{"region":"西南","fee":10},{"region":"西北","fee":12},{"region":"东北","fee":12},{"region":"港澳台","fee":25}]',
+ 199.00, 10.00);
+
+-- ============================================================
 -- 4. 商品（上架状态）
 -- ============================================================
 INSERT INTO `product` (`id`, `shop_id`, `category_id`, `name`, `main_image`, `images`, `detail`,
                         `price`, `original_price`, `stock`, `sales`, `status`) VALUES
 -- DigitalStore 商品 (shop_id=1)
-(100, 1, 7, 'Laptop Pro 15 高性能笔记本',        '/images/p100.jpg',  '["/images/p100_1.jpg","/images/p100_2.jpg"]',  '15.6英寸 4K屏 i9-13900H 32GB 1TB SSD',              5999.00, 6999.00, 100, 50, 1),
-(101, 1, 7, 'Laptop Air 14 轻薄办公本',          '/images/p101.jpg',  '["/images/p101_1.jpg","/images/p101_2.jpg"]',  '14英寸 2.5K屏 i7-1360P 16GB 512GB SSD',             4299.00, 4999.00, 80,  30, 1),
-(102, 1, 6, 'Tablet Pro 12.9 平板电脑',           '/images/p102.jpg',  '["/images/p102_1.jpg"]',                       '12.9英寸 M2芯片 256GB Wi-Fi版',                      5499.00, 6499.00, 60,  25, 1),
-(103, 1, 8, '降噪蓝牙耳机 ANC Pro',              '/images/p103.jpg',  '["/images/p103_1.jpg"]',                       '主动降噪 40dB 蓝牙5.3 30小时续航',                   899.00,  1299.00, 200, 120, 1),
-(104, 1, 8, '智能蓝牙音箱 SoundPlus',            '/images/p104.jpg',  '["/images/p104_1.jpg"]',                       '360°环绕立体声 智能语音助手 IPX7防水',               299.00,  399.00,  150, 60,  1),
-(105, 1, 6, '旗舰手机 X1 5G',                    '/images/p105.jpg',  '["/images/p105_1.jpg","/images/p105_2.jpg"]',  '骁龙8Gen3 12GB+256GB 5000mAh 120W快充',             3999.00, 4599.00, 50,  80,  1),
-(106, 1, 6, '性价比手机 Lite 5G',                 '/images/p106.jpg',  '["/images/p106_1.jpg"]',                       '天玑8200 8GB+128GB 4800mAh 67W快充',                1999.00, 2299.00, 120, 150, 1),
+(100, 1, 7, 'Laptop Pro 15 高性能笔记本',        '/images/p100.jpg',  '["/images/p100.jpg"]',  '15.6英寸 4K屏 i9-13900H 32GB 1TB SSD',              5999.00, 6999.00, 100, 50, 1),
+(101, 1, 7, 'Laptop Air 14 轻薄办公本',          '/images/p101.jpg',  '["/images/p101.jpg"]',  '14英寸 2.5K屏 i7-1360P 16GB 512GB SSD',             4299.00, 4999.00, 80,  30, 1),
+(102, 1, 6, 'Tablet Pro 12.9 平板电脑',           '/images/p102.jpg',  '["/images/p102.jpg"]',                       '12.9英寸 M2芯片 256GB Wi-Fi版',                      5499.00, 6499.00, 60,  25, 1),
+(103, 1, 8, '降噪蓝牙耳机 ANC Pro',              '/images/p103.jpg',  '["/images/p103.jpg"]',                       '主动降噪 40dB 蓝牙5.3 30小时续航',                   899.00,  1299.00, 200, 120, 1),
+(104, 1, 8, '智能蓝牙音箱 SoundPlus',            '/images/p104.jpg',  '["/images/p104.jpg"]',                       '360°环绕立体声 智能语音助手 IPX7防水',               299.00,  399.00,  150, 60,  1),
+(105, 1, 6, '旗舰手机 X1 5G',                    '/images/p105.jpg',  '["/images/p105.jpg"]',  '骁龙8Gen3 12GB+256GB 5000mAh 120W快充',             3999.00, 4599.00, 50,  80,  1),
+(106, 1, 6, '性价比手机 Lite 5G',                 '/images/p106.jpg',  '["/images/p106.jpg"]',                       '天玑8200 8GB+128GB 4800mAh 67W快充',                1999.00, 2299.00, 120, 150, 1),
 -- FashionStore 商品 (shop_id=2)
-(107, 2, 9, '纯棉经典圆领T恤',                    '/images/p107.jpg',  '["/images/p107_1.jpg","/images/p107_2.jpg"]',  '100%纯棉 舒适透气 多色可选',                         99.00,   159.00,  500, 300, 1),
-(108, 2, 9, '修身弹力牛仔裤',                     '/images/p108.jpg',  '["/images/p108_1.jpg"]',                       '弹力面料 修身版型 经典五袋款',                       199.00,  299.00,  200, 100, 1),
-(109, 2, 10,'碎花连衣裙 夏季新款',                '/images/p109.jpg',  '["/images/p109_1.jpg"]',                       '轻盈雪纺面料 碎花印花 收腰设计',                     259.00,  399.00,  80,  60,  1),
-(110, 2, 11,'休闲百搭运动鞋',                     '/images/p110.jpg',  '["/images/p110_1.jpg","/images/p110_2.jpg"]',  '透气网面 EVA缓震底 轻便舒适',                       359.00,  499.00,  100, 90,  1),
-(111, 2, 9, '男士休闲夹克外套',                   '/images/p111.jpg',  '["/images/p111_1.jpg"]',                       '春秋薄款 防风面料 简约设计',                         299.00,  459.00,  60,  40,  1),
-(112, 2, 11,'专业缓震跑步鞋',                     '/images/p112.jpg',  '["/images/p112_1.jpg"]',                       '全掌气垫 透气飞织 专业跑步',                         499.00,  699.00,  70,  55,  1);
+(107, 2, 9, '纯棉经典圆领T恤',                    '/images/p107.jpg',  '["/images/p107.jpg"]',  '100%纯棉 舒适透气 多色可选',                         99.00,   159.00,  500, 300, 1),
+(108, 2, 9, '修身弹力牛仔裤',                     '/images/p108.jpg',  '["/images/p108.jpg"]',                       '弹力面料 修身版型 经典五袋款',                       199.00,  299.00,  200, 100, 1),
+(109, 2, 10,'碎花连衣裙 夏季新款',                '/images/p109.jpg',  '["/images/p109.jpg"]',                       '轻盈雪纺面料 碎花印花 收腰设计',                     259.00,  399.00,  80,  60,  1),
+(110, 2, 11,'休闲百搭运动鞋',                     '/images/p110.jpg',  '["/images/p110.jpg"]',  '透气网面 EVA缓震底 轻便舒适',                       359.00,  499.00,  100, 90,  1),
+(111, 2, 9, '男士休闲夹克外套',                   '/images/p111.jpg',  '["/images/p111.jpg"]',                       '春秋薄款 防风面料 简约设计',                         299.00,  459.00,  60,  40,  1),
+(112, 2, 11,'专业缓震跑步鞋',                     '/images/p112.jpg',  '["/images/p112.jpg"]',                       '全掌气垫 透气飞织 专业跑步',                         499.00,  699.00,  70,  55,  1);
 
 -- ============================================================
 -- 5. SKU 规格
 -- ============================================================
 INSERT INTO `sku` (`product_id`, `spec_json`, `price`, `stock`, `image`) VALUES
-(100, '{"color":"深空灰","storage":"256GB"}', 5999.00, 50, '/images/sku/100_gray_256.jpg'),
-(100, '{"color":"银色","storage":"512GB"}',   6999.00, 30, '/images/sku/100_silver_512.jpg'),
-(101, '{"color":"深空灰","storage":"512GB"}', 4799.00, 40, '/images/sku/101_gray_512.jpg'),
-(101, '{"color":"金色","storage":"256GB"}',   4299.00, 40, '/images/sku/101_gold_256.jpg'),
-(105, '{"color":"黑色","storage":"128GB"}',   1999.00, 60, '/images/sku/105_black_128.jpg'),
-(105, '{"color":"蓝色","storage":"256GB"}',   2299.00, 40, '/images/sku/105_blue_256.jpg'),
-(106, '{"color":"白色","storage":"128GB"}',   2199.00, 50, '/images/sku/106_white_128.jpg'),
-(107, '{"size":"M","color":"白色"}',           99.00, 200, '/images/sku/107_white_m.jpg'),
-(107, '{"size":"L","color":"白色"}',           99.00, 150, '/images/sku/107_white_l.jpg'),
-(107, '{"size":"XL","color":"黑色"}',         109.00, 100, '/images/sku/107_black_xl.jpg'),
-(108, '{"size":"29","color":"深蓝"}',         199.00,  80, '/images/sku/108_blue_29.jpg'),
-(108, '{"size":"30","color":"深蓝"}',         199.00, 120, '/images/sku/108_blue_30.jpg');
+(100, '{"color":"深空灰","storage":"256GB"}', 5999.00, 50, '/images/p100.jpg'),
+(100, '{"color":"银色","storage":"512GB"}',   6999.00, 30, '/images/p100.jpg'),
+(101, '{"color":"深空灰","storage":"512GB"}', 4799.00, 40, '/images/p101.jpg'),
+(101, '{"color":"金色","storage":"256GB"}',   4299.00, 40, '/images/p101.jpg'),
+(105, '{"color":"黑色","storage":"128GB"}',   1999.00, 60, '/images/p105.jpg'),
+(105, '{"color":"蓝色","storage":"256GB"}',   2299.00, 40, '/images/p105.jpg'),
+(106, '{"color":"白色","storage":"128GB"}',   2199.00, 50, '/images/p106.jpg'),
+(107, '{"size":"M","color":"白色"}',           99.00, 200, '/images/p107.jpg'),
+(107, '{"size":"L","color":"白色"}',           99.00, 150, '/images/p107.jpg'),
+(107, '{"size":"XL","color":"黑色"}',         109.00, 100, '/images/p107.jpg'),
+(108, '{"size":"29","color":"深蓝"}',         199.00,  80, '/images/p108.jpg'),
+(108, '{"size":"30","color":"深蓝"}',         199.00, 120, '/images/p108.jpg');
 
 -- ============================================================
 -- 6. 收货地址
@@ -186,9 +218,11 @@ INSERT INTO `cart` (`user_id`, `product_id`, `sku_id`, `quantity`, `selected`) V
 (6,  100, 1,    1, 0);   -- user5 未选中笔记本
 
 -- ============================================================
--- 11. 订单数据（覆盖所有状态）
+-- 11. 订单数据（覆盖 status 0~6，不覆盖 7-已退款）
 --    0-待付款, 1-待发货, 2-已发货, 3-已收货, 4-已完成,
 --    5-已取消, 6-退款中, 7-已退款
+--    注意：status=0（待付款）的 2 笔订单会被系统每分钟自动取消任务
+--    （OrderTimeoutTask）回收为 status=5，属系统正常行为，非脚本缺陷。
 -- ============================================================
 INSERT INTO `orders` (`order_no`, `user_id`, `shop_id`, `total_amount`, `freight_amount`, `discount_amount`, `pay_amount`, `status`, `address_snapshot`, `pay_type`, `pay_time`, `remark`, `create_time`) VALUES
 -- user1 订单
@@ -260,10 +294,10 @@ INSERT INTO `logistics` (`order_id`, `company`, `company_code`, `tracking_no`, `
 -- 15. 评价数据
 -- ============================================================
 INSERT INTO `review` (`order_item_id`, `user_id`, `product_id`, `rating`, `content`, `images`, `create_time`) VALUES
-(3, 2, 100, 5, '很棒的笔记本！性能强劲，屏幕显示效果非常好',        '["/images/review/100_1.jpg"]', NOW() - INTERVAL 6 DAY),
+(3, 2, 100, 5, '很棒的笔记本！性能强劲，屏幕显示效果非常好',        NULL, NOW() - INTERVAL 6 DAY),
 (12, 5, 103, 4, '降噪效果不错，佩戴舒适，就是续航可以再长点',     NULL, NOW() - INTERVAL 20 DAY),
 (1, 2, 100, 5, '第二次购买了，送朋友的',                          NULL, NOW() - INTERVAL 5 DAY),
-(2, 2, 103, 4, '音质好，降噪效果满意',                           '["/images/review/103_1.jpg"]', NOW() - INTERVAL 5 DAY);
+(2, 2, 103, 4, '音质好，降噪效果满意',                           NULL, NOW() - INTERVAL 5 DAY);
 
 -- ============================================================
 -- 16. 退款申请
